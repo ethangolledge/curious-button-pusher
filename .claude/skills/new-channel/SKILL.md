@@ -1,6 +1,6 @@
 ---
 name: new-channel
-description: Set someone up from nothing and build their channel with them, as a conversation in stages - their computer, their OpenRouter key, optional Google Cloud, then every part of the channel (its storytelling voice, look, movement, feeling, narrator, music, subtitles, formats) - through to their first video. Use when the repository has no channel yet (themes/ holds only starter), when someone new arrives ("help me get started", "set me up", "I want my own channel"), when someone forks it, or wants to change what makes an existing channel distinctive.
+description: Set someone up from nothing and build their channel with them, as a conversation in stages - their computer, their OpenRouter key, optional safe keeping (a folder or Google Cloud), then every part of the channel (its storytelling voice, look, movement, feeling, narrator, music, subtitles, formats) - through to their first video. Use when the repository has no channel yet (themes/ holds only starter), when someone new arrives ("help me get started", "set me up", "I want my own channel"), when someone forks it, or wants to change what makes an existing channel distinctive.
 ---
 
 # Setting someone up, and building their channel
@@ -11,7 +11,7 @@ unmistakably theirs, and a first video.
 
 A channel is one private folder, `themes/<name>/`: its `theme.json` (every exact setting,
 explained one by one in `docs/theme-settings.md`), its `SKILL.md` (the channel in words, read by
-every creative agent), its `config.json` (which models it uses, its spending cap, its bucket),
+every creative agent), its `config.json` (which models it uses, its spending cap, where it is kept),
 its voice and music once locked, its taste data, and `notes/`. It is gitignored and never
 committed; only `themes/starter/` is shared. The engine in `src/` never changes for a channel.
 
@@ -44,7 +44,7 @@ committed; only `themes/starter/` is shared. The engine in `src/` never changes 
   works ("Your key works and has $9.80 on it.").
 - **Write down progress** in `themes/<name>/notes/setup.md` after each stage: what was
   decided and why, what is done, what is next. A later session (yours or another assistant's)
-  reads it and carries on. With a bucket, `content storage save-theme` after each stage too.
+  reads it and carries on. With a folder or bucket, `content storage save-theme` after each stage too.
 - **If something fails,** read the error, fix what you can, and explain the rest in plain
   words. `docs/getting-started.md` and `docs/google-cloud.md` list the usual problems.
 
@@ -107,29 +107,36 @@ left?") shows it all (`docs/spending.md`). Their Claude subscription is not trac
 
 **Check:** `content check` shows "OpenRouter key: works; $… left".
 
-## Stage 3: Keeping it safe in Google Cloud (optional, free tier, about 20 minutes)
+## Stage 3: Keeping it safe: a folder or Google Cloud (optional)
 
-Why, in their terms: without it, the channel and videos live only on this computer. With it,
-every change to the channel is kept with its history, every video is kept at each sign-off and
-when it finishes (never twice), and a new computer gets everything back. Free up to 5 GB (about
-25 long videos); Google asks for a card even so.
+Why, in their terms: without it, the channel and videos live only in the project folder. With
+it, every change to the channel is kept with its history, every video is kept at each sign-off
+and when it finishes (never twice), and another computer can get everything back. Offer the
+two ways, with your recommendation (`docs/storage.md`, "A folder or a bucket"):
 
-Ask whether to do it now or later (later is fine; stage 4 can add the bucket afterwards). If
-now, follow `docs/google-cloud.md`:
+- **A folder** (free, nothing to set up). Recommend it for anyone who wants to start quickly,
+  and suggest a folder that survives the computer: on an external disk, or in Dropbox, iCloud
+  Drive or OneDrive if they use one (`~/Dropbox/<channel>-archive`). `archive` inside the
+  project also works and is never committed, but dies with the computer: say so plainly.
+  Nothing to do now: stage 4 adds `--folder <it>`.
+- **Google Cloud** (free tier, about 20 minutes). Recommend it when they want it safe without
+  thinking about drives. Google asks for a card even so. Follow `docs/google-cloud.md`:
+  - They do steps 1–6: account, terms, project (note the project ID), billing with a $1 budget
+    alert, installing gcloud, and the two sign-ins in their own terminal.
+  - You do step 7, once the channel exists (stage 4): install the `cloud` extra, then
+    `content cloud setup --bucket <name> --config <channel>` (suggest a unique name like
+    `<channel>-videos-2026`). It checks their part (gcloud, both sign-ins, the project,
+    billing) and stops with the exact fix if one is missing; run it again once they have done
+    it. Then it turns on Cloud Storage, makes or corrects the bucket, connects the channel and
+    saves it.
+  - If any gcloud command hangs, it is the network quirk at the end of `docs/google-cloud.md`.
+  - Ask the amount of the budget alert they set, and record it after stage 4:
+    `content spend budget google-cloud <amount> --kind monthly --config <channel>`.
 
-- They do steps 1–6: account, terms, project (note the project ID), billing with a $1 budget
-  alert, installing gcloud, and the two sign-ins in their own terminal.
-- You do step 7, once the channel exists (stage 4): install the `cloud` extra, then
-  `content cloud setup --bucket <name> --config <channel>` (suggest a unique name like
-  `<channel>-videos-2026`). It checks their part (gcloud, both sign-ins, the project, billing)
-  and stops with the exact fix if one is missing; run it again once they have done it. Then it
-  turns on Cloud Storage, makes or corrects the bucket, connects the channel and saves it.
-- If any gcloud command hangs, it is the network quirk at the end of `docs/google-cloud.md`.
-- Ask the amount of the budget alert they set (and any free-trial credit Google gave them),
-  and record it after stage 4: `content spend budget google-cloud <amount> --kind monthly
-  --config <channel>`.
+Later is fine too: either can be added to the channel's `config.json` at any time.
 
-**Check (after stage 4):** `content check --config <channel>` shows "Bucket: … reachable".
+**Check (after stage 4):** `content check --config <channel>` shows "Storage: the folder …" or
+"Storage: the bucket … reachable".
 
 ## Stage 4: Name and create the channel (free)
 
@@ -137,7 +144,7 @@ Ask for the channel's name (the folder becomes lower case with hyphens: "Odd His
 `odd-history`). Then:
 
 ```bash
-content new-channel <name> [--bucket <their-bucket>]
+content new-channel <name> [--folder <their-folder>]   # a bucket is connected by cloud setup
 ```
 
 It copies the starter to `themes/<name>/` and writes `themes/<name>/config.json`. Tell them
@@ -261,7 +268,7 @@ Two ways:
   valid, and their channel carries a story from research to a finished package with stand-in
   models, every prompt and setting included.
 - `content check --config <channel>`: everything ready.
-- With a bucket: `content storage save-theme --config <channel>`.
+- With a folder or bucket: `content storage save-theme --config <channel>`.
 - Update `notes/setup.md`: setup done; what the channel is, in their words; what to revisit
   after the first video (tone, references, motion).
 
@@ -282,5 +289,5 @@ they want ("make a video about…", "change the narrator's pace", "set up a new 
 - `SKILL.md` describes their channel and has no real story from their plans in it.
 - The voice and music are locked, or deliberately left to presets and generation.
 - `themes/<name>/notes/setup.md` records what was decided and why.
-- With a bucket, the channel is saved (`content storage show themes/<name> --config …`).
+- With a folder or bucket, the channel is saved (`content storage show themes/<name> --config …`).
 - They know how to start the next video, and that the folder is private and never committed.

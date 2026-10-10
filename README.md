@@ -78,9 +78,10 @@ through the same steps. Every setting, with what it does and what changing it co
 [docs/theme-settings.md](docs/theme-settings.md). `content check --config
 themes/my-channel/config.json` says what is ready.
 
-Your channel folder is gitignored, so nothing of it reaches a public repository. To keep it safe
-beyond this machine, with its full history, keep it in your own Google Cloud bucket
-([docs/google-cloud.md](docs/google-cloud.md)): `content new-channel my-channel --bucket <your-bucket>`.
+Your channel folder is gitignored, so nothing of it reaches a public repository. To keep it safe,
+with its full history, give it a folder (`content new-channel my-channel --folder
+~/Dropbox/my-channel-archive`, free) or your own Google Cloud bucket
+([docs/google-cloud.md](docs/google-cloud.md)); [docs/storage.md](docs/storage.md) compares them.
 
 ## A Real Run
 
@@ -103,7 +104,8 @@ finished videos in a bucket).
 
 ## Bring Your Channel Back
 
-On a fresh clone or another machine, with your channel kept in a bucket:
+On a fresh clone or another machine, with your channel kept in a bucket (with a folder: skip
+the sign-in and pull with `--folder <folder>`):
 
 ```bash
 .venv/bin/pip install -e '.[live,learn,cloud,dev]'

@@ -204,11 +204,11 @@ def _connect(config_path: Path, bucket: str) -> Check:
 
 
 def _keep_first(config_path: Path) -> str:
-    from content.storage import GcsStore, describe, save_theme
+    from content.storage import describe, open_store, save_theme
 
     config = load_config(config_path)
     assert config.storage is not None
-    return describe(save_theme(GcsStore(config.storage.bucket), config.theme.root))
+    return describe(save_theme(open_store(config.storage), config.theme.root))
 
 
 def _hint(error: str) -> str:

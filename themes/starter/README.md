@@ -50,24 +50,29 @@ gitignored, never committed. Then edit, in this order:
 9. **`examples/`:** a made-up sample of a rejected script for `content eval`; replace it with
    your own channel's once a director has rejected one (`examples/README.md`).
 10. **Notes and safe keeping.** Write your channel's decisions in `notes/` so a later session can
-    pick them up. To keep the whole folder safe beyond this machine, with every earlier version,
-    and every video at each sign-off, give it a Google Cloud bucket (`docs/google-cloud.md`):
-    make a project with billing and sign in twice (`gcloud auth login`,
-    `gcloud auth application-default login`), then one command does the rest, safe to run
-    again:
+    pick them up. To keep the whole folder safe, with every earlier version, and every video at
+    each sign-off, give it somewhere to be kept (`docs/storage.md`):
 
-    ```bash
-    .venv/bin/pip install -e '.[cloud]'
-    .venv/bin/content cloud setup --bucket my-channel-videos-2026 --config themes/my-channel/config.json
-    ```
+    - **A folder**, free and with nothing to set up: add `"storage": {"folder":
+      "~/Dropbox/my-channel-archive"}` to `config.json` (or start with `content new-channel
+      my-channel --folder <it>`). A folder on an external or synced drive survives this
+      computer; `archive` in the project works too and is never committed, but does not.
+    - **A Google Cloud bucket** (`docs/google-cloud.md`): make a project with billing and sign
+      in twice (`gcloud auth login`, `gcloud auth application-default login`), then one command
+      does the rest, safe to run again:
+
+      ```bash
+      .venv/bin/pip install -e '.[cloud]'
+      .venv/bin/content cloud setup --bucket my-channel-videos-2026 --config themes/my-channel/config.json
+      ```
 
     From then on the channel is saved after every change, and
-    `content storage pull --bucket <bucket> --channel my-channel` brings it back on a fresh
-    clone.
+    `content storage pull --folder <folder> --channel my-channel` (or `--bucket <bucket>`)
+    brings it back on a fresh clone.
 11. **What you have and what you spend.** Every paid call is recorded in your channel's
     `spend.sqlite`; `content spend --config themes/my-channel/config.json` shows what this
-    channel has spent (by video and stage), what is left on your OpenRouter account, Google
-    Cloud storage against its free 5 GB, and warnings before a balance or key runs out
+    channel has spent (by video and stage), what is left on your OpenRouter account, how much
+    is kept (a bucket against its free 5 GB), and warnings before a balance or key runs out
     (`docs/spending.md`).
 
 Check it is all ready: `content check --config themes/my-channel/config.json` lists what is

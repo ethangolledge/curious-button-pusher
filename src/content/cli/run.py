@@ -25,8 +25,8 @@ from content.schemas.research import ResearchPack, SourceMaterial
 from content.schemas.review import ReviewRequest
 from content.state import ContentOutput
 from content.storage import (
-    GcsStore,
     archive_run,
+    open_store,
 )
 from content.workflow.records import (
     build_review_handoff,
@@ -237,11 +237,11 @@ def main(arguments: list[str]) -> int:
         folder.resume_file.write_text(review_handoff_to_json(handoff) + "\n", encoding="utf-8")
         folder.write_building_blocks(handoff)
         if config.storage is not None:
-            bucket = config.storage.bucket
-            # The run so far is kept in the bucket at every stop: building blocks, its
-            # saved state, and what has been signed off (never the working cache).
+            storage = config.storage
+            # The run so far is kept at every stop (in its bucket or folder): building blocks,
+            # its saved state, and what has been signed off (never the working cache).
             keep(
-                lambda: archive_run(GcsStore(bucket), folder.root),
+                lambda: archive_run(open_store(storage), folder.root),
                 f"content storage archive {folder.root}",
             )
 
@@ -314,9 +314,9 @@ def main(arguments: list[str]) -> int:
         else _write_results(state, result.error, session, folder)
     )
     if status == 0 and result.config.storage is not None:
-        bucket = result.config.storage.bucket
+        finished_in = result.config.storage
         keep(
-            lambda: archive_run(GcsStore(bucket), folder.root),
+            lambda: archive_run(open_store(finished_in), folder.root),
             f"content storage archive {folder.root}",
         )
     if result.config.learning is not None:

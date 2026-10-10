@@ -143,29 +143,40 @@ def _channel(config_path: Path | None) -> list[Check]:
         ]
     return [
         Check("Channel", "ready", f"{config.theme.spec.name}: settings, prompts and files load"),
-        *_bucket(config),
+        *_storage(config),
     ]
 
 
-def _bucket(config: ContentConfig) -> list[Check]:
+def _storage(config: ContentConfig) -> list[Check]:
     if config.storage is None:
         return [
             Check(
-                "Bucket",
+                "Storage",
                 "optional",
-                "none: the channel and its videos stay on this machine",
-                "To keep them safe with every version, see docs/google-cloud.md.",
+                "none: only the channel folder and run folders on this machine",
+                'Keep every version and every video: a folder (`"storage": {"folder": '
+                '"archive"}` in config.json) or Google Cloud (docs/google-cloud.md).',
             )
         ]
+    if config.storage.folder is not None:
+        return [_folder(config.storage.folder)]
     bucket = config.storage.bucket
+    assert bucket is not None
     if importlib.util.find_spec("google.cloud.storage") is None:
-        return [Check("Bucket", "missing", bucket, "`.venv/bin/pip install -e '.[cloud]'`")]
+        return [
+            Check(
+                "Storage",
+                "missing",
+                f"the bucket {bucket}",
+                "`.venv/bin/pip install -e '.[cloud]'`",
+            )
+        ]
     if not (os.environ.get("GOOGLE_APPLICATION_CREDENTIALS") or GOOGLE_SIGN_IN.is_file()):
         return [
             Check(
-                "Bucket",
+                "Storage",
                 "missing",
-                f"{bucket}: not signed in to Google",
+                f"the bucket {bucket}: not signed in to Google",
                 "In a terminal of your own (not inside Claude Code): "
                 "`gcloud auth application-default login` (docs/google-cloud.md).",
             )
@@ -174,9 +185,9 @@ def _bucket(config: ContentConfig) -> list[Check]:
     if reached is None:
         return [
             Check(
-                "Bucket",
+                "Storage",
                 "missing",
-                f"{bucket}: no answer in {BUCKET_SECONDS:.0f} s",
+                f"the bucket {bucket}: no answer in {BUCKET_SECONDS:.0f} s",
                 "Your network may block Google's metadata lookup: see the quirk at the end of "
                 "docs/google-cloud.md.",
             )
@@ -184,14 +195,37 @@ def _bucket(config: ContentConfig) -> list[Check]:
     if isinstance(reached, Exception):
         return [
             Check(
-                "Bucket",
+                "Storage",
                 "missing",
-                f"{bucket}: {type(reached).__name__}: {reached}",
+                f"the bucket {bucket}: {type(reached).__name__}: {reached}",
                 "Check the bucket's name in the channel's config.json, and that your Google "
                 "account owns it (docs/google-cloud.md).",
             )
         ]
-    return [Check("Bucket", "ready", f"{bucket}: reachable, {reached} kept")]
+    return [Check("Storage", "ready", f"the bucket {bucket}: reachable, {reached} kept")]
+
+
+def _folder(folder: Path) -> Check:
+    from content.storage import LocalStore, kept
+
+    if folder.is_dir():
+        return Check(
+            "Storage", "ready", f"the folder {folder}: {len(kept(LocalStore(folder)))} kept"
+        )
+    if not os.access(_existing_parent(folder), os.W_OK):
+        return Check(
+            "Storage",
+            "missing",
+            f"the folder {folder} cannot be made here",
+            "Choose another folder.",
+        )
+    return Check("Storage", "ready", f"the folder {folder}: made at the first save")
+
+
+def _existing_parent(path: Path) -> Path:
+    while not path.exists():
+        path = path.parent
+    return path
 
 
 def _list_bucket(bucket: str) -> int:

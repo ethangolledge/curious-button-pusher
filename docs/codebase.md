@@ -28,7 +28,7 @@ agents/       the roles that write: one folder each, agent.py + prompt.md (+ <jo
 production/   from storyboard to finished cut: five stages on one shared studio
 learning/     the taste models that learn from a person's decisions
 review/       the person's side: the file reviewer, sign-off cards, the run folder, the page
-storage.py    permanent storage in the person's bucket
+storage.py    permanent storage: the person's folder or bucket
 workflow/     the graph (the only topology), routing, gates, review requests, running a run
 cli/          one module per command group
 __main__.py   dispatch only
@@ -54,7 +54,7 @@ Every file in `src/content`.
 | `theme.py` | `Theme` and its spec, prompt building, spoken text, `new_theme` | `themes/<name>/theme.json` is the data |
 | `state.py` | the graph state (`ContentState`), its reducers, `CallRecord` and `call_record` | Judgements, decisions, calls and events append; assets merge per key; everything else replaces |
 | `spend.py` | the channel's spending ledger (`spend.sqlite`): every paid call, what the person said they have, each provider's own figures, and the calibration between them | Plain SQL; calls no provider ([spending.md](spending.md)) |
-| `storage.py` | the person's bucket: runs in progress and finished under their own names (finishing moves a run, never keeping both), and the channel folder by hash, with every version | [storage.md](storage.md) |
+| `storage.py` | the archive (a folder, `LocalStore`, or a bucket, `GcsStore`): runs in progress and finished under their own names (finishing moves a run, never keeping both), and the channel folder by hash, with every version | [storage.md](storage.md) |
 
 ### Providers (`providers/`)
 

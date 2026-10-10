@@ -212,9 +212,19 @@ def _openrouter_warnings(config: ContentConfig, reading: Balance) -> list[str]:
 def _google_cloud(
     config: ContentConfig, ledger: Ledger, said: Budget | None, warnings: list[str]
 ) -> list[str]:
-    lines = ["", "Google Cloud (the bucket)"]
     if config.storage is None:
-        return [*lines, "  No bucket: nothing is stored or spent there (docs/google-cloud.md)."]
+        return ["", "Where it is kept", "  Only on this computer (docs/storage.md)."]
+    if config.storage.folder is not None:
+        from content.storage import LocalStore
+
+        stored = LocalStore(config.storage.folder).size("") / 1e9
+        return [
+            "",
+            "Where it is kept",
+            f"  The folder {config.storage.folder}: {stored:.2f} GB, nothing to pay.",
+        ]
+    lines = ["", "Google Cloud (the bucket)"]
+    assert config.storage.bucket is not None
     if said is not None:
         lines.append(f"  Your budget:    {_budget(said)}")
     reading = read_bucket(ledger, config.storage.bucket)

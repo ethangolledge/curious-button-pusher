@@ -265,8 +265,13 @@ def _new_channel(arguments: list[str]) -> int:
         "in themes/<name>/, private to you (gitignored).",
     )
     parser.add_argument("name", help="Folder name for the channel, e.g. my-channel")
-    parser.add_argument(
-        "--bucket", help="A Google Cloud Storage bucket to keep the channel in (docs/storage.md)"
+    kept_in = parser.add_mutually_exclusive_group()
+    kept_in.add_argument(
+        "--folder",
+        help="A folder to keep the channel and its videos in, e.g. archive (docs/storage.md)",
+    )
+    kept_in.add_argument(
+        "--bucket", help="A Google Cloud Storage bucket to keep them in (docs/google-cloud.md)"
     )
     args = parser.parse_args(arguments)
     themes = Path("themes")
@@ -274,7 +279,9 @@ def _new_channel(arguments: list[str]) -> int:
         target = new_theme(themes / "starter", themes / args.name)
     except ThemeError as exc:
         parser.error(str(exc))
-    config = write_channel_config(Path("config/config.example.json"), target, args.bucket)
+    config = write_channel_config(
+        Path("config/config.example.json"), target, bucket=args.bucket, folder=args.folder
+    )
     print(f"Created {target}, with its configuration {config}.")
     print(f"Next: follow {target / 'README.md'}, and pass --config {config} to every command.")
     return 0

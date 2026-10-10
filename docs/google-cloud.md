@@ -122,7 +122,7 @@ The settings it gives the bucket, and why:
 
 A bucket's region and class cannot change after it is made; the command says so if an existing
 one is outside the free tier. `content check --config themes/<name>/config.json` confirms
-everything ("Bucket: … reachable").
+everything ("Storage: the bucket … reachable").
 
 From now on it happens by itself.
 

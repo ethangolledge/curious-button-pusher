@@ -19,7 +19,7 @@ Otherwise, start with the one you need:
 | know what a configuration key does, or which config file to use | [configuration.md](configuration.md) |
 | check that the pipeline still catches the narration failures a person found (`content eval`) | [narration.md](narration.md#regression-content-eval) |
 | run a video, or understand the sign-offs and the run folder | [runs-and-review.md](runs-and-review.md) |
-| keep my channel and finished videos in a cloud bucket, with their history, and get them back | [storage.md](storage.md) |
+| keep my channel and finished videos in a folder or a cloud bucket, with their history, and get them back | [storage.md](storage.md) |
 | understand or tune the narration (pace, takes, timing, music, mix) | [narration.md](narration.md) |
 | understand or tune the pictures (storyboard, keyframes, focus, glide, morphs, texture) | [visuals.md](visuals.md) |
 | know what any model does, costs, and how it fails (Jev, the LLMs, media models, local models) | [models.md](models.md) |

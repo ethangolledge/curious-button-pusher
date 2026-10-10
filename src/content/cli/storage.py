@@ -13,12 +13,14 @@ from content.config import (
 from content.errors import ConfigurationError
 from content.storage import (
     GcsStore,
+    LocalStore,
     Manifest,
     StorageError,
     archive_run,
     describe,
     kept,
     kept_versions,
+    open_store,
     pull_theme,
     restore_run,
     save_theme,
@@ -32,7 +34,7 @@ def _storage(arguments: list[str]) -> int:
     common.add_argument("--config", type=Path, help="Runtime configuration JSON")
     parser = argparse.ArgumentParser(
         prog="content storage",
-        description="Keep runs and the channel's theme in the cloud bucket, and bring them "
+        description="Keep runs and the channel's theme in its bucket or folder, and bring them "
         "back. A run keeps its building blocks and what was signed off; the working cache "
         "stays in .cache/.",
     )
@@ -60,21 +62,25 @@ def _storage(arguments: list[str]) -> int:
     pull.add_argument(
         "--bucket", help="On a fresh clone, with --channel: no configuration needed (it comes back)"
     )
+    pull.add_argument("--folder", help="Or, with --channel: the folder it is kept in")
     pull.add_argument("--channel", help="The channel's folder name in themes/")
     actions.add_parser("versions", parents=[common], help="The theme's earlier versions")
-    actions.add_parser("list", parents=[common], help="What the bucket keeps")
+    actions.add_parser("list", parents=[common], help="What is kept")
     show_kept = actions.add_parser(
         "show", parents=[common], help="One kept run or channel, by file"
     )
     show_kept.add_argument("name", help="As `list` prints it, e.g. runs/finished/<topic>")
     args = parser.parse_args(arguments)
     try:
-        if args.action == "pull" and args.bucket and args.channel:
+        if args.action == "pull" and args.channel and (args.bucket or args.folder):
             theme_root = Path("themes") / args.channel
-            print(f"Restored: {describe(pull_theme(GcsStore(args.bucket), theme_root))}")
+            kept_in = (
+                GcsStore(args.bucket) if args.bucket else LocalStore(Path(args.folder).expanduser())
+            )
+            print(f"Restored: {describe(pull_theme(kept_in, theme_root))}")
             return 0
         storage, theme_root = load_storage(args.config)
-        store = GcsStore(storage.bucket)
+        store = open_store(storage)
         if args.action == "archive":
             print(f"Kept: {describe(archive_run(store, args.run))}")
         elif args.action == "restore":
@@ -109,8 +115,8 @@ def keep(save: Callable[[], Manifest], retry: str) -> None:
 def keep_theme(config: ContentConfig) -> None:
     """After anything that changes the channel's theme: a lock, a beat map, taste data."""
     if config.storage is not None:
-        bucket, root = config.storage.bucket, config.theme.root
-        keep(lambda: save_theme(GcsStore(bucket), root), "content storage save-theme")
+        storage, root = config.storage, config.theme.root
+        keep(lambda: save_theme(open_store(storage), root), "content storage save-theme")
 
 
 COMMANDS = {"storage": _storage}

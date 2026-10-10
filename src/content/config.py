@@ -111,9 +111,16 @@ class LearningConfig:
 
 @dataclass(frozen=True, slots=True)
 class StorageConfig:
-    """The cloud bucket that keeps finished runs and the channel's theme (see `storage.py`)."""
+    """Where the channel and its runs are kept (see `storage.py`): a Google Cloud bucket, or a
+    folder on this computer (or an external or synced drive). Exactly one is set."""
 
-    bucket: str
+    bucket: str | None = None
+    folder: Path | None = None
+
+    @property
+    def where(self) -> str:
+        """In plain words, for messages."""
+        return f"the bucket {self.bucket}" if self.bucket else f"the folder {self.folder}"
 
 
 @dataclass(frozen=True, slots=True)
@@ -212,16 +219,20 @@ def _project_root(config_path: Path) -> Path:
     return Path(__file__).resolve().parents[2]
 
 
-def write_channel_config(template: Path, theme: Path, bucket: str | None = None) -> Path:
+def write_channel_config(
+    template: Path, theme: Path, bucket: str | None = None, folder: str | None = None
+) -> Path:
     """A new channel's own configuration, `<theme>/config.json`: the template pointed at
-    the theme and its taste data, and at a bucket when one is given. `theme` is relative
-    to the project root, like every path in a configuration."""
+    the theme and its taste data, and at where it is kept (a bucket, or a folder) when one
+    is given. `theme` is relative to the project root, like every path in a configuration."""
     data = json.loads(template.read_text(encoding="utf-8"))
     data["theme"] = theme.as_posix()
     if "learning" in data:
         data["learning"]["directory"] = (theme / "learning").as_posix()
     if bucket is not None:
         data["storage"] = {"bucket": bucket}
+    elif folder is not None:
+        data["storage"] = {"folder": folder}
     target = theme / "config.json"
     target.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     return target
@@ -320,7 +331,7 @@ def load_config(config_path: Path | None = None) -> ContentConfig:
             _production_config(root, _section(data, "production")) if "production" in data else None
         ),
         learning=learning,
-        storage=_storage_config(data),
+        storage=_storage_config(data, root),
     )
 
 
@@ -328,7 +339,7 @@ def load_storage(config_path: Path | None = None) -> tuple[StorageConfig, Path]:
     """The bucket and the theme folder, read without loading the theme: a fresh clone
     pulls the channel's theme from the bucket before the theme can load."""
     data, root = _read(config_path)
-    storage = _storage_config(data)
+    storage = _storage_config(data, root)
     if storage is None:
         raise ConfigurationError("This configuration has no storage section")
     theme = (root / str(_required(data, "theme", "config"))).resolve()
@@ -350,10 +361,18 @@ def _read(config_path: Path | None) -> tuple[dict[str, Any], Path]:
     return data, _project_root(path)
 
 
-def _storage_config(data: Mapping[str, Any]) -> StorageConfig | None:
+def _storage_config(data: Mapping[str, Any], root: Path) -> StorageConfig | None:
     if "storage" not in data:
         return None
-    return StorageConfig(bucket=str(_required(_section(data, "storage"), "bucket", "storage")))
+    section = _section(data, "storage")
+    if ("bucket" in section) == ("folder" in section):
+        raise ConfigurationError(
+            "storage needs exactly one of bucket (Google Cloud) or folder (on this computer)"
+        )
+    if "bucket" in section:
+        return StorageConfig(bucket=str(section["bucket"]))
+    folder = Path(str(section["folder"])).expanduser()
+    return StorageConfig(folder=folder if folder.is_absolute() else root / folder)
 
 
 def _theme(root: Path, value: str) -> Theme:

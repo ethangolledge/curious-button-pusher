@@ -4,7 +4,7 @@ A configuration file chooses the models, the theme, the limits and the review po
 It never holds style (that is the theme, [themes.md](themes.md)) or secrets (the OpenRouter key is
 in `.env`). Loaded by `config.py`; pass one with `--config`.
 
-Last reviewed: 2026-10-09.
+Last reviewed: 2026-10-10.
 
 ## The Four Files
 
@@ -18,7 +18,7 @@ Last reviewed: 2026-10-09.
 The offline files skip the Script sign-off and accept provisional research, so demos and tests
 run unattended. `content new-channel <name>` writes `themes/<name>/config.json` from
 `config.example.json`, pointing `theme` and `learning.directory` at the new theme (and adding
-`storage` with `--bucket`). Paths in a configuration are relative to the project root, wherever
+`storage` with `--folder` or `--bucket`). Paths in a configuration are relative to the project root, wherever
 the file lives.
 
 Required sections are checked on load, and so are the question names in `decisions.blocking`
@@ -109,8 +109,11 @@ Details: [machine-learning.md](machine-learning.md).
 
 ## `storage` (omit it to keep everything on this machine)
 
+Exactly one of:
+
 | Key | Meaning |
 |---|---|
-| `bucket` | the Google Cloud Storage bucket that keeps finished runs and the channel's theme |
+| `folder` | a folder that keeps runs and the channel's theme: relative to the project root (`archive`, gitignored), or anywhere (`~/Dropbox/my-channel-archive`) |
+| `bucket` | a Google Cloud Storage bucket that keeps them |
 
 Only a channel's own configuration has it. Details, costs and setup: [storage.md](storage.md).

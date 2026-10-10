@@ -23,12 +23,14 @@ git, which holds only the starter theme. Restoring checks every file against its
 
 import hashlib
 import mimetypes
+import shutil
 import tempfile
 from collections.abc import Callable, Iterable
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Protocol
 
+from content.config import StorageConfig
 from content.schemas.base import ImmutableModel
 
 # What a run keeps: what each sign-off approved, the final cut once there is one, the
@@ -362,6 +364,65 @@ class GcsStore:
     def size(self, prefix: str) -> int:
         """Bytes kept under `prefix`: what the bucket bills for."""
         return sum(blob.size or 0 for blob in self._bucket.list_blobs(prefix=prefix))
+
+
+class LocalStore:
+    """A folder on this computer (or an external or synced drive) used exactly like a bucket:
+    each object a file under its name. Nothing leaves the machine."""
+
+    def __init__(self, root: Path) -> None:
+        self.root = root
+
+    def _path(self, name: str) -> Path:
+        return self.root / name
+
+    def exists(self, name: str) -> bool:
+        return self._path(name).is_file()
+
+    def upload(self, name: str, source: Path, content_type: str) -> None:
+        self._write(source, self._path(name))
+
+    def download(self, name: str, target: Path) -> None:
+        shutil.copyfile(self._path(name), target)
+
+    def names(self, prefix: str) -> list[str]:
+        if not self.root.is_dir():
+            return []
+        found = (p.relative_to(self.root).as_posix() for p in self.root.rglob("*") if p.is_file())
+        return sorted(
+            name for name in found if name.startswith(prefix) and not name.endswith(".partial")
+        )
+
+    def delete(self, name: str) -> None:
+        path = self._path(name)
+        path.unlink()
+        # Folders left empty go too, so a finished run leaves no empty in-progress folder.
+        for parent in path.parents:
+            if parent == self.root or any(parent.iterdir()):
+                break
+            parent.rmdir()
+
+    def copy(self, source: str, target: str) -> None:
+        self._write(self._path(source), self._path(target))
+
+    def size(self, prefix: str) -> int:
+        return sum(self._path(name).stat().st_size for name in self.names(prefix))
+
+    @staticmethod
+    def _write(source: Path, target: Path) -> None:
+        # Write then rename, so an interrupted save never leaves half a file under its name.
+        target.parent.mkdir(parents=True, exist_ok=True)
+        partial = target.with_name(target.name + ".partial")
+        shutil.copyfile(source, partial)
+        partial.replace(target)
+
+
+def open_store(storage: StorageConfig) -> "GcsStore | LocalStore":
+    """Where the channel is kept: its Google Cloud bucket, or its folder."""
+    if storage.bucket is not None:
+        return GcsStore(storage.bucket)
+    assert storage.folder is not None
+    return LocalStore(storage.folder)
 
 
 def describe(manifest: Manifest) -> str:

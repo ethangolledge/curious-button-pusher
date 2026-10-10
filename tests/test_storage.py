@@ -7,6 +7,7 @@ import pytest
 from content.config import load_config, load_storage
 from content.errors import ConfigurationError
 from content.storage import (
+    LocalStore,
     StorageError,
     archive_run,
     kept,
@@ -279,3 +280,45 @@ def test_storage_is_off_unless_the_configuration_names_a_bucket(tmp_path: Path) 
     storage, theme_root = load_storage(tmp_path / "config.json")
     assert storage.bucket == "a-bucket"
     assert theme_root.name == "starter"
+
+
+def test_a_folder_keeps_runs_and_the_theme_exactly_as_a_bucket_does(tmp_path: Path) -> None:
+    store = LocalStore(tmp_path / "archive")
+    run = _run(tmp_path / "runs" / "topic", final=None)
+    archive_run(store, run)
+    (run / "4-final.mp4").write_bytes(b"final cut")
+    archive_run(store, run)
+    theme = _channel_theme(tmp_path / "channel")
+    save_theme(store, theme.root)
+    (theme.root / "SKILL.md").write_bytes(b"# Edited")
+    save_theme(store, theme.root)
+
+    # Finishing leaves no empty in-progress folder behind, and no half-written file.
+    assert not (tmp_path / "archive/runs/in-progress").exists()
+    assert not list((tmp_path / "archive").rglob("*.partial"))
+    restored = tmp_path / "restored"
+    restore_run(store, "topic", restored)
+    assert (restored / "4-final.mp4").read_bytes() == b"final cut"
+    assert (restored / "building-blocks/research.md").read_bytes() == b"# Research"
+    clone = tmp_path / "clone" / "channel"
+    pull_theme(store, clone, kept_versions(store, "channel")[0])
+    assert (clone / "SKILL.md").read_bytes() == (
+        PROJECT_ROOT / "themes/starter/SKILL.md"
+    ).read_bytes()
+
+
+def test_a_folder_in_the_configuration_is_found_from_the_project_not_the_shell(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    data = json.loads((PROJECT_ROOT / "config/config.json").read_text(encoding="utf-8"))
+    monkeypatch.chdir(tmp_path)
+
+    data["storage"] = {"folder": "archive"}
+    (tmp_path / "config.json").write_text(json.dumps(data), encoding="utf-8")
+    storage, _ = load_storage(tmp_path / "config.json")
+    assert storage.folder == PROJECT_ROOT / "archive"
+
+    data["storage"] = {"folder": "archive", "bucket": "a-bucket"}
+    (tmp_path / "config.json").write_text(json.dumps(data), encoding="utf-8")
+    with pytest.raises(ConfigurationError, match="exactly one"):
+        load_storage(tmp_path / "config.json")
