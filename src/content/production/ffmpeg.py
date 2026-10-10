@@ -75,7 +75,8 @@ def probe(path: Path) -> MediaInfo:
         numerator, denominator = video["avg_frame_rate"].split("/")
         fps = int(numerator) / int(denominator)
     return MediaInfo(
-        duration=float(data["format"]["duration"]),
+        # A still picture has no duration.
+        duration=float(data["format"].get("duration", 0.0)),
         width=video.get("width") if video else None,
         height=video.get("height") if video else None,
         fps=fps,

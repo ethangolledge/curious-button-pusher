@@ -5,10 +5,12 @@ import argparse
 import hashlib
 import io
 import re
+import shutil
 import tempfile
 import zipfile
 from dataclasses import replace
 from pathlib import Path
+from typing import Any
 
 from content.blender.job import ActorCall, BlockCall, Job
 from content.blender.registry import ENGINE
@@ -23,6 +25,8 @@ from content.staging.plan import themed
 from content.staging.templates import TEMPLATES, render
 
 MAX_FACES = 150_000
+# Pictures (maps, paintings, views) join the library as they are, for the picture actor.
+PICTURES = (".png", ".jpg", ".jpeg", ".webp")
 SOURCES: dict[str, type[AssetSource]] = {"smithsonian": Smithsonian}
 
 
@@ -72,7 +76,7 @@ def _staging(arguments: list[str]) -> int:
         "--can", default="", help="What it can do, comma separated: vehicle, humanoid, seat, light…"
     )
     add.add_argument(
-        "--height", type=float, help="Its real height in metres, if the file's scale is off"
+        "--height", type=float, help="Its real height in metres (a picture: its width)"
     )
     add.add_argument(
         "--alongside", action="store_true", help="Add it although a similar model exists"
@@ -254,10 +258,14 @@ def _ingest(
     library = catalogue.library
     assert library.folder is not None
     model_id = re.sub(r"[^a-z0-9_]+", "_", args.model_id.lower()).strip("_")
-    target = library.folder / f"{model_id}.glb"
-    facts = LocalBlender().ingest(
-        file, target, height=args.height, max_faces=MAX_FACES, turn=args.turn
-    )
+    if file.suffix.lower() in PICTURES:
+        target = library.folder / f"{model_id}{file.suffix.lower()}"
+        facts = _picture_facts(file, target, width=args.height or 1.0)
+    else:
+        target = library.folder / f"{model_id}.glb"
+        facts = LocalBlender().ingest(
+            file, target, height=args.height, max_faces=MAX_FACES, turn=args.turn
+        )
     model = Model(
         model_id=model_id,
         names=tuple(n.strip() for n in args.names.split(",") if n.strip()),
@@ -284,8 +292,22 @@ def _ingest(
         f"✓ {model_id} added ({facts['width']:.2f}×{facts['depth']:.2f}×"
         f"{facts['height']:.2f} m, {int(facts['faces'])} faces)."
     )
+    if target.suffix != ".glb":
+        print("  A picture: stand it in a shot with the picture actor.")
+        return 0
     print(f"  Four views of it in the studio: {_turntable(catalogue, model_id)}")
     return 0
+
+
+def _picture_facts(source: Path, target: Path, *, width: float) -> dict[str, Any]:
+    """A picture is kept as it is; its real size is its width and its own shape."""
+    info = ffmpeg.probe(source)
+    if not info.width or not info.height:
+        raise ValueError(f"{source} is not a picture ffmpeg can read")
+    target.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copyfile(source, target)
+    height = round(width * info.height / info.width, 3)
+    return {"width": width, "depth": 0.0, "height": height, "faces": 0}
 
 
 def _turntable(catalogue: Catalogue, model_id: str) -> Path:

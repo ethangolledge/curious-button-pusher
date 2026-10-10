@@ -4,6 +4,7 @@ ambience, and a filmic tone curve. The engine's default, and the base to compare
 own look against."""
 
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Annotated, Any, ClassVar
 
 import bpy  # type: ignore[import-not-found]
@@ -90,6 +91,18 @@ class Plain(Look):
                 shader.inputs["Transmission Weight"].default_value = 0.9
             self._made[role] = material
         return self._made[role]
+
+    def picture(self, path: str) -> Any:
+        """The image as the card's colour, a little rough, lit like everything else."""
+        if path not in self._made:
+            material = bpy.data.materials.new(f"picture {Path(path).stem}")
+            shader = material.node_tree.nodes["Principled BSDF"]
+            image = material.node_tree.nodes.new("ShaderNodeTexImage")
+            image.image = bpy.data.images.load(path)
+            material.node_tree.links.new(image.outputs["Color"], shader.inputs["Base Color"])
+            shader.inputs["Roughness"].default_value = 0.8
+            self._made[path] = material
+        return self._made[path]
 
     def restyle(self, obj: Any) -> None:
         if obj.type == "MESH" and not obj.data.materials:

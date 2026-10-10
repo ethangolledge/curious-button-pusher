@@ -161,6 +161,26 @@ class BlenderStage:
                 group.scale = (height / box.size.z,) * 3
         return group
 
+    def picture(
+        self, model_id: str, *, name: str, width: float, lying: bool = False
+    ) -> BlenderObject:
+        if model_id not in self._model_files:
+            raise KeyError(f"no picture called '{model_id}'")
+        path, (w, _, h) = self._model_files[model_id]
+        tall = width * h / w
+        size = Vec(width, tall, 0.002) if lying else Vec(width, 0.002, tall)
+        card = self.shape("box", size, Vec(), role="paper", name=name)
+        card.data.materials.clear()
+        card.data.materials.append(self._look.picture(path))
+        # The image is laid across the card, its top at the far edge (lying) or the top.
+        layer = card.data.uv_layers.new(name="UVMap")
+        for polygon in card.data.polygons:
+            for index in polygon.loop_indices:
+                corner = card.data.vertices[card.data.loops[index].vertex_index].co
+                up = (corner.y / tall + 0.5) if lying else corner.z / tall
+                layer.data[index].uv = (corner.x / width + 0.5, up)
+        return card
+
     def group(
         self, name: str, at: Vec = ORIGIN, parent: BlenderObject | None = None
     ) -> BlenderObject:

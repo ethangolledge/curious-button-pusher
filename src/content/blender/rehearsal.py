@@ -137,6 +137,15 @@ class RehearsalStage:
             piece.turn = heading_rotation(Vec(*part["facing"]))
         return model
 
+    def picture(self, model_id: str, *, name: str, width: float, lying: bool = False) -> Thing:
+        self._record("picture", model=model_id, name=name, width=width, lying=lying)
+        if model_id not in self._model_sizes:
+            raise KeyError(f"no picture called '{model_id}'")
+        w, _, h = self._model_sizes[model_id]
+        tall = width * h / w
+        size = Vec(width, tall, 0.002) if lying else Vec(width, 0.002, tall)
+        return self._new(name, Vec(), size, None)
+
     def group(self, name: str, at: Vec = ORIGIN, parent: Thing | None = None) -> Thing:
         self._record("group", name=name, at=at)
         return self._new(name, at, Vec(), parent)

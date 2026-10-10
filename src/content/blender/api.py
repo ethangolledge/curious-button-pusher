@@ -123,6 +123,12 @@ class Stage(Protocol):
         scaled to `height` metres if given."""
         ...
 
+    def picture(self, model_id: str, *, name: str, width: float, lying: bool = False) -> Thing:
+        """A picture from the library on a thin card `width` metres wide, at the origin:
+        upright with its face towards −Y (a painting, a view through a window), or lying
+        face up with its top towards +Y (a map on a table)."""
+        ...
+
     def group(self, name: str, at: Vec = ORIGIN, parent: Thing | None = None) -> Thing:
         """An empty that other things hang from, so they move together."""
         ...
