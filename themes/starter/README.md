@@ -51,11 +51,27 @@ gitignored, never committed. Then edit, in this order:
    your own channel's once a director has rejected one (`examples/README.md`).
 10. **Notes and safe keeping.** Write your channel's decisions in `notes/` so a later session can
     pick them up. To keep the whole folder safe beyond this machine, with every earlier version,
-    give the channel a Google Cloud Storage bucket (`new-channel --bucket`, or a `storage`
-    section in its `config.json`): it is saved after every change, and
-    `content storage pull --bucket <bucket> --channel my-channel` brings it back on a fresh
-    clone (`docs/storage.md`).
+    and every video at each sign-off, give it a Google Cloud bucket (`docs/google-cloud.md`):
+    make a project with billing and sign in twice (`gcloud auth login`,
+    `gcloud auth application-default login`), then one command does the rest, safe to run
+    again:
 
-Check it loads: run the offline demo with your theme
-(a copy of `config/config.fake-video.json` in your channel folder, with `"theme"` set to it), and the
-theme tests (`pytest tests/test_theme.py`), which validate every theme in `themes/`.
+    ```bash
+    .venv/bin/pip install -e '.[cloud]'
+    .venv/bin/content cloud setup --bucket my-channel-videos-2026 --config themes/my-channel/config.json
+    ```
+
+    From then on the channel is saved after every change, and
+    `content storage pull --bucket <bucket> --channel my-channel` brings it back on a fresh
+    clone.
+11. **What you have and what you spend.** Every paid call is recorded in your channel's
+    `spend.sqlite`; `content spend --config themes/my-channel/config.json` shows what this
+    channel has spent (by video and stage), what is left on your OpenRouter account, Google
+    Cloud storage against its free 5 GB, and warnings before a balance or key runs out
+    (`docs/spending.md`).
+
+Check it is all ready: `content check --config themes/my-channel/config.json` lists what is
+set up and what to do about anything that is not. Check the theme itself: run the offline demo
+with it (a copy of `config/config.fake-video.json` in your channel folder, with `"theme"` set
+to it), and the theme tests (`pytest tests/test_theme.py`), which validate every theme in
+`themes/`.
