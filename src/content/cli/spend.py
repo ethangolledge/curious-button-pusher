@@ -119,7 +119,8 @@ def _spend(arguments: list[str]) -> int:
 def _report(config: ContentConfig, ledger: Ledger) -> list[str]:
     lines = [
         f"Spending for {config.theme.spec.name}, kept in {ledger.path}",
-        "Every paid call from runs, channel tools and training is recorded there: what made it, "
+        "Every paid call this project makes (videos, channel tools, training) is recorded there: "
+        "what made it, "
         "the model, tokens and cost. OpenRouter's own figures are read at the start of every run "
         "and each time this runs.",
         "",
@@ -138,14 +139,13 @@ def _openrouter(
     config: ContentConfig, ledger: Ledger, said: Budget | None, warnings: list[str]
 ) -> list[str]:
     lines = ["OpenRouter (one key pays for every model)"]
-    lines.append(f"  You said:       {_budget(said)}")
     reading = read_openrouter(ledger)
     if isinstance(reading, str):
-        lines.append(f"  OpenRouter:     {reading}")
+        lines.append(f"  Left in total:  {reading}")
     else:
         assert reading.credits_usd is not None and reading.used_usd is not None
         lines.append(
-            f"  OpenRouter:     ${reading.remaining_usd:.2f} left to spend "
+            f"  Left in total:  ${reading.remaining_usd:.2f}, for every project on this account "
             f"(${reading.used_usd:.2f} of ${reading.credits_usd:.2f} credit used"
             + (f"; key limit ${reading.limit_usd:.2f}" if reading.limit_usd is not None else "")
             + ")"
@@ -157,7 +157,7 @@ def _openrouter(
     take_usd = (reconciled.take_usd if reconciled else None) or NARRATION_TAKE_USD
     calibrated = "calibrated" if reconciled and reconciled.take_usd else "estimated"
     lines.append(
-        f"  Recorded here:  ${spent.priced_usd:.2f} priced, in {spent.calls} calls"
+        f"  This project:   ${spent.priced_usd:.2f} priced, in {spent.calls} calls"
         + (
             f"; {takes} narration takes unpriced (about ${takes * take_usd:.2f} at "
             f"${take_usd:.2f} each, {calibrated})"
@@ -182,8 +182,10 @@ def _openrouter(
     sources = ", ".join(f"{s} ${v:.2f}" for s, v in sorted(spent.by_source.items()))
     lines += [
         f"  By stage:       {stages or 'nothing yet'}",
-        f"  By run or tool: {sources or 'nothing yet'}",
+        f"  By video or tool: {sources or 'nothing yet'}",
     ]
+    if said is not None:
+        lines.append(f"  Your budget:    {_budget(said)}")
     return lines
 
 
@@ -213,7 +215,8 @@ def _google_cloud(
     lines = ["", "Google Cloud (the bucket)"]
     if config.storage is None:
         return [*lines, "  No bucket: nothing is stored or spent there (docs/google-cloud.md)."]
-    lines.append(f"  You said:       {_budget(said)}")
+    if said is not None:
+        lines.append(f"  Your budget:    {_budget(said)}")
     reading = read_bucket(ledger, config.storage.bucket)
     if isinstance(reading, str):
         return [*lines, f"  {config.storage.bucket}: {reading}"]
@@ -231,9 +234,7 @@ def _google_cloud(
     return lines
 
 
-def _budget(said: Budget | None) -> str:
-    if said is None:
-        return "nothing yet (record it: content spend budget <service> <amount> --config …)"
+def _budget(said: Budget) -> str:
     note = f": {said.note}" if said.note else ""
     return f"${said.amount_usd:.2f} ({said.kind}, {said.set_at[:10]}){note}"
 

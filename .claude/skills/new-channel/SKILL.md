@@ -97,8 +97,9 @@ Why: one key pays for every model the videos use (writing, voices, pictures, vid
    the key after `OPENROUTER_API_KEY=`, then Ctrl+O, Enter, Ctrl+X. (Or any text editor:
    the file is `.env` in the project folder.)
 
-4. Ask how much credit they added, and any limit they set, and record it once the channel
-   exists (stage 4): `content spend budget openrouter <amount> --config <channel>`.
+4. Ask whether they want a budget for this project (optional: some only want to see what each
+   project spends and what is left in total, which is always shown). If they do, record it once
+   the channel exists (stage 4): `content spend budget openrouter <amount> --config <channel>`.
 
 Tell them what is tracked: every paid call goes into their channel's spending ledger, with
 OpenRouter's own figures read before every run, and `content spend` (or "how much have I got

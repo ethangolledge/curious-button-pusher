@@ -2,7 +2,9 @@
 
 Last reviewed: 2026-10-10
 
-Every dollar is tracked in one place per channel: `themes/<name>/spend.sqlite`, a small
+Spending is shown two ways: **this project** (the channel: each video and tool it paid for) and
+**left in total** (the whole OpenRouter account, shared by every project). Every dollar is
+tracked in one place per channel: `themes/<name>/spend.sqlite`, a small
 database kept with the channel (private, and saved to the bucket with it). `content spend
 --config themes/<name>/config.json` shows it all; the assistant runs it before every video and
 whenever you ask "how much have I got left?".
@@ -12,7 +14,7 @@ whenever you ask "how much have I got left?".
 | What | Where it comes from | When |
 |---|---|---|
 | **Every paid call**: what made it (research, a keyframe, a narration take…), its stage, the model, tokens, seconds and cost | the provider's reply to each call | at the end of every run session; after every channel tool (`voice-audition`, `voice-design`, `music-audition`), `eval` and `train` |
-| **What you said you have** on each service: credit added, a key's limit, a monthly alert | you, once, and whenever it changes: `content spend budget openrouter 20 --config …` | when you set it up, or top up |
+| **A budget, if you want one** (optional): credit set aside for this project, a key's limit, a monthly alert | you: `content spend budget openrouter 20 --config …` | whenever you choose |
 | **OpenRouter's own figures**: credit added and used on the account, the key's limit and what it may still spend, and when the key stops working | OpenRouter (free to read) | at the start of every run, and each time `content spend` runs |
 | **Google Cloud storage**: what the bucket holds, and this month's cost beyond the free 5 GB | the bucket itself | each time `content spend` runs |
 

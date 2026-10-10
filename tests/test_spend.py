@@ -104,9 +104,9 @@ def test_the_report_says_what_is_left_and_warns_before_it_runs_out(
 
     report = "\n".join(_report(config, ledger))
 
-    assert "You said:       $10.00 (credit" in report
-    assert "$3.00 left to spend" in report
-    assert "Recorded here:  $0.40 priced" in report
+    assert "Your budget:    $10.00 (credit" in report
+    assert "Left in total:  $3.00, for every project" in report
+    assert "This project:   $0.40 priced" in report
     assert "under a video's $5.00 cap" in report  # warned before a run lowers its cap
     assert "stops working on 2026-10-20" in report
     assert "No bucket" in report

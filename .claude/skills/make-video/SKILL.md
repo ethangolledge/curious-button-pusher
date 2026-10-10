@@ -179,7 +179,7 @@ than `themes/starter`.
 ### Money
 
 - **Before every intake**, run `content spend --config <channel>` and tell the person in one
-  line what they have left and anything it warns about (a low balance, a key about to expire);
+  line what this project has spent, what is left in total, and anything it warns about (a low balance, a key about to expire);
   after a run, what it spent. If they mention topping up, record it: `content spend budget
   openrouter <new total> --config <channel>`. Every call is recorded for them; never keep spend
   in Markdown.
