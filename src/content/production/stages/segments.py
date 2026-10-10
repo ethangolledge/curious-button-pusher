@@ -1,6 +1,7 @@
 """The morphs: each a short AI video from one keyframe into the next, judged from sampled
 frames."""
 
+from dataclasses import replace
 from pathlib import Path
 
 from langgraph.types import Send
@@ -23,6 +24,7 @@ from content.production.studio import (
 from content.providers.cache import file_digest
 from content.schemas.media import (
     RenderedAsset,
+    Timeline,
 )
 from content.staging.plan import join_for
 from content.state import CallRecord, ContentState
@@ -64,6 +66,7 @@ class Segments(Studio):
                 job = join_for(
                     scene, self.theme, speed=speed, first=first, last=last, seconds=seconds
                 )
+                job = self._moving(job, keyframes, scene.scene_id, following.scene_id, timeline)
                 join = job.dumps()
                 prompt = f"rendered transition: {job.transition.block}"
                 signature = render_signature("blender-join", STAGING_LOOK, join)
@@ -115,6 +118,28 @@ class Segments(Studio):
                     )
                 )
         return tasks or "segment_verdict"
+
+    def _moving(
+        self,
+        join: Join,
+        keyframes: dict[str, RenderedAsset],
+        leaving: str,
+        arriving: str,
+        timeline: Timeline,
+    ) -> Join:
+        """A rendered join between staged scenes plays over their moving shots: the one it
+        leaves from where its morph out begins, the one it arrives at from its start."""
+        fps = self.theme.spec.format.fps
+        if keyframes[leaving].shot:
+            folder, _ = self.shot_frames(keyframes[leaving], final=True)
+            window = self.window(timeline, leaving)
+            join = replace(
+                join, first_frames=str(folder), first_from=window.frame(window.out_from, fps)
+            )
+        if keyframes[arriving].shot:
+            folder, _ = self.shot_frames(keyframes[arriving], final=True)
+            join = replace(join, last_frames=str(folder), last_from=1)
+        return join
 
     def produce_segment(self, state: RenderTask) -> ContentState:
         task = state

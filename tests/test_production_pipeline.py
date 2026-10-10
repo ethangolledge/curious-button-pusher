@@ -88,7 +88,8 @@ def test_a_staged_channel_renders_the_scenes_it_can_stage_and_draws_the_rest(
     # The morphs into and out of a staged scene start and end on its shot's own frames.
     morph_into = next(t for t in result["segments"].values() if t.scene_id == "S1")
     assert morph_into.rendered
-    assert keyframes["S2"].first_frame.endswith("0001.png")
+    # Its shot starts with the morph into it; its own picture holds from a later frame.
+    assert int(Path(keyframes["S2"].first_frame).stem) > 1
     info = ffmpeg.probe(Path(package.production.video_path))
     assert info.duration == pytest.approx(package.production.scenes[-1].end, abs=0.2)
     assert [review.stage for review in reviews] == ["storyboard", "final_cut"]
@@ -113,6 +114,31 @@ def test_rendered_joins_replace_every_paid_morph(video_config: ContentConfig) ->
     presets = {preset.block for preset in config.theme.spec.staging.joins.values()}
     assert {join.transition.block for join in joins} <= presets
     assert all(asset.rendered for asset in result["segments"].values())
+
+
+@pytest.mark.video
+def test_a_fully_rendered_run_keeps_staged_shots_moving_through_their_joins(
+    video_config: ContentConfig, tmp_path: Path
+) -> None:
+    assert video_config.production is not None
+    root = tmp_path / "channel"
+    shutil.copytree(video_config.theme.root, root)
+    config = replace(
+        video_config,
+        theme=Theme(root, video_config.theme.spec, video_config.theme.skill),
+        production=replace(video_config.production, pictures="staged", joins="rendered"),
+    )
+    media, blender = FakeMediaProvider(), FakeBlender()
+
+    result, _ = _run(config, media, renderer=blender)
+
+    assert result["final_package"] is not None
+    assert "video" not in media.calls
+    joins = {job.join_id: job for job in blender.jobs if isinstance(job, Join)}
+    # S2 is staged: the join into it arrives on its moving shot, the join out leaves from it.
+    assert joins["S1"].last_frames and joins["S1"].last_from == 1
+    assert joins["S2"].first_frames and joins["S2"].first_from > 1
+    assert not joins["S2"].last_frames  # S3 is drawn
 
 
 @pytest.mark.video

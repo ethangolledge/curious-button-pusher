@@ -162,13 +162,19 @@ class Keyframes(Studio):
             return None
         timeline = required(state.get("timeline"), "a timeline")
         spec = self.theme.spec.visual.field
-        seconds = self.held_seconds(timeline, scene.scene_id)
-        count = max(round(seconds * self.theme.spec.format.fps), 1)
+        window = self.window(timeline, scene.scene_id)
+        fps = self.theme.spec.format.fps
         grade = Grade(warmth=warmth(feeling, spec))
-        frames = sorted({1, (count + 1) // 2, count})
+        # Where its picture starts holding, the middle of the hold, and where the morph out
+        # of it begins: the frames it is judged by and morphed from.
+        frames = [
+            window.frame(window.held_from, fps),
+            window.frame(window.held_from + window.held / 2, fps),
+            window.frame(window.out_from, fps),
+        ]
         base = job_for(
-            shot, self.theme, staging[1], seconds=seconds, quality="final",
-            frames=frames, grade=grade, seed=self.config.seed,
+            shot, self.theme, staging[1], seconds=window.seconds, quality="final",
+            frames=sorted(set(frames)), grade=grade, seed=self.config.seed,
         )  # fmt: skip
         signature = render_signature("blender", STAGING_LOOK, base.dumps())
         attempt = next_attempt(previous, signature, self.config.keyframe_attempts)
@@ -220,6 +226,7 @@ class Keyframes(Studio):
             report = self.render_shot(Job.loads(task["shot"]))
             if not report.frames:
                 return {"keyframes": {task["scene_id"]: _unrendered(task, report.issues)}}
+            # The frames, in order: where its hold starts, its middle, and where it morphs out.
             first, image, last = (Path(report.frames[i]) for i in (0, len(report.frames) // 2, -1))
             return self._judged(task, image, [], shot=(first, last))
         try:

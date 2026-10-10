@@ -392,13 +392,16 @@ def shot_clip(
     height: int,
     fps: int,
     tint: tuple[str, float] | None = None,
+    skip: float = 0.0,
 ) -> Path:
     """A rendered 3D shot (a folder of numbered frames at `frame_rate`) made into a scene's
-    clip: fitted to the frame and the cut's rate, cut or held to `seconds`, with the same
-    breathing ripples and tint a keyframe gets. The camera move is the shot's own."""
+    clip: from `skip` seconds in (the shot's start belongs to the morph into it), fitted to
+    the frame and the cut's rate, cut or held to `seconds`, with the same breathing ripples
+    and tint a keyframe gets. The camera move is the shot's own."""
     count = max(round(seconds * fps), 1)
     source = (
-        f"[0:v]scale={width}:{height}:force_original_aspect_ratio=increase,"
+        f"[0:v]trim=start={skip:.4f},setpts=PTS-STARTPTS,"
+        f"scale={width}:{height}:force_original_aspect_ratio=increase,"
         f"crop={width}:{height},fps={fps},tpad=stop_mode=clone:stop_duration={seconds:.3f},"
     )
     graph = _breathing(source, focal, seconds, breath, width, height, fps, tint)

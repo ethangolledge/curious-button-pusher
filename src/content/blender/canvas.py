@@ -31,7 +31,17 @@ class Node:
 
 
 class BlenderCanvas:
-    def __init__(self, *, frames: int, fps: int, aspect: float, pictures: dict[str, str]) -> None:
+    def __init__(
+        self,
+        *,
+        frames: int,
+        fps: int,
+        aspect: float,
+        pictures: dict[str, str],
+        moving: dict[str, tuple[str, int]] | None = None,
+    ) -> None:
+        """`pictures` are stills; `moving` gives a side as a folder of numbered frames and
+        the frame to start on, played on through the transition."""
         self._frames, self._fps, self._aspect = frames, fps, aspect
         scene = bpy.context.scene
         mesh = bpy.data.meshes.new("canvas")
@@ -54,6 +64,12 @@ class BlenderCanvas:
         scene.camera = camera
         self._coords = self._tree.nodes.new("ShaderNodeTexCoord").outputs["Object"]
         self._images = {which: bpy.data.images.load(path) for which, path in pictures.items()}
+        self._moving: dict[str, int] = {}
+        for which, (folder, start) in (moving or {}).items():
+            image = bpy.data.images.load(f"{folder}/0001.png")
+            image.source = "SEQUENCE"
+            self._images[which] = image
+            self._moving[which] = start
 
     @property
     def aspect(self) -> float:
@@ -89,6 +105,11 @@ class BlenderCanvas:
         )
         texture = self._new("ShaderNodeTexImage")
         texture.image = self._images[which]
+        if which in self._moving:
+            texture.image_user.frame_start = 1
+            texture.image_user.frame_offset = self._moving[which] - 1
+            texture.image_user.frame_duration = self._frames
+            texture.image_user.use_auto_refresh = True
         texture.extension = edge.upper()
         texture.interpolation = "Cubic"
         self._feed(texture.inputs["Vector"], uv)

@@ -124,6 +124,12 @@ class Join:
     channel_blocks: tuple[str, ...] = ()
     # The frames to render for a still; empty renders every frame.
     frames: tuple[int, ...] = ()
+    # When a side is a moving shot: the folder of its frames, and the frame the join starts
+    # on, so the picture keeps moving through the join instead of holding still.
+    first_frames: str = ""
+    first_from: int = 1
+    last_frames: str = ""
+    last_from: int = 1
 
     @property
     def frame_count(self) -> int:

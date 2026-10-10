@@ -9,7 +9,7 @@ import json
 import re
 import time
 from collections.abc import Callable, Mapping, Sequence
-from dataclasses import replace
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any, TypedDict
 
@@ -105,6 +105,24 @@ class RenderTask(TypedDict):
     shot: str | None
     # A rendered join: the transition job (JSON) instead of a prompt to the video model.
     join: str | None
+
+
+@dataclass(frozen=True)
+class ShotWindow:
+    """Where, in seconds from the start of a staged scene's shot, its own picture holds
+    (`held_from` to `out_from`) and the morph out of it begins (`out_from`)."""
+
+    seconds: float
+    held_from: float
+    out_from: float
+
+    @property
+    def held(self) -> float:
+        return self.out_from - self.held_from
+
+    def frame(self, at: float, fps: int) -> int:
+        """The shot's frame number at `at` seconds (frames count from 1)."""
+        return min(max(round(at * fps) + 1, 1), max(round(self.seconds * fps), 1))
 
 
 class Studio:
@@ -328,7 +346,8 @@ class Studio:
                 fields.get(timing.scene_id), self.theme.spec.visual.field, motion.breath.tint
             )
             if timing.scene_id in shots:
-                still = self._shot_clip(shots[timing.scene_id], seconds, tint, final=final)
+                skip = self.window(timeline, timing.scene_id).held_from
+                still = self._shot_clip(shots[timing.scene_id], seconds, skip, tint, final=final)
             else:
                 still = self._still(image, seconds, start, end, focal, tint)
             if clips:
@@ -426,6 +445,7 @@ class Studio:
         self,
         asset: RenderedAsset,
         seconds: float,
+        skip: float,
         tint: tuple[str, float] | None,
         *,
         final: bool,
@@ -434,17 +454,7 @@ class Studio:
         animatic, full quality for the cut), breathing and tinted as a keyframe would be."""
         spec = self.theme.spec.format
         breath = self.theme.spec.visual.motion.breath
-        keyed = Job.loads(asset.shot)
-        if final:
-            job = replace(keyed, quality="final", frames=())
-        else:
-            job = replace(
-                keyed, quality="draft", frames=(), fps=DRAFT_FPS,
-                width=keyed.width // 4 * 2, height=keyed.height // 4 * 2,
-            )  # fmt: skip
-        report = self.render_shot(job)
-        if not report.frames:
-            raise ValueError(f"{asset.scene_id}: its 3D shot was not rendered: {report.issues}")
+        frames, job = self.shot_frames(asset, final=final)
         clip = self.derived(
             "shotclip",
             [
@@ -459,10 +469,26 @@ class Studio:
         )
         if not clip.is_file():
             assemble.shot_clip(
-                Path(report.frames[0]).parent, job.fps, seconds, CENTRE, clip, breath=breath,
-                width=spec.width, height=spec.height, fps=spec.fps, tint=tint,
+                frames, job.fps, seconds, CENTRE, clip, breath=breath,
+                width=spec.width, height=spec.height, fps=spec.fps, tint=tint, skip=skip,
             )  # fmt: skip
         return clip
+
+    def shot_frames(self, asset: RenderedAsset, *, final: bool) -> tuple[Path, Job]:
+        """A staged scene's whole shot, rendered (a quick half-size draft for the animatic, or
+        full quality), as a folder of numbered frames, with the job that made it."""
+        keyed = Job.loads(asset.shot)
+        if final:
+            job = replace(keyed, quality="final", frames=())
+        else:
+            job = replace(
+                keyed, quality="draft", frames=(), fps=DRAFT_FPS,
+                width=keyed.width // 4 * 2, height=keyed.height // 4 * 2,
+            )  # fmt: skip
+        report = self.render_shot(job)
+        if not report.frames:
+            raise ValueError(f"{asset.scene_id}: its 3D shot was not rendered: {report.issues}")
+        return Path(report.frames[0]).parent, job
 
     def focal(self, scene: Scene, image: Path) -> tuple[float, float]:
         """Where the scene's focus sits in its keyframe, found once and kept."""
@@ -517,22 +543,17 @@ class Studio:
             raise ValueError("A staged scene needs Blender (production.pictures: staged)")
         return staging[0].render(job, folder)
 
-    def held_seconds(self, timeline: Timeline, scene_id: str) -> float:
-        """How long a scene's own picture is on screen: its time, less what the morphs into
-        and out of it take from it."""
-        starts = {timing.scene_id: timing.start for timing in timeline.scenes}
+    def window(self, timeline: Timeline, scene_id: str) -> "ShotWindow":
+        """The stretch of time a staged scene's shot covers: from the start of the morph into
+        it to the end of the morph out of it, so the morphs play over its moving frames."""
         timing = next(t for t in timeline.scenes if t.scene_id == scene_id)
-        leaving = sum(
-            starts[t.to_scene_id] - t.start
-            for t in timeline.transitions
-            if t.from_scene_id == scene_id
-        )
-        entering = sum(
-            t.seconds - (starts[t.to_scene_id] - t.start)
-            for t in timeline.transitions
-            if t.to_scene_id == scene_id
-        )
-        return timing.end - timing.start - leaving - entering
+        into = next((t for t in timeline.transitions if t.to_scene_id == scene_id), None)
+        out = next((t for t in timeline.transitions if t.from_scene_id == scene_id), None)
+        begins = into.start if into else timing.start
+        held_from = (into.start + into.seconds if into else timing.start) - begins
+        out_from = (out.start if out else timing.end) - begins
+        ends = out.start + out.seconds if out else timing.end
+        return ShotWindow(seconds=ends - begins, held_from=held_from, out_from=out_from)
 
     def pricing(self) -> Pricing:
         return Pricing(

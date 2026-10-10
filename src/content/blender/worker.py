@@ -108,6 +108,14 @@ def _join(join: Join, out: Path) -> int:
         fps=join.fps,
         aspect=join.width / join.height,
         pictures={"from": join.first, "to": join.last},
+        moving={
+            which: (folder, start)
+            for which, folder, start in (
+                ("from", join.first_frames, join.first_from),
+                ("to", join.last_frames, join.last_from),
+            )
+            if folder
+        },
     )
     block().build(canvas, read(block, join.transition.settings))
     scene.render.engine = ENGINE
