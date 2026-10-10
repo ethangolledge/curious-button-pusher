@@ -44,6 +44,7 @@ from content.review.render import (
 )
 from content.schemas.package import FinalContentPackage, ReviewHandoff
 from content.schemas.review import ReviewItem, ReviewRequest, ReviewResponse
+from content.spend import cost_stage
 
 
 def slug(topic: str) -> str:
@@ -207,7 +208,7 @@ class RunFolder:
         calls = summary.get("calls", [])
         stages = dict.fromkeys(COST_STAGES, 0.0)
         for call in calls:
-            stages[_cost_stage(call["operation"])] += call["cost_usd"] or 0.0
+            stages[cost_stage(call["operation"])] += call["cost_usd"] or 0.0
         unpriced_takes = sum(
             1 for call in calls if call["operation"] == "narration" and call["cost_usd"] is None
         )
@@ -242,7 +243,7 @@ class RunFolder:
             if new:
                 table.writerow(["session", "stage", *CALL_COLUMNS.values()])
             for call in calls:
-                stage = _cost_stage(call["operation"])
+                stage = cost_stage(call["operation"])
                 table.writerow([session, stage, *(call.get(field, "") for field in CALL_COLUMNS)])
 
     def write_page(
@@ -275,20 +276,6 @@ class RunFolder:
 def _fingerprint(item: ReviewItem) -> str:
     media = Path(item.media)
     return item.text + ("|" + str(media.stat().st_size) if item.media and media.is_file() else "")
-
-
-def _cost_stage(operation: str) -> str:
-    """Which column of cost.csv a call's spend goes in."""
-    if operation.startswith("judge_") or operation == "perception":
-        return "checks"
-    return {
-        "narration": "narration",
-        "transcription": "narration",
-        "reference_download": "pictures",
-        "keyframe": "pictures",
-        "segment": "morphs",
-        "music": "music",
-    }.get(operation, "writing")
 
 
 # The review page

@@ -53,6 +53,7 @@ in the bucket (`storage.save_theme`, `THEME_SKIPPED`):
 |---|---|
 | `theme.json`, `SKILL.md`, `README.md`, `references/`, `fonts/`: the recipe | `learning/embedder/`: a published model, downloaded again on first use |
 | `config.json`: the channel's configuration, bucket included | |
+| `spend.sqlite`: everything spent, and what is left ([spending.md](spending.md)) | |
 | `examples/`, `notes/`: your regression examples, decisions and plans | |
 | `voice/master.*`: the locked narrator (a real person's voice stays private) | `music/candidates/`: auditions |
 | `music/bed.*` and its beat map `bed.map.json` | |

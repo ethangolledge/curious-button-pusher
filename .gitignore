@@ -230,6 +230,7 @@ themes/*
 themes/starter/voice/
 themes/starter/music/
 themes/starter/learning/
+themes/starter/spend.sqlite
 # Downloaded embedding model for the local decision models (labels and models are kept)
 **/learning/embedder/
 # Personal Claude Code settings (the project skill in .claude/skills is shared).

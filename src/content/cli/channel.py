@@ -6,6 +6,7 @@ import shutil
 import tempfile
 from pathlib import Path
 
+from content.cli.spend import record_spend
 from content.cli.storage import keep_theme
 from content.config import (
     load_config,
@@ -20,6 +21,7 @@ from content.production.music_map import analyse_track, save_map
 from content.production.narration_analysis import analyse, apply_to_theme
 from content.production.score import arrangements, choose, render
 from content.production.voice_lock import lock_voice
+from content.spend import now
 from content.theme import ThemeError, new_theme
 from content.workflow.providers import (
     build_media_provider,
@@ -42,8 +44,10 @@ def _audition(arguments: list[str]) -> int:
     if media is None:
         parser.error("Voice audition needs a configuration with a production section")
     output = args.output or config.application.output_directory / "_theme" / "voice-audition"
-    for clip in audition(config.theme, media, output):
+    clips, calls = audition(config.theme, media, output)
+    for clip in clips:
         print(f"Voice: {clip}")
+    record_spend(config, calls, source="voice-audition", session=now(), stage="tools")
     print("Set voice.model, voice.voice and voice.direction_style in the theme to lock it.")
     return 0
 
@@ -64,8 +68,10 @@ def _voice_design(arguments: list[str]) -> int:
     if media is None:
         parser.error("Voice design needs a configuration with a production section")
     output = args.output or config.application.output_directory / "_theme" / "voice-design"
-    for result in design_voices(config.theme, media, output):
+    results, calls = design_voices(config.theme, media, output)
+    for result in results:
         print(f"Design: {result}")
+    record_spend(config, calls, source="voice-design", session=now(), stage="tools")
     print("Lock your favourite with: python -m content voice-lock <clip> --model <cloning model>")
     return 0
 
@@ -130,7 +136,9 @@ def _music_audition(arguments: list[str]) -> int:
         parser.error("Music audition needs a production section with a music_model")
     output = args.output or config.theme.root / "music" / "candidates"
     model = config.production.music_model
-    for track in music_audition(config.theme, media, model, output, seconds=args.seconds):
+    tracks, calls = music_audition(config.theme, media, model, output, seconds=args.seconds)
+    record_spend(config, calls, source="music-audition", session=now(), stage="tools")
+    for track in tracks:
         swing = loudness_range(track)
         note = "steady" if swing <= 6 else "swells; may pull attention" if swing <= 10 else "busy"
         print(f"Music: {track}  (loudness range {swing:.1f} LU: {note})")

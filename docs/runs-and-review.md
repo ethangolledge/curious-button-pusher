@@ -217,7 +217,8 @@ and `"person"`), or for its own reviews (`"assistant"`).
   (`writing`: every text model; `checks`: Jev and the vision model; `narration`, `pictures`
   with reference downloads, `morphs`, `music`), the priced total, unpriced calls, and an
   estimate for unpriced narration takes (the provider does not price them; about $0.09 each).
-  The rows are kept in `.work/costs.jsonl`; stages are mapped by `review/run_folder._cost_stage`.
+  The rows are kept in `.work/costs.jsonl`; stages are mapped by `spend.cost_stage`. Across all
+  runs and tools, with what is left on each service: `content spend` ([spending.md](spending.md)).
 - `calls.csv` breaks the same spend down per call (one row each, appended per session), so a
   costly or slow artifact can be found: `made` is the operation (`research`, `plan`, `script`,
   `script_line_edit`, `fact_check_light`, `critique_script`, `narration`, `keyframe`…). Each

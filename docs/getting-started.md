@@ -146,6 +146,7 @@ free). Every setting, with what it does: [theme-settings.md](theme-settings.md).
 | A run stopped part-way | in Claude Code: "carry on with my video"; nothing already paid for is paid again |
 | Anything with Google Cloud | [google-cloud.md](google-cloud.md), "When something goes wrong" |
 | You are not sure what is set up | `.venv/bin/content check` in the project folder |
+| You want to know what you have spent and what is left | ask "how much have I got left?", or `content spend --config themes/<name>/config.json` ([spending.md](spending.md)) |
 
 ## Words you will meet
 

@@ -15,6 +15,7 @@ Otherwise, start with the one you need:
 | make my own channel: the look, voice, music and taste a theme holds | [themes.md](themes.md) |
 | know exactly what one channel setting does, its starter value, and what changing it costs | [theme-settings.md](theme-settings.md) |
 | set up Google Cloud from nothing, to keep my channel and videos safe | [google-cloud.md](google-cloud.md) |
+| know what has been spent and what is left, on every service | [spending.md](spending.md) |
 | know what a configuration key does, or which config file to use | [configuration.md](configuration.md) |
 | check that the pipeline still catches the narration failures a person found (`content eval`) | [narration.md](narration.md#regression-content-eval) |
 | run a video, or understand the sign-offs and the run folder | [runs-and-review.md](runs-and-review.md) |

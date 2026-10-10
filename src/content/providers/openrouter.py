@@ -2,6 +2,7 @@
 
 import os
 from collections.abc import Mapping
+from dataclasses import dataclass
 from typing import Any, TypeVar
 
 from pydantic import BaseModel
@@ -35,6 +36,50 @@ def key_credit_remaining(client: Any | None = None) -> float | None:
     response.raise_for_status()
     remaining = response.json()["data"].get("limit_remaining")
     return None if remaining is None else float(remaining)
+
+
+@dataclass(frozen=True)
+class Account:
+    """OpenRouter's own figures: the credit ever added and used on the account, and the
+    key's limit, what it may still spend, and when it stops working."""
+
+    credits_usd: float
+    used_usd: float
+    key_limit_usd: float | None
+    key_remaining_usd: float | None
+    key_expires: str | None
+
+    @property
+    def remaining_usd(self) -> float:
+        """What can still be spent: the account's balance, or less if the key's limit is lower."""
+        balance = self.credits_usd - self.used_usd
+        if self.key_remaining_usd is None:
+            return round(balance, 4)
+        return round(min(balance, self.key_remaining_usd), 4)
+
+
+def account_balance(client: Any | None = None) -> Account:
+    """Read the account's credit and the key's limit (both free to read)."""
+    if client is None:
+        import httpx
+
+        client = httpx.Client(
+            base_url=API_ROOT, headers={"Authorization": f"Bearer {_api_key()}"}, timeout=30.0
+        )
+    credits = client.get("/v1/credits")
+    credits.raise_for_status()
+    key = client.get("/v1/key")
+    key.raise_for_status()
+    account, limits = credits.json()["data"], key.json()["data"]
+    return Account(
+        credits_usd=float(account["total_credits"]),
+        used_usd=float(account["total_usage"]),
+        key_limit_usd=None if limits.get("limit") is None else float(limits["limit"]),
+        key_remaining_usd=(
+            None if limits.get("limit_remaining") is None else float(limits["limit_remaining"])
+        ),
+        key_expires=limits.get("expires_at"),
+    )
 
 
 class OpenRouterModelProvider:

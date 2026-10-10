@@ -332,10 +332,12 @@ def test_voice_audition_renders_directable_voices_with_and_without_direction(
         1 if c.direction_style == "none" else 2 for c in candidates if cloning or not c.clone
     )
 
-    results = audition(THEME, FakeMediaProvider(), tmp_path)
+    results, calls = audition(THEME, FakeMediaProvider(), tmp_path)
     clips = [line for line in results if Path(line).is_file()]
 
     assert len(clips) == expected
+    # Every clip made is a paid call, recorded for the ledger.
+    assert len(calls) == expected
     assert len(results) - len(clips) == (0 if cloning else sum(c.clone for c in candidates))
     assert any("__directed." in clip for clip in clips)
 
@@ -350,9 +352,9 @@ def test_designed_voices_are_rendered_with_their_descriptions(tmp_path: Path) ->
     voice = THEME.spec.voice.model_copy(update={"designs": [design, design]})
     theme = Theme(THEME.root, THEME.spec.model_copy(update={"voice": voice}), THEME.skill)
 
-    results = design_voices(theme, FakeMediaProvider(), tmp_path)
+    results, calls = design_voices(theme, FakeMediaProvider(), tmp_path)
 
-    assert len(results) == 2
+    assert len(results) == len(calls) == 2
     sidecar = json.loads((tmp_path / "design-1.json").read_text())
     assert sidecar["description"] == design.description
 
@@ -377,7 +379,7 @@ def test_locking_a_voice_stores_the_master_and_needs_no_calibration(tmp_path: Pa
     assert locked.reference_audio == "voice/master.mp3"
     assert master.is_file()
     # Clones of the master are auditioned once it exists.
-    clips = audition(load_theme(tmp_path / "theme"), FakeMediaProvider(), tmp_path / "audition")
+    clips, _ = audition(load_theme(tmp_path / "theme"), FakeMediaProvider(), tmp_path / "audition")
     assert any("__master" in clip for clip in clips)
 
 

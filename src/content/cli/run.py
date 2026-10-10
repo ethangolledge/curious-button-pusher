@@ -9,6 +9,7 @@ from pathlib import Path
 from pydantic import ValidationError
 
 from content.choices import RunChoices, configure_run
+from content.cli.spend import ledger_for, read_openrouter, record_spend
 from content.cli.storage import keep, keep_theme
 from content.config import (
     ContentConfig,
@@ -260,6 +261,12 @@ def main(arguments: list[str]) -> int:
             print(f"Stopped before anything was spent: {folder.root}")
             return 2
         folder.create(topic, brief)
+    ledger = ledger_for(config)
+    if ledger is not None:
+        # OpenRouter's own figures before anything is spent: the ledger calibrates against them.
+        reading = read_openrouter(ledger)
+        if not isinstance(reading, str) and reading.remaining_usd is not None:
+            print(f"OpenRouter: ${reading.remaining_usd:.2f} left to spend.")
     try:
         if carry_on:
             result = continue_workflow(
@@ -295,6 +302,7 @@ def main(arguments: list[str]) -> int:
     calls = state.get("call_log", [])[result.first_call :]
     summary = run_summary(calls)
     folder.record_cost(summary, state.get("current_stage", "unknown"))
+    record_spend(result.config, calls, source=folder.root.name, session=session.name)
     cost = summary["total"]["cost_usd"]
     print(f"Model calls: {len(calls)}; cost: {'unknown' if cost is None else f'${cost:.4f}'}")
     write_run_summary(calls, session)

@@ -97,6 +97,13 @@ Why: one key pays for every model the videos use (writing, voices, pictures, vid
    the key after `OPENROUTER_API_KEY=`, then Ctrl+O, Enter, Ctrl+X. (Or any text editor:
    the file is `.env` in the project folder.)
 
+4. Ask how much credit they added, and any limit they set, and record it once the channel
+   exists (stage 4): `content spend budget openrouter <amount> --config <channel>`.
+
+Tell them what is tracked: every paid call goes into their channel's spending ledger, with
+OpenRouter's own figures read before every run, and `content spend` (or "how much have I got
+left?") shows it all (`docs/spending.md`). Their Claude subscription is not tracked here.
+
 **Check:** `content check` shows "OpenRouter key: works; $… left".
 
 ## Stage 3: Keeping it safe in Google Cloud (optional, free tier, about 20 minutes)
@@ -115,6 +122,9 @@ now, follow `docs/google-cloud.md`:
   install the `cloud` extra, and connect it (`--bucket` in stage 4, or `"storage"` in
   `config.json`).
 - If any gcloud command hangs, it is the network quirk at the end of `docs/google-cloud.md`.
+- Ask the amount of the budget alert they set (and any free-trial credit Google gave them),
+  and record it after stage 4: `content spend budget google-cloud <amount> --kind monthly
+  --config <channel>`.
 
 **Check (after stage 4):** `content check --config <channel>` shows "Bucket: … reachable".
 
@@ -130,6 +140,9 @@ content new-channel <name> [--bucket <their-bucket>]
 It copies the starter to `themes/<name>/` and writes `themes/<name>/config.json`. Tell them
 the folder is theirs and private. Start `themes/<name>/notes/setup.md` with the date, their
 one-sentence idea, and the stages ahead.
+
+Record what they told you in stages 2 and 3 (`content spend budget …`), then show them
+`content spend --config <channel>`: what they have, what is left, and that it starts at zero.
 
 **Check:** `content check --config <channel>` shows the channel loading.
 

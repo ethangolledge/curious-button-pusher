@@ -3,12 +3,14 @@ and the story regression (`eval`)."""
 
 import argparse
 import json
+import time
 from collections.abc import Mapping
 from dataclasses import asdict
 from datetime import UTC, datetime
 from pathlib import Path
 
 from content.agents.base import load_prompt
+from content.cli.spend import record_spend
 from content.cli.storage import keep_theme
 from content.config import (
     ContentConfig,
@@ -26,6 +28,8 @@ from content.learning.examples import (
 from content.learning.labelling import label_interactively
 from content.schemas.audience import AudienceReport
 from content.schemas.judgement import Outcome
+from content.spend import now
+from content.state import CallRecord, call_record
 from content.workflow.providers import (
     build_decision_provider,
     build_providers,
@@ -87,28 +91,31 @@ def _eval(arguments: list[str]) -> int:
     provider = build_providers(config)[model.provider]
     decider = build_decision_provider(config)
     instructions = load_prompt(director.prompt.with_name("listener_prompt.md"))
-    spent = 0.0
+    calls: list[CallRecord] = []
 
     def ask(question_id: str, state: Mapping[str, object]) -> Outcome:
-        nonlocal spent
         question = QUESTIONS[question_id]
+        started = time.perf_counter()
         result = decider.decide(
             model=config.decisions.model,
             state=dict(state),
             questions={question_id: question.request()},
         )
-        spent += result.usage.cost_usd or 0.0
+        calls.append(
+            call_record(f"judge_{question_id}", result.usage, time.perf_counter() - started)
+        )
         answer = result.answers[question_id]
         return answer_outcome(question, answer, None, config.decisions)
 
     for fixture in load_fixtures(args.fixtures or config.theme.root / "examples"):
+        started = time.perf_counter()
         heard, usage = provider.generate_structured(
             instructions=instructions,
             input_text=json.dumps({"narration": fixture.narration}),
             output_type=AudienceReport,
             model=model,
         )
-        spent += usage.cost_usd or 0.0
+        calls.append(call_record("cold_viewer", usage, time.perf_counter() - started))
         result = score(fixture, flags(fixture, heard, ask))
         print(f"\n{fixture.name} ({fixture.kind})")
         for expected, checks in result.caught:
@@ -117,7 +124,9 @@ def _eval(arguments: list[str]) -> int:
         label = "false alarms" if fixture.kind == "positive" else "also flagged"
         for flag in result.unexpected:
             print(f"  {label}: {flag.unit_id or 'narration'} {flag.check}: {flag.detail[:80]}")
+    spent = sum(call["cost_usd"] or 0.0 for call in calls)
     print(f"\nSpent about ${spent:.2f}.")
+    record_spend(config, calls, source="eval", session=now(), stage="tools")
     return 0
 
 
@@ -226,6 +235,7 @@ def _train(arguments: list[str]) -> int:
             questions=[asdict(entry) for entry in report.questions],
         )
     )
+    record_spend(config, report.teacher_calls, source="train", session=now(), stage="tools")
     spent = sum(run.cost_usd for run in store.training_runs())
     print(
         f"Teacher labels: {len(report.teacher_calls)} for ${report.cost_usd:.4f} "

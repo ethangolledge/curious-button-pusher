@@ -359,6 +359,10 @@ class GcsStore:
         # Inside the bucket: nothing is downloaded or uploaded again.
         self._bucket.copy_blob(self._bucket.blob(source), self._bucket, target)
 
+    def size(self, prefix: str) -> int:
+        """Bytes kept under `prefix`: what the bucket bills for."""
+        return sum(blob.size or 0 for blob in self._bucket.list_blobs(prefix=prefix))
+
 
 def describe(manifest: Manifest) -> str:
     size = sum(stored.bytes for stored in manifest.files.values())

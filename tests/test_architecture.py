@@ -12,6 +12,7 @@ LAYERS: list[set[str]] = [
     {"errors", "models"},
     {"providers"},  # the paid models and the stand-ins for them
     {"state"},  # the run's state, and the record of every call
+    {"spend"},  # what has been spent, and what is left
     {"judging"},  # Jev: the questions, the outcomes, the judge
     {"theme"},
     {"config"},

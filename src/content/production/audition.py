@@ -1,22 +1,27 @@
 """Auditions: the same passage in every candidate voice, and the theme's music prompt in
 every variation, so a person can pick one of each and lock it in the theme."""
 
+import time
 from pathlib import Path
 
 from content.production.media import MediaProvider
+from content.state import CallRecord, call_record
 from content.theme import Theme
 
 
-def audition(theme: Theme, media: MediaProvider, output_directory: Path) -> list[str]:
+def audition(
+    theme: Theme, media: MediaProvider, output_directory: Path
+) -> tuple[list[str], list[CallRecord]]:
     """Render the theme's audition passage with each candidate voice, with and without
     spoken direction when the voice takes it. A candidate that fails is reported, not fatal.
 
     Lock the chosen one by setting `voice.model`, `voice.voice`, and
-    `voice.direction_style` in the theme."""
+    `voice.direction_style` in the theme. Returns the clips and the calls paid for."""
     voice = theme.spec.voice
     text = theme.spoken_text(voice.audition_text)
     output_directory.mkdir(parents=True, exist_ok=True)
-    results = []
+    results: list[str] = []
+    calls: list[CallRecord] = []
     master = theme.reference_audio
     for candidate in voice.candidates:
         if candidate.clone and master is None:
@@ -29,8 +34,9 @@ def audition(theme: Theme, media: MediaProvider, output_directory: Path) -> list
             base = "master" if candidate.clone else candidate.voice or "default"
             name = f"{candidate.model.replace('/', '_')}__{base}"
             clip = output_directory / f"{name}{'__directed' if direction else ''}"
+            started = time.perf_counter()
             try:
-                audio, _ = media.speech(
+                audio, usage = media.speech(
                     model=candidate.model,
                     text=text,
                     voice=candidate.voice,
@@ -42,23 +48,29 @@ def audition(theme: Theme, media: MediaProvider, output_directory: Path) -> list
             except Exception as error:  # one failed candidate must not stop the rest
                 results.append(f"{name}: failed ({error})")
                 continue
+            calls.append(call_record("voice_audition", usage, time.perf_counter() - started))
             clip = clip.with_name(clip.name + _suffix(audio))
             clip.write_bytes(audio)
             results.append(str(clip))
-    return results
+    return results, calls
 
 
-def design_voices(theme: Theme, media: MediaProvider, output_directory: Path) -> list[str]:
+def design_voices(
+    theme: Theme, media: MediaProvider, output_directory: Path
+) -> tuple[list[str], list[CallRecord]]:
     """Render the audition passage once per voice design. Each clip reads the audition
-    passage, so it can become the master recording with that passage as its transcript."""
+    passage, so it can become the master recording with that passage as its transcript.
+    Returns the clips and the calls paid for."""
     voice = theme.spec.voice
     text = theme.spoken_text(voice.audition_text)
     output_directory.mkdir(parents=True, exist_ok=True)
-    results = []
+    results: list[str] = []
+    calls: list[CallRecord] = []
     for index, design in enumerate(voice.designs, start=1):
         clip = output_directory / f"design-{index}"
+        started = time.perf_counter()
         try:
-            audio, _ = media.speech(
+            audio, usage = media.speech(
                 model=design.model,
                 text=text,
                 voice=design.voice,
@@ -70,30 +82,35 @@ def design_voices(theme: Theme, media: MediaProvider, output_directory: Path) ->
         except Exception as error:  # one failed design must not stop the rest
             results.append(f"design-{index} ({design.model}): failed ({error})")
             continue
+        calls.append(call_record("voice_design", usage, time.perf_counter() - started))
         clip = clip.with_name(clip.name + _suffix(audio))
         clip.write_bytes(audio)
         clip.with_suffix(".json").write_text(design.model_dump_json(indent=2), encoding="utf-8")
         results.append(f"{clip}  ({design.model}, {design.voice or 'default'})")
-    return results
+    return results, calls
 
 
 def music_audition(
     theme: Theme, media: MediaProvider, model: str, output_directory: Path, *, seconds: float = 60
-) -> list[Path]:
-    """Render one candidate bed per variation of the theme's music prompt.
+) -> tuple[list[Path], list[CallRecord]]:
+    """Render one candidate bed per variation of the theme's music prompt; returns the beds
+    and the calls paid for.
 
     Lock the chosen one by copying it into the theme and setting `music.track`."""
     music = theme.spec.music
     output_directory.mkdir(parents=True, exist_ok=True)
-    tracks = []
+    tracks: list[Path] = []
+    calls: list[CallRecord] = []
     for index, variation in enumerate(music.variations or [""], start=1):
-        audio, _ = media.music(
+        started = time.perf_counter()
+        audio, usage = media.music(
             model=model, prompt=f"{music.prompt} {variation}".strip(), seconds=seconds
         )
+        calls.append(call_record("music_audition", usage, time.perf_counter() - started))
         track = output_directory / f"music-{index}.mp3"
         track.write_bytes(audio)
         tracks.append(track)
-    return tracks
+    return tracks, calls
 
 
 def _suffix(audio: bytes) -> str:

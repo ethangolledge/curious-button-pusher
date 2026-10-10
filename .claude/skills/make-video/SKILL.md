@@ -178,6 +178,11 @@ than `themes/starter`.
 
 ### Money
 
+- **Before every intake**, run `content spend --config <channel>` and tell the person in one
+  line what they have left and anything it warns about (a low balance, a key about to expire);
+  after a run, what it spent. If they mention topping up, record it: `content spend budget
+  openrouter <new total> --config <channel>`. Every call is recorded for them; never keep spend
+  in Markdown.
 - `content check --config <channel>` says whether the machine, the key (with its balance) and
   the channel are ready; use it whenever something seems off.
 - Check the key before a paid stage: `content check --config <channel>` shows its balance.
