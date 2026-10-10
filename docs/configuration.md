@@ -63,16 +63,16 @@ different model family from the writer), `listener` (the cold viewer, a third fa
 | `allow_provisional_research` | `true`: research resting partly on allegation or weak sourcing continues; `false` (real): it stops at a research review |
 | `review_plan` | stop for a person at the creative plan (off; Jev and the critic judge it) |
 | `review_script` | the Script sign-off before narration is paid for (on in real runs) |
-| `max_revisions.research`, `.script`, `.visuals` | automatic revisions each stage may make before the run asks a person; the script's also covers oral revisions after the listener test |
+| `workflow.max_revisions.research`, `workflow.max_revisions.script`, `workflow.max_revisions.visuals` | automatic revisions each stage may make before the run asks a person; the script's also covers oral revisions after the listener test |
 
 ## `decisions` (Jev)
 
 | Key | Meaning |
 |---|---|
 | `provider`, `model` | `openrouter` and `typesafe/jev-1.13` (pinned) |
-| `thresholds.yes_min` | a yes/no answer passes at or above this probability of yes (0.6 real) |
-| `thresholds.no_max` | and fails at or below it (0.2) |
-| `thresholds.act_min` | choices and scores below this confidence are unsure (0.5) |
+| `decisions.thresholds.yes_min` | a yes/no answer passes at or above this probability of yes (0.6 real) |
+| `decisions.thresholds.no_max` | and fails at or below it (0.2) |
+| `decisions.thresholds.act_min` | choices and scores below this confidence are unsure (0.5) |
 | `blocking` | the questions whose failures route the graph; the rest are advice ([architecture.md](architecture.md#how-judgements-become-routes)) |
 
 ## `production` (omit it to stop at the prompt package)

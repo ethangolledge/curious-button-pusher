@@ -4,10 +4,14 @@
 
 This repository is an engine (`src/content/`) and a starter kit (`themes/starter/`). A person's
 channel lives in its own folder, `themes/<name>/`, which is private: gitignored, and kept in their
-cloud bucket if they use one. First work out which case you are in:
+cloud bucket if they use one. Assume the person may be completely non-technical: you do the technical work, they decide.
+First work out which case you are in (`.venv/bin/content check` reports what is set up, if the
+project is installed):
 
-1. **No channel yet** (`themes/` holds only `starter`): help the person build one. Follow
-   `.claude/skills/new-channel/SKILL.md`; it starts with `content new-channel <name>`.
+1. **No channel yet, or not set up** (`themes/` holds only `starter`, or `content check` lists
+   things to do): set them up and build their channel with them, as a conversation in stages.
+   Follow `.claude/skills/new-channel/SKILL.md`; a half-finished setup is recorded in
+   `themes/<name>/notes/setup.md`, so carry on from there.
 2. **A channel is named but missing** (a fresh clone): ask for their bucket and channel name and
    run `content storage pull --bucket <bucket> --channel <name>` (`docs/storage.md`).
 3. **A channel is present** (`themes/<name>/config.json`): read `PROJECT_CONTEXT.md`, then the

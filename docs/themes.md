@@ -13,6 +13,8 @@ style; swap the theme and the same pipeline makes a different channel.
   `content storage pull` brings it back on a fresh clone ([storage.md](storage.md)).
 
 Every theme present in `themes/` is loaded and validated by the tests (`tests/test_theme.py`).
+Every single setting, with its starter value, what it does and what changing it costs, is in
+[theme-settings.md](theme-settings.md); this page explains how a theme fits together.
 
 Last reviewed: 2026-10-09.
 

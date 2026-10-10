@@ -1,117 +1,270 @@
 ---
 name: new-channel
-description: Build a new channel (its theme and configuration) from the starter kit with the person, from a fresh clone to a first finished video. Use when the repository has no channel yet (themes/ holds only starter), when someone forks it, wants their own look, voice, music or storytelling voice, asks to "start from scratch", or wants to change what makes an existing channel distinctive.
+description: Set someone up from nothing and build their channel with them, as a conversation in stages - their computer, their OpenRouter key, optional Google Cloud, then every part of the channel (its storytelling voice, look, movement, feeling, narrator, music, subtitles, formats) - through to their first video. Use when the repository has no channel yet (themes/ holds only starter), when someone new arrives ("help me get started", "set me up", "I want my own channel"), when someone forks it, or wants to change what makes an existing channel distinctive.
 ---
 
-# Building a channel from the starter
+# Setting someone up, and building their channel
 
-A channel is a folder: `themes/<name>/` holds its look, motion, narrator, music, writing voice,
-taste data and its own configuration (`config.json`). The engine in `src/` never changes for a
-new channel. Every setting is listed in `docs/themes.md`; configuration keys in
-`docs/configuration.md`. The starter (`themes/starter/`) describes what each setting could be;
-the person's answers decide what it is.
+You are guiding a person who may have never used a terminal. They bring taste and decisions;
+you do everything technical. By the end they have a working setup, a channel that is
+unmistakably theirs, and a first video.
 
-The person decides taste; you do the editing. Ask what they want the channel to feel like, show
-them options, write the theme from their answers, and get a yes before anything that costs money
-(auditions and the first run).
+A channel is one private folder, `themes/<name>/`: its `theme.json` (every exact setting,
+explained one by one in `docs/theme-settings.md`), its `SKILL.md` (the channel in words, read by
+every creative agent), its `config.json` (which models it uses, its spending cap, its bucket),
+its voice and music once locked, its taste data, and `notes/`. It is gitignored and never
+committed; only `themes/starter/` is shared. The engine in `src/` never changes for a channel.
 
-## 0. Where the channel lives
+## How to run the conversation
 
-The channel folder is private to the person: gitignored, never committed (only `themes/starter`
-is shared). If they want it safe beyond this machine, with every earlier version restorable,
-they keep it in their own Google Cloud Storage bucket (`docs/storage.md`, "Setting it up"); ask
-whether they have one before step 1.
+- **One stage at a time.** Say where you are and what comes next ("Stage 3 of 12: your
+  narrator. Next: the music."). Never dump the whole plan on them.
+- **Explain why, in one plain sentence,** before asking anything. Translate every term the
+  first time ("a bucket: a private folder in Google's cloud").
+- **Do it for them.** Run the commands and edit the files yourself. Ask the person only for:
+  decisions of taste; what only they can do (accounts, payment, passwords, browser sign-ins);
+  and a yes before anything that costs money.
+- **What they must do themselves, and how:**
+  - Websites (OpenRouter, Google Cloud): give the exact link and the clicks, one at a time.
+  - Commands that need their password (`sudo apt …`) or open a browser sign-in
+    (`gcloud auth …`): ask them to run them in a terminal window of their own, not inside
+    Claude Code, which cannot type a password or paste a code back for them. Give the exact
+    line to copy.
+  - A short non-interactive command they want to see run in this session: they can type it
+    after `!` in Claude Code.
+- **Secrets never go through the chat.** Never ask them to paste an API key here; they put it
+  in `.env` themselves (stage 2). Never print it, commit it, or write it anywhere else.
+- **Offer, don't interrogate.** For taste, give two or three concrete options with your
+  recommendation first ("Ink and watercolour (recommended for history: warm and human), flat
+  paper cut-outs, or bold comic panels"). `AskUserQuestion` with at most four questions a
+  round, each with a one-line reason.
+- **Say the cost before anything paid,** in money: "about 30 cents for five voices".
+  Everything in stages 0–7 and 10–11 is free.
+- **Check after every stage** (`content check`, the theme tests) and say plainly what now
+  works ("Your key works and has $9.80 on it.").
+- **Write down progress** in `themes/<name>/notes/setup.md` after each stage: what was
+  decided and why, what is done, what is next. A later session (yours or another assistant's)
+  reads it and carries on. With a bucket, `content storage save-theme` after each stage too.
+- **If something fails,** read the error, fix what you can, and explain the rest in plain
+  words. `docs/getting-started.md` and `docs/google-cloud.md` list the usual problems.
 
-## 1. Set up (free)
+All commands below run in the project folder, as `.venv/bin/content …` (written `content`).
+Channel commands take `--config themes/<name>/config.json` (written `--config <channel>`).
+
+## Stage 0: Where are we? (free)
+
+Find out before saying anything about steps:
+
+- `ls themes` and `ls themes/*/notes/setup.md`: is there a channel, and how far did setup get?
+  If `setup.md` exists, read it and carry on from where it stopped.
+- Is the project installed? (`.venv/bin/content check` runs, or `.venv` is missing.)
+- Ask, in one go: their computer (macOS, Windows, Linux), and what they want to make, in a
+  sentence. That sentence guides every later suggestion.
+
+## Stage 1: The computer (free, about 15 minutes)
+
+Check what is installed: `python3 --version` (3.11 or newer), `ffmpeg -version`,
+`git --version`. For anything missing, give them the exact lines for their system, to run in
+their own terminal (they need their password):
+
+- macOS: Homebrew if missing (`/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"`),
+  then `brew install python@3.12 ffmpeg git`.
+- Ubuntu, Debian, or Windows with WSL: `sudo apt update && sudo apt install -y python3
+  python3-venv python3-pip ffmpeg git`. On Windows, WSL itself first:
+  https://learn.microsoft.com/windows/wsl/install.
+
+Then install the project yourself:
 
 ```bash
-python -m venv .venv && .venv/bin/pip install -e '.[dev,live]'   # needs ffmpeg
-cp .env.example .env                                              # the person pastes their OpenRouter key
-.venv/bin/content new-channel <name> [--bucket <their-bucket>]    # the theme and its config.json
+python3 -m venv .venv
+.venv/bin/pip install -e '.[live,learn,dev]'
 ```
 
-`new-channel` copies `themes/starter` to `themes/<name>/` and writes `themes/<name>/config.json`
-from `config/config.example.json`, pointed at the theme and its taste data (and the bucket).
-Use `--config themes/<name>/config.json` for every command below. To try the theme offline while
-editing, copy `config/config.fake-video.json` into the channel folder and set its `"theme"`.
+**Check:** `content check` shows Python, ffmpeg, ffprobe and the `live` extra ready (the key
+comes next). Optionally show them a free practice run with stand-in models, so they see what
+a run looks like: `content "The Great Stink" --sources fixtures/example_input.json --config
+config/config.json` (a sign-off page opens; they approve it).
 
-## 2. The channel in words (free)
+## Stage 2: The OpenRouter key (they add credit, about 5 minutes)
 
-Talk it through with the person, then write `themes/<name>/SKILL.md`. Every creative agent
-reads it. Cover, in the starter's section order:
+Why: one key pays for every model the videos use (writing, voices, pictures, video).
 
-- **The feeling** the viewer should leave with.
-- **Visual language:** the medium (one, concretely: "flat paper cut-outs", "ink and watercolour"),
-  the palette, how real people are drawn, what is never shown.
-- **The theme is a way of drawing, never a subject;** every scene's anchor comes from the story.
-- **Pacing** and **voice**: who the storyteller is, the humour, the shape stories usually take,
-  what counts as cliché.
-- **Good and bad examples** in neutral subjects. Never use a story they plan to make: examples
-  steer every story toward themselves.
+1. They sign up at https://openrouter.ai, then **Settings → Credits**: add credit. Suggest $10
+   to start: a short video is capped at $5.
+2. **Settings → Keys → Create key.** Give it a spending limit (the pipeline never spends more
+   than the key allows, and lowers a run's cap to fit).
+3. In their own terminal, in the project folder: `cp .env.example .env && nano .env`, paste
+   the key after `OPENROUTER_API_KEY=`, then Ctrl+O, Enter, Ctrl+X. (Or any text editor:
+   the file is `.env` in the project folder.)
 
-Then `theme.json` → `writing.voice`: one sentence; Jev judges every script against it. The
-starter's `writing.weights.role_seconds` (how long a spine claim, context, evidence, or colour
-may take) suit most channels; slow them for a contemplative channel, quicken them for a brisk
-one.
+**Check:** `content check` shows "OpenRouter key: works; $… left".
 
-## 3. The look (free to edit; pictures cost only in a run)
+## Stage 3: Keeping it safe in Google Cloud (optional, free tier, about 20 minutes)
 
-In `theme.json` → `visual` (meanings in `docs/themes.md` and `docs/visuals.md`):
+Why, in their terms: without it, the channel and videos live only on this computer. With it,
+every change to the channel is kept with its history, every video is kept at each sign-off and
+when it finishes (never twice), and a new computer gets everything back. Free up to 5 GB (about
+25 long videos); Google asks for a card even so.
 
-1. `style`, `texture`, `lighting`: the medium in words an image model follows, technique names
-   only (never artists or franchises). `avoid` and `morph_avoid` keep photorealism and text out.
-2. `figure` and `silhouette`: how a public figure is drawn, and the fallback when a portrait is
-   refused. Keep their slots (`{subject}`, `{name}`, `{likeness}`, `{silhouette}`).
-3. `morph`: describe the change you want to see between pictures (melting, one shape becoming
-   another). Video models follow it literally; effect words ("kaleidoscope", "hallucinatory")
-   give exactly that.
-4. `camera_moves` and `motion`: glides, breathing, the morph layer and the texture pass. 0
-   switches an effect off; the starter is calm, and `docs/visuals.md` gives strong values for
-   comparison.
-5. `tone`: how bright and saturated pictures should be. Leave the starter's numbers until a first
-   run's keyframes have been approved, then refit them (`docs/machine-learning.md`, colour).
-6. `palette` and `subtitles` (font in `fonts/`, colours, position).
-7. `formats`: the shapes of video the channel makes (the starter has `short`, 9:16, and `long`,
-   16:9 with a Story plan sign-off), each with its size, shortest and longest video, how
-   prompts name the frame (`frame`, `orientation`), and subtitle sizes for that frame; `format`
-   names the default. Ask the person which platforms they make for; a format they never use can
-   go. Keep the frame out of the prompt templates' wording: they say `{frame}` and
-   `{orientation}`.
+Ask whether to do it now or later (later is fine; stage 4 can add the bucket afterwards). If
+now, follow `docs/google-cloud.md`:
 
-Check it loads after every edit: `.venv/bin/python -m pytest -q tests/test_theme.py`.
+- They do steps 1–6: account, terms, project (note the project ID), billing with a $1 budget
+  alert, installing gcloud, and the two sign-ins in their own terminal.
+- You do steps 7–8: make the bucket (suggest a unique name like `<channel>-videos-2026`),
+  install the `cloud` extra, and connect it (`--bucket` in stage 4, or `"storage"` in
+  `config.json`).
+- If any gcloud command hangs, it is the network quirk at the end of `docs/google-cloud.md`.
 
-## 4. The narrator (cents; ask first)
+**Check (after stage 4):** `content check --config <channel>` shows "Bucket: … reachable".
 
-- `voice-audition` renders the theme's `audition_text` in every `voice.candidates` voice, with and
-  without direction, into `runs/_theme/voice-audition/`. The person listens and picks.
-- Or `voice-design` renders each description in `voice.designs` as a new voice.
-- A stock voice: set `voice.model`, `voice.voice` and `direction_style`. A designed or recorded
-  voice: `voice-lock <clip> --model <cloning model> --direction-style …` saves `voice/master.*` and
-  points the theme at it. A real person's voice only with their consent (`--transcript`).
-- Pace is set, not predicted (`words_per_minute`, `docs/narration.md`). To match a narrator they
-  admire, `analyse-narration <audio> --apply` sets `writing.rhythm` from numbers only.
+## Stage 4: Name and create the channel (free)
 
-## 5. The music (cents; ask first)
+Ask for the channel's name (the folder becomes lower case with hyphens: "Odd History" →
+`odd-history`). Then:
 
-- `music-audition` renders one bed per `music.variations` prompt. The person picks one.
-- `music-lock <track>` copies it into the theme and maps its beats and phrases (needs the `music`
-  extra), so stories are cut to its bars. Without a locked bed, music is generated per video
-  from `music.prompt`.
+```bash
+content new-channel <name> [--bucket <their-bucket>]
+```
 
-## 6. The first run
+It copies the starter to `themes/<name>/` and writes `themes/<name>/config.json`. Tell them
+the folder is theirs and private. Start `themes/<name>/notes/setup.md` with the date, their
+one-sentence idea, and the stages ahead.
 
-Follow the `make-video` skill: the intake questions, then the sign-offs. On the first video, read every
-sign-off with them for the channel's taste as well as the story's, and fold what they say into
-the theme's `SKILL.md` or `theme.json`, not into the run. A note on one story stays in that run.
+**Check:** `content check --config <channel>` shows the channel loading.
+
+## Stage 5: The channel in words (free)
+
+This is the most important stage: every creative agent reads the channel's `SKILL.md`. Talk
+it through, in one or two rounds of questions, offering examples:
+
+- **What stories?** True stories of what kind (history, science, crime, business, the
+  everyday), and what makes one right for this channel.
+- **Who is watching,** and what should they feel and think when it ends?
+- **The storyteller:** who is speaking (a dry historian, a curious friend, a wry detective),
+  the humour (none, dry, warm), how serious.
+- **The shape** their stories usually take, and **what is off-limits** (clichés, tones,
+  subjects).
+- **Channels or narrators they admire,** for technique only: never copy words or style
+  wholesale.
+
+Write `themes/<name>/SKILL.md` in the starter's section order: the feeling, the visual
+language, the voice, the story shape, a good and a bad example. Examples must be neutral
+subjects, never a story they plan to make: examples steer every story toward themselves.
+Then set `writing.voice` (one sentence; every script is judged against it),
+`writing.max_weighty_lines`, and, for a slower or brisker channel, `writing.weights.role_seconds`
+(`docs/theme-settings.md`, Writing). If they have a recording of a narrator they admire:
+`content analyse-narration <audio> --apply --config <channel>` sets the rhythm from numbers
+only.
+
+Read the result back to them in a few lines and get a yes.
+
+## Stage 6: The look (free to edit)
+
+Ask about, with options:
+
+- **The medium**, one, concretely: flat illustration, ink and watercolour, paper cut-outs,
+  woodcut print, bold comic panels, painterly gouache, chalk on a blackboard… Never
+  photorealistic: the models draw real people and places better, and more safely, as
+  illustration.
+- **The palette:** three to six colours; suggest some from their feeling.
+- **Light and texture:** bright and even, moody and low, grainy print…
+- **How real people are drawn** (recognisable but stylised) and what is never shown.
+
+Then edit `palette`, `visual.style`, `visual.texture`, `visual.lighting`, `visual.figure`,
+`visual.silhouette` (keep their slots), `visual.avoid` (keep photorealism and text out), and
+`visual.morph` and `visual.morph_avoid`: describe the change between pictures they want to see
+("ink bleeds into the next scene"); effect words ("kaleidoscope") come out literally. Style
+images in `references/` are optional (2–4 images, no text or real people); they can add them
+after the first video. Keep the frame out of the prompt templates' wording: they say
+`{frame}` and `{orientation}`. Every setting: `docs/theme-settings.md`, "The look in words".
+
+Tell them honestly: they will first see pictures at the first video's Pictures sign-off,
+before any of the expensive moving parts are made.
+
+## Stage 7: Movement and feeling (free)
+
+- **How much movement:** calm (the starter), medium, or strong. Strong values for the local
+  effects are in `docs/visuals.md`; set `visual.motion` from their choice. Every effect costs
+  nothing: it is rendered on their computer.
+- **Camera moves:** the starter's six suit most channels; add one only for a reason.
+- **The emotional field:** each scene's space, light and camera follow how its lines make a
+  listener react (curious, tense, repelled, at rest). Rewrite each reaction's `frame`, `light`
+  and `motion` wordings in their visual language, three strengths each
+  (`docs/theme-settings.md`, "The emotional field"). Only space, light, colour and motion:
+  never emotion words.
+- **Tone** (brightness and colourfulness targets): leave the starter's numbers until their
+  first video's pictures are approved, then refit them from those (`docs/machine-learning.md`,
+  colour).
+
+Then run `.venv/bin/python -m pytest -q tests/test_theme.py`: it validates their theme.
+
+## Stage 8: The narrator (cents; ask first)
+
+Options, recommended first:
+
+1. **A stock voice:** `content voice-audition --config <channel>` renders the theme's
+   `voice.audition_text` in every `voice.candidates` voice, with and without direction, into
+   `runs/_theme/voice-audition/` (a few cents each). They listen and pick; set `voice.model`,
+   `voice.voice` and `voice.direction_style` from the one they chose.
+2. **A designed voice no one else uses:** write two or three `voice.designs` (who is speaking:
+   age, accent, warmth, pace), then `content voice-design --config <channel>`. Lock the chosen
+   clip with `content voice-lock <clip> --model bytedance-seed/seed-audio-1-0
+   --direction-style inline --config <channel>`.
+3. **A real person's recording** (theirs, or a friend's): only with that person's consent.
+   `content voice-lock <clip> --model … --transcript "<exactly what the clip says>" --config
+   <channel>`.
+
+Then `voice.direction` (how every passage is spoken), `voice.words_per_minute` (160 is a
+brisk explainer; slower for a contemplative channel), and `voice.lexicon` for words the voice
+gets wrong. `docs/narration.md` explains pace.
+
+## Stage 9: The music (cents; ask first)
+
+Two ways:
+
+- **Generated for each video** from `music.prompt`: nothing more to do. Write the prompt with
+  them (instruments, mood, what it must never do: vocals, a big melody that fights the voice).
+- **One locked bed for every video,** like a signature: `content music-audition --config
+  <channel>` renders one candidate per `music.variations`; they pick one; `content music-lock
+  <track> --config <channel>` locks it and maps its beats, so stories are cut to its bars. This
+  needs the `music` extra, which needs PyTorch first: `.venv/bin/pip install torch torchaudio
+  --index-url https://download.pytorch.org/whl/cpu` then `.venv/bin/pip install -e '.[music]'`.
+
+## Stage 10: Subtitles and formats (free)
+
+- **Subtitles:** a font in `fonts/` licensed for video (the starter's is under the OFL), colours
+  from their palette, size and position (`docs/theme-settings.md`, Subtitles).
+- **Formats:** where they will publish. `short` (9:16, up to 3 minutes: TikTok, Reels, Shorts)
+  and `long` (16:9, YouTube, with a Story plan sign-off) are ready. Remove one they will never
+  make; set `format` to the usual one.
+
+## Stage 11: Check and keep (free)
+
+- `.venv/bin/python -m pytest -q tests/test_theme.py tests/test_rehearsal.py`: the theme is
+  valid, and their channel carries a story from research to a finished package with stand-in
+  models, every prompt and setting included.
+- `content check --config <channel>`: everything ready.
+- With a bucket: `content storage save-theme --config <channel>`.
+- Update `notes/setup.md`: setup done; what the channel is, in their words; what to revisit
+  after the first video (tone, references, motion).
+
+## Stage 12: The first video
+
+Follow the `make-video` skill: one round of questions (format, length, scenes, angle, with
+costs), then the sign-offs. On the first video, read every sign-off with them for the
+channel's taste as well as the story's, and fold what they say about the channel into its
+`SKILL.md` or `theme.json`, never into the run. A note about one story stays in that run.
+After the Pictures sign-off is approved, refit `visual.tone` from the approved pictures.
+
+Afterwards, tell them how to carry on: open Claude Code in the project folder and say what
+they want ("make a video about…", "change the narrator's pace", "set up a new computer").
 
 ## Done when
 
-- `tests/test_theme.py` passes, and the offline demo runs on the theme.
-- `SKILL.md` has no real story from their plans in it.
+- `content check --config <channel>` says ready, and the theme and rehearsal tests pass.
+- `SKILL.md` describes their channel and has no real story from their plans in it.
 - The voice and music are locked, or deliberately left to presets and generation.
-- The channel's decisions so far are in `themes/<name>/notes/` (what it is, why it looks and
-  sounds that way), so a later session can pick it up; a rejected script with its failures
-  named goes in `themes/<name>/examples/` (format: `themes/starter/examples/README.md`).
-- The theme folder is private: gitignored, never committed. With a `storage` section it is
-  saved to the bucket after every change; run `storage save-theme` after editing `theme.json`
-  or `SKILL.md` by hand (`docs/storage.md`).
+- `themes/<name>/notes/setup.md` records what was decided and why.
+- With a bucket, the channel is saved (`content storage show themes/<name> --config …`).
+- They know how to start the next video, and that the folder is private and never committed.

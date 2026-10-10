@@ -160,33 +160,13 @@ anything.
 
 ## Setting it up (once)
 
-Make a Google Cloud project (the free tier needs billing enabled, but stays free within its
-limits), install the [gcloud CLI](https://cloud.google.com/sdk/docs/install), then:
+Step by step, for someone who has never used Google Cloud, with what each option means and
+what to do when something goes wrong: [google-cloud.md](google-cloud.md). In short: a Google
+Cloud project with billing on (the free tier needs a card) and a budget alert, the gcloud tool,
+two sign-ins (`gcloud auth login`, `gcloud auth application-default login`), a Standard bucket
+in `us-east1` with public access prevented and soft delete off, the `cloud` extra, and a
+`storage` section in the channel's `config.json`. `content check --config …` confirms it.
 
-```bash
-gcloud auth login                                  # the gcloud tool
-gcloud auth application-default login              # the Python client (storage.GcsStore)
-gcloud config set project <your-project>
-gcloud storage buckets create gs://<your-bucket> --location=us-east1 \
-  --default-storage-class=STANDARD --uniform-bucket-level-access \
-  --public-access-prevention --soft-delete-duration=0
-pip install -e '.[cloud]'
-```
-
-Then give your channel the bucket: `content new-channel <name> --bucket <your-bucket>`, or add
-`"storage": {"bucket": "<your-bucket>"}` to its `config.json`, and run `content storage
-save-theme --config themes/<name>/config.json` once.
-
-- **Soft delete is off on purpose.** New buckets keep deleted files for 7 days and bill for them;
-  replacing a re-cut's final would be paid for twice for a week.
-- Bucket versioning and Autoclass stay off (their defaults): the theme's versions are kept by
-  `storage.py`, sharing unchanged files. Public access is blocked; there are no key files,
-  only your own sign-in (`gcloud auth application-default login` saves a token under
-  `~/.config/gcloud/`, outside the repo).
-
-**Quirk: gcloud hangs on some networks.** gcloud and Google's Python client both look up
-`metadata.google.internal` to see whether they run on a Google Cloud VM. On a network that never
-answers that lookup (`getent hosts metadata.google.internal` hangs), every command waits
-forever. Fix it in your shell profile by pointing the check at a port that refuses at once
-(`GCE_METADATA_ROOT`, `GCE_METADATA_IP`, `GCE_METADATA_HOST` = `127.0.0.1:1`,
-`NO_GCE_CHECK=True`), plus `gcloud config set core/check_gce_metadata false`.
+There are no key files: only your own sign-in, saved under `~/.config/gcloud/`, outside the
+project. Bucket versioning and Autoclass stay off: the channel's versions are kept by
+`storage.py`, sharing unchanged files.

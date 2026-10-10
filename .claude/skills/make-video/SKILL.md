@@ -178,8 +178,9 @@ than `themes/starter`.
 
 ### Money
 
-- Check the key before a paid stage:
-  `.venv/bin/python -c "from dotenv import load_dotenv; load_dotenv(); from content.providers.openrouter import key_credit_remaining as k; print(k())"`.
+- `content check --config <channel>` says whether the machine, the key (with its balance) and
+  the channel are ready; use it whenever something seems off.
+- Check the key before a paid stage: `content check --config <channel>` shows its balance.
   When the key holds less than `production.max_usd`, the run lowers its own cap to the balance
   (less $0.25) and says so; it refuses only below about $1. Tell the person before a paid stage
   if the cap came down, since fewer scenes are planned.

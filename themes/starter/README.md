@@ -5,8 +5,14 @@ illustration look, a stock voice (no cloning needed), and generated music (no lo
 
 Every value here is a neutral example of what a setting could be; your answers decide what it
 is. This file is for people. The pipeline reads only `theme.json` and `SKILL.md` (and
-`examples/` for `content eval`). An assistant working with you follows
-`.claude/skills/new-channel/SKILL.md`, which walks the same steps.
+`examples/` for `content eval`).
+
+**The easy way:** open Claude Code in the project folder and say "help me build my channel".
+It follows `.claude/skills/new-channel/SKILL.md`: the same steps as below, as a conversation,
+doing the editing for you. New to all of it? Start at `docs/getting-started.md`.
+
+Every setting in `theme.json`, with its value here, what it does, and what changing it costs:
+`docs/theme-settings.md`.
 
 ## Make it yours
 

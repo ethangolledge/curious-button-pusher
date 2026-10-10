@@ -18,9 +18,10 @@ infrastructure. Publishing is out of scope.
 
 ## Start Here
 
-**New to all of this?** Follow [docs/getting-started.md](docs/getting-started.md): what to
-install, every command to paste, and how to make your channel and your first video by talking
-to Claude Code. No coding needed.
+**New to all of this?** Follow [docs/getting-started.md](docs/getting-started.md): install four
+tools, download the project, open Claude Code and say "help me get set up". The assistant
+takes you through the rest as a conversation, from your accounts to your channel to your first
+video. No coding needed.
 
 | You are… | Do this |
 |---|---|
@@ -73,11 +74,13 @@ This creates `themes/my-channel/`: a complete, neutral theme copied from `themes
 channel's own configuration, `themes/my-channel/config.json`. Then make it yours, step by step,
 with `themes/my-channel/README.md` (the look, the writing voice, the narrator, the music, the
 subtitles, the formats), or ask the assistant: it follows the `new-channel` skill and walks you
-through the same steps. Every setting: [docs/themes.md](docs/themes.md).
+through the same steps. Every setting, with what it does and what changing it costs:
+[docs/theme-settings.md](docs/theme-settings.md). `content check --config
+themes/my-channel/config.json` says what is ready.
 
 Your channel folder is gitignored, so nothing of it reaches a public repository. To keep it safe
-beyond this machine, with its full history, keep it in your own cloud bucket
-([docs/storage.md](docs/storage.md)): `content new-channel my-channel --bucket <your-bucket>`.
+beyond this machine, with its full history, keep it in your own Google Cloud bucket
+([docs/google-cloud.md](docs/google-cloud.md)): `content new-channel my-channel --bucket <your-bucket>`.
 
 ## A Real Run
 

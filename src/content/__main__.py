@@ -6,13 +6,14 @@ from collections.abc import Callable
 
 from dotenv import load_dotenv
 
-from content.cli import channel, learning, review, run, storage
+from content.cli import channel, check, learning, review, run, storage
 
 COMMANDS: dict[str, Callable[[list[str]], int]] = {
     **review.COMMANDS,
     **channel.COMMANDS,
     **learning.COMMANDS,
     **storage.COMMANDS,
+    **check.COMMANDS,
 }
 
 

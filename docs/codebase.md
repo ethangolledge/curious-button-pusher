@@ -169,6 +169,7 @@ Each folder: `agent.py` (the code), `prompt.md` (what its model is told, theme-n
 | `learning.py` | `harvest`, `verdict`, `label`, `train`, `eval` |
 | `review.py` | `review`, `estimate` |
 | `storage.py` | `storage`, and keeping the channel after any command that changes it (`keep_theme`) |
+| `check.py` | `check`: is this machine ready (Python, ffmpeg, extras, the key and its balance, the channel, the bucket), with the fix for anything missing |
 
 ## Tunable Constants
 
