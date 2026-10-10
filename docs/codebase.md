@@ -69,11 +69,13 @@ imports nothing from the rest of `content`; only the files marked † use Blende
 | `blender/job.py` | the job: everything one shot needs, as JSON; the whole contract between the two sides |
 | `blender/api.py` | `Stage`: every verb a block may use, and `Box`, `Pose`, `Mark` |
 | `blender/maths.py` | vectors, rotations, easing, curves (line, arc, spline, constant-speed), turn limits, drift |
-| `blender/camera.py`, `motion.py`, `sets.py`, `shapes.py`, `lighting.py` | what blocks share: framing and keeping inside the set; travel and finding things; room shells; legs, slabs and drawers; light sources and flicker |
+| `blender/canvas_api.py`, `patterns.py` | `Canvas`: the verbs a transition's per-pixel program uses; the patterns transitions share (polar coordinates, turning, mirrored wedges, the Droste spiral) |
+| `blender/canvas.py` † | `Canvas` built as a GPU shader on a plane filling an orthographic camera; moving pictures as image sequences |
+| `blender/camera.py`, `motion.py`, `sets.py`, `shapes.py`, `shapes_figure.py`, `lighting.py` | what blocks share: framing and keeping inside the set; travel and finding things; room shells; legs, slabs and drawers; light sources and flicker |
 | `blender/blocks/` | one block per file, a folder per kind (`base.py`: what a block is, reading settings) |
 | `blender/registry.py`, `direct.py` | finding blocks by folder; building a shot in its one order |
-| `blender/rehearsal.py` | a `Stage` without Blender: checks shots and tests blocks |
-| `blender/stage.py` †, `worker.py` †, `audit.py` †, `ingest.py` † | the foundation; the job runner; the checks before rendering; preparing a downloaded model |
+| `blender/rehearsal.py` | a `Stage` and a `Canvas` without Blender: checks shots and tests blocks and transitions |
+| `blender/stage.py` †, `worker.py` †, `audit.py` †, `ingest.py` † | the foundation; the runner of shot and join jobs; the checks before rendering; preparing a downloaded model or character |
 | `staging/catalogue.py` | the blocks and models, described; the shot check |
 | `staging/library.py` | the model library: search by meaning, no duplicates |
 | `staging/templates.py` | the starting file for a new block of each kind |

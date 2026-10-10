@@ -67,6 +67,20 @@ Only when no block, with any settings, can do it. A block is general (`drive`, n
 8. A change to an existing block that alters what it builds fails its snapshot; renew it on
    purpose (`UPDATE_SNAPSHOTS=1 pytest -k <name>`) and say what changed.
 
+## A transition
+
+A new transition is a block too (`content staging new transitions <name>`): a program on the frame written with the `Canvas` verbs and the
+shared `patterns`, never Blender's API. Keep the theme's rule: it transforms, it never cuts,
+strobes or flashes; open from the plain first picture and close on the plain second. Test it
+on two real keyframes (a join job: `docs/staging.md`) at small size before anything else.
+
+## A character
+
+Only with the director's sign-off, and only once per person (`docs/staging.md`, "Characters"):
+a figurine model sheet (front approved first), a multiview image-to-3D model with a rig, then
+`content staging add … --can humanoid --turn … --height …`. Check its four-view sheet faces the
+front and stands on the plinth. Anonymous people are the free `person` and `seated_person`.
+
 ## A channel's look
 
 The look is the channel's style and lives in its folder (`themes/<name>/blender/looks/`).

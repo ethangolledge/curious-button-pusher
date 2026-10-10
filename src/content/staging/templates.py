@@ -2,6 +2,35 @@
 writes it, ready to fill in. Each is the smallest complete block of its kind."""
 
 TEMPLATES: dict[str, str] = {
+    "transitions": '''"""TODO: how one picture becomes the next, in a director's words."""
+
+from dataclasses import dataclass
+from typing import Annotated
+
+from content.blender.blocks.base import Range, Transition
+from content.blender.canvas_api import Canvas
+from content.blender.patterns import smoothstep, zoom
+
+
+@dataclass(frozen=True)
+class Settings:
+    closer: Annotated[float, Range(1, 4, "how far it looks in at the height")] = 1.5
+
+
+class {Name}(Transition):
+    name = "{name}"
+    settings = Settings
+    example = Settings()
+
+    def build(self, canvas: Canvas, p: Settings) -> None:
+        t = canvas.progress()
+        at = canvas.coords()
+        looked = zoom(canvas, at, p.closer)
+        mixed = canvas.mix(canvas.picture("from", looked), canvas.picture("to", looked), t)
+        # It opens from the plain first picture and closes on the plain second.
+        opened = canvas.mix(canvas.picture("from", at), mixed, smoothstep(canvas, 0.0, 0.2, t))
+        canvas.output(canvas.mix(opened, canvas.picture("to", at), smoothstep(canvas, 0.8, 1.0, t)))
+''',
     "moves": '''"""TODO: what the camera does, in a sentence a director would use."""
 
 from dataclasses import dataclass

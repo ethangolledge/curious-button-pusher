@@ -72,11 +72,12 @@ with a change). `AGENTS.md` says which applies when a session starts.
   tests in 20 s plus 12 whole-video renders (`pytest -m video`), ruff and strict mypy clean, no
   import cycles and one-way layers (enforced by a test). Validated end to end on a first
   long-form production.
-- 3D shots (Blender 5.2): the foundation, 31 blocks (custom hand-built sets included), 34
-  props made in code, a model library with search and ingest, `content staging`; joined to the
-  pipeline: `production.pictures: "staged"` stages what the toolkit can show and draws the rest,
-  with the same judging, colour, morphs and texture ([docs/staging.md](docs/staging.md)). Not
-  yet: figures, finding models during a run, cloud rendering.
+- 3D shots (Blender 5.2): the foundation, 42 blocks (9 transitions; custom sets, characters
+  and pictures included), 36 props made in code, a model library, `content staging`; in the
+  pipeline: `production.pictures: "staged"` stages what the toolkit can show, and
+  `production.joins: "rendered"` draws the morphs in Blender, free, over the shots' moving
+  frames ([docs/staging.md](docs/staging.md)). Not yet: characters made during a run, a
+  motion library, cloud rendering.
 - `content eval` caught all seven failures a director named in a rejected final cut, three runs
   out of three ([docs/narration.md](docs/narration.md#regression-content-eval)); false alarms on an
   approved script are not measured yet.

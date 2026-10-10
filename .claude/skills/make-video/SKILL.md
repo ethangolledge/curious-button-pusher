@@ -212,6 +212,9 @@ toolkit can show in Blender (`docs/staging.md`, "In a run"). For the person, wha
 - After the run, `content staging backlog --config <channel>` lists what the toolkit lacked,
   most wanted first; offer to build the top one.
 - `content check` must show Blender ready before a staged run.
+- **Rendered joins** (`production.joins: "rendered"`, with keyframes or staged pictures): the
+  morphs are drawn in Blender, free; say so when estimating (no morph cost), and that each
+  join takes a minute or two to render on this laptop.
 
 ## Editing a script by hand
 

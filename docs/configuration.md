@@ -81,7 +81,7 @@ different model family from the writer), `listener` (the cold viewer, a third fa
 |---|---|
 | `provider` | `openrouter`, or `fake` (colour stills and tones by ffmpeg, at the theme's neutral tone) |
 | `pictures` | how scenes are pictured: `keyframes` (each scene an image model's still, moved by ffmpeg; the starter's default) or `staged` (each scene the toolkit can show is a 3D shot built and rendered in Blender, free; the rest stay keyframes). Morphs, breathing, the feeling's colour and the texture are the same either way ([staging.md](staging.md)). Staged needs Blender 5.2 (`BLENDER`, or on the path) |
-| `joins` | how one scene turns into the next: `ai` (the video model morphs between the two pictures, about $0.17 a join; the default) or `rendered` (a transition drawn in Blender from the two pictures, free: flowing, rushing through, spiralling in… chosen per join by the storyboard or by the theme's `staging.joins`). Works with either `pictures`; needs Blender ([staging.md](staging.md#transitions)) |
+| `joins` | how one scene turns into the next: `ai` (the video model morphs between the two pictures, about $0.17 a join; the default) or `rendered` (a transition drawn in Blender from the two pictures, free: flowing, rushing through, spiralling in… chosen per join by the storyboard or by the theme's `staging.joins`). Works with either `pictures`; needs Blender ([staging.md](staging.md#transitions-morphs-drawn-in-blender)) |
 | `cache_directory` | the paid-asset cache (`.cache`); deleting it means paying again |
 | `image_model`, `image_resolution` | keyframes |
 | `video_model`, `video_resolution`, `video_durations`, `transition_seconds` | morphs: lengths the model accepts, and the one used |
