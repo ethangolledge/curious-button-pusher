@@ -11,6 +11,7 @@ import json
 import sys
 import time
 from pathlib import Path
+from typing import Any
 
 SOURCE = Path(__file__).resolve().parents[2]
 if str(SOURCE) not in sys.path:
@@ -23,11 +24,12 @@ from content.blender.audit import audit  # noqa: E402
 from content.blender.blocks.base import Look, read  # noqa: E402
 from content.blender.camera import SUBJECT  # noqa: E402
 from content.blender.direct import build  # noqa: E402
-from content.blender.job import Job, Report  # noqa: E402
+from content.blender.job import Grade, Job, Report  # noqa: E402
 from content.blender.registry import KINDS, LOOKS, discover  # noqa: E402
 from content.blender.stage import BlenderStage  # noqa: E402
 
-SAMPLES = {"still": 16, "draft": 8, "final": 32}
+# How far full warmth (or cold) moves the white balance from daylight.
+WARMTH_KELVIN = 2500
 
 
 def main(job_path: Path, out: Path, *, force: bool) -> int:
@@ -46,6 +48,7 @@ def main(job_path: Path, out: Path, *, force: bool) -> int:
     scene.render.image_settings.file_format = "PNG"
     look.world(scene)
     look.render(scene, job.quality)
+    _grade(scene, job.grade)
     stage = BlenderStage(
         frames=job.frame_count,
         fps=job.fps,
@@ -77,6 +80,15 @@ def main(job_path: Path, out: Path, *, force: bool) -> int:
     )
     (out / "report.json").write_text(report.dumps())
     return 0 if frames else 2
+
+
+def _grade(scene: Any, grade: Grade) -> None:
+    """The scene's feeling on top of the look: exposure, and warmth through the white
+    balance (a warmer scene is balanced for bluer light, so it renders warmer)."""
+    scene.view_settings.exposure += grade.exposure
+    if grade.warmth:
+        scene.view_settings.use_white_balance = True
+        scene.view_settings.white_balance_temperature = 6500 + WARMTH_KELVIN * grade.warmth
 
 
 def _subject(stage: BlenderStage) -> tuple[Vector, float] | None:

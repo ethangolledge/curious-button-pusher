@@ -60,6 +60,14 @@ from content.schemas.script import (
     ScriptUnit,
     VoiceDirection,
 )
+from content.schemas.staging import (
+    BlockChoice,
+    Setting,
+    StagedActor,
+    StagedScene,
+    StagedVisualPackage,
+    StagePlan,
+)
 from content.schemas.story import Feeling
 from content.schemas.visuals import PublicFigure, Scene, SceneAnchor, VisualPackage
 
@@ -115,6 +123,12 @@ CHECKPOINT_MODEL_TYPES = [
     EditedLine,
     LineEditPackage,
     VisualPackage,
+    Setting,
+    BlockChoice,
+    StagedActor,
+    StagePlan,
+    StagedScene,
+    StagedVisualPackage,
     FinalContentPackage,
     ReviewHandoff,
     ReviewRequest,

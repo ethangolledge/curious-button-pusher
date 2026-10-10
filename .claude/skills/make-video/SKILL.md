@@ -195,6 +195,24 @@ than `themes/starter`.
   morphs appear in `.cache/` that you did not expect, stop the run at the next review and find
   out why before approving anything.
 
+### Staged pictures (3D)
+
+A channel with `production.pictures: "staged"` in its `config.json` renders the scenes the
+toolkit can show in Blender (`docs/staging.md`, "In a run"). For the person, what changes:
+
+- **Cost**: a staged scene's picture is free; morphs are still paid. The same cap affords more
+  scenes. **Time**: rendering takes seconds a frame on a laptop, so say so before the final
+  cut of a long video, and keep the run detached.
+- **At the Pictures sign-off**, say which scenes are staged and which are drawn, and why any
+  were drawn (each unstaged scene's `missing`). The animatic shows a quick draft of each shot;
+  the cut renders them in full.
+- **Notes on a staged scene** go back to the Visual Director as usual (`S3: …`); a note about
+  how a block moves or looks is a change to the toolkit, not the run: build it with the
+  `staging` skill.
+- After the run, `content staging backlog --config <channel>` lists what the toolkit lacked,
+  most wanted first; offer to build the top one.
+- `content check` must show Blender ready before a staged run.
+
 ## Editing a script by hand
 
 A script the person loves is edited surgically, never sent back for a rewrite. At the Script

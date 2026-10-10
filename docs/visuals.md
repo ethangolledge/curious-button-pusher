@@ -6,7 +6,7 @@ colour) is theme data ([themes.md](themes.md)); values quoted are the starter th
 examples of what a setting could be, and measurements come from a first long-form production
 made with this pipeline.
 
-Last reviewed: 2026-10-09.
+Last reviewed: 2026-10-10.
 
 ## The Path at a Glance
 
@@ -91,6 +91,10 @@ follow how its lines land on a listener. Then the space changes, smoothly, into 
   only; everything is still drawn in the theme's style. Licences and authors appear on the story
   sheet. Commons is the only source today; another would be a second `ImageSource` in
   `providers/images.py`.
+
+A channel with `production.pictures: "staged"` renders the scenes the toolkit can show as 3D
+shots in Blender instead of drawing them; every step below still applies to them, with the
+differences in [staging.md](staging.md#in-a-run).
 
 ## 3. Keyframes ($)
 

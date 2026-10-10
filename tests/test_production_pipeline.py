@@ -1,4 +1,5 @@
 import re
+import shutil
 from collections.abc import Mapping
 from dataclasses import replace
 from pathlib import Path
@@ -19,11 +20,13 @@ from content.production.producer import Producer
 from content.production.score import arrangements
 from content.production.studio import NarrationTask
 from content.providers.base import Usage
+from content.providers.blender import FakeBlender
 from content.providers.fake import FakeDecisionProvider, FakeModelProvider
 from content.providers.images import FakeImageSource
 from content.schemas.plan import EditorialBrief
 from content.schemas.review import ReviewRequest, ReviewResponse
 from content.schemas.visuals import VisualPackage
+from content.staging.backlog import most_wanted
 from content.state import ContentOutput
 from content.theme import Theme
 from content.workflow.checkpoint import create_checkpointer
@@ -51,6 +54,44 @@ def video_config(project_root: Path, tmp_path: Path) -> ContentConfig:
         theme=theme,
         production=replace(config.production, cache_directory=tmp_path),
     )
+
+
+@pytest.mark.video
+def test_a_staged_channel_renders_the_scenes_it_can_stage_and_draws_the_rest(
+    video_config: ContentConfig, tmp_path: Path
+) -> None:
+    assert video_config.production is not None
+    # A copy of the channel: what it could not stage is noted in its folder.
+    root = tmp_path / "channel"
+    shutil.copytree(video_config.theme.root, root)
+    theme = Theme(root, video_config.theme.spec, video_config.theme.skill)
+    config = replace(
+        video_config,
+        theme=theme,
+        production=replace(video_config.production, pictures="staged"),
+    )
+    media, blender = FakeMediaProvider(), FakeBlender()
+
+    result, reviews = _run(config, media, renderer=blender)
+
+    package = result["final_package"]
+    assert package is not None and package.production is not None
+    keyframes = result["keyframes"]
+    staged = sorted(scene for scene, asset in keyframes.items() if asset.shot)
+    assert staged == ["S2", "S4"]
+    # Their pictures cost nothing: only the four drawn scenes asked the image model.
+    assert media.calls.count("image") == 4
+    # Stills to judge, then a draft for the animatic, then the final shot for the cut.
+    qualities = [(job.shot_id, job.quality) for job in blender.jobs]
+    assert qualities.count(("S2", "final")) == 2 and ("S2", "draft") in qualities
+    # The morphs into and out of a staged scene start and end on its shot's own frames.
+    morph_into = next(t for t in result["segments"].values() if t.scene_id == "S1")
+    assert morph_into.rendered
+    assert keyframes["S2"].first_frame.endswith("0001.png")
+    info = ffmpeg.probe(Path(package.production.video_path))
+    assert info.duration == pytest.approx(package.production.scenes[-1].end, abs=0.2)
+    assert [review.stage for review in reviews] == ["storyboard", "final_cut"]
+    assert most_wanted(root) == [("layout: a reading room", 1)]
 
 
 @pytest.mark.video
@@ -469,6 +510,7 @@ def _run(
     respond: Any = None,
     source: FakeImageSource | None = None,
     stop_at_listen: bool = False,
+    renderer: FakeBlender | None = None,
 ) -> tuple[ContentOutput, list[ReviewRequest]]:
     graph = build_graph(
         config=config,
@@ -477,6 +519,7 @@ def _run(
         media_provider=media,
         image_sources=[source or FakeImageSource()],
         checkpointer=create_checkpointer(),
+        renderer=renderer,
     )
     initial = create_initial_state(
         "The Great Stink",

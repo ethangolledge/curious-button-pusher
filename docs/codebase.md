@@ -4,7 +4,7 @@ A guide for changing the code: where things live, why they are shaped as they ar
 choice costs, and where to optimise. Rules for contributors are in `AGENTS.md`; the current
 design is in [architecture.md](architecture.md); models are in [models.md](models.md).
 
-Last reviewed: 2026-10-10. About 16,000 lines of Python in `src/content`, about 250 tests (`pytest`, 20 s) and 12 whole-video renders (`pytest -m video`).
+Last reviewed: 2026-10-10. About 27,000 lines of Python in `src/content`, about 350 tests (`pytest`, 20 s) and 12 whole-video renders (`pytest -m video`).
 
 **Code holds no style and no story.** Every look, voice, camera move, local effect, prompt
 template and taste threshold is theme data ([themes.md](themes.md)); every story lives in a run
@@ -49,7 +49,7 @@ Every file in `src/content`.
 
 | Module | Owns | Notes |
 |---|---|---|
-| `schemas/` | every record that crosses a boundary, one module per subject: `research`, `plan` (the story ledger), `script`, `fact_check`, `audience`, `judgement` (Jev's answers, the critic), `perception`, `visuals`, `references`, `media`, `package` (the final package and the resume file), `review`, `story` (the shared vocabulary) | Frozen, `extra="forbid"`; depends on nothing else |
+| `schemas/` | every record that crosses a boundary, one module per subject: `research`, `plan` (the story ledger), `script`, `fact_check`, `audience`, `judgement` (Jev's answers, the critic), `perception`, `visuals`, `references`, `media`, `package` (the final package and the resume file), `review`, `story` (the shared vocabulary), `staging` (a staged scene's 3D shot) | Frozen, `extra="forbid"`; depends on nothing else |
 | `errors.py` | `ConfigurationError`, `InputError`: what is reported before any model is called | |
 | `models.py` | `ModelConfig` and the alias registry | Agents name aliases, never models |
 | `config.py` | `ContentConfig` from JSON: models, agents (each with its `prompt`), decisions, workflow, production, learning, theme, storage; `write_channel_config` for `new-channel` | Required sections are checked; question names in `decisions.blocking` and `learning.local_questions` must exist |
@@ -77,6 +77,8 @@ imports nothing from the rest of `content`; only the files marked † use Blende
 | `staging/catalogue.py` | the blocks and models, described; the shot check |
 | `staging/library.py` | the model library: search by meaning, no duplicates |
 | `staging/templates.py` | the starting file for a new block of each kind |
+| `staging/plan.py` | a staged scene to a render job (the theme's look, moves and frame); the storyboard's shot check; drawing a scene instead |
+| `staging/backlog.py` | what scenes could not be staged for, kept in the channel's folder |
 
 ### Providers (`providers/`)
 

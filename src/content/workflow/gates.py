@@ -18,6 +18,8 @@ from content.schemas.judgement import JudgedStage
 from content.schemas.media import Arrangement
 from content.schemas.plan import EditorialBrief, StorySize
 from content.schemas.visuals import VisualPackage
+from content.staging.catalogue import Catalogue
+from content.staging.plan import staging_issues, unstage
 from content.state import ContentState, merge_warnings
 from content.story.faithfulness import Inference, contradiction_issues
 from content.story.field import unit_feelings
@@ -325,7 +327,13 @@ def audience_verdict(state: ContentState) -> ContentState:
     }
 
 
-def check_visuals(state: ContentState, *, theme: Theme) -> ContentState:
+def check_visuals(
+    state: ContentState,
+    *,
+    theme: Theme,
+    catalogue: Catalogue | None = None,
+    most_revisions: int = 0,
+) -> ContentState:
     visuals, script = state.get("visual_package"), state.get("script_package")
     if visuals is None or script is None:
         raise ValueError("The visual gate requires a visual plan and script")
@@ -333,13 +341,25 @@ def check_visuals(state: ContentState, *, theme: Theme) -> ContentState:
         *visual_issues(visuals, script, theme.spec.visual.camera_moves),
         *scene_count_issues(visuals, state.get("scene_allowance")),
     ]
-    return _decision(
-        "visuals",
-        "repair" if issues else "judge",
-        issues,
-        structural=bool(issues),
-        message=f"Visual structure: {len(issues)} blocking issue(s)",
-    )
+    unstaged: ContentState = {}
+    if catalogue is not None:
+        staging = staging_issues(visuals, theme, catalogue)
+        if staging and state.get("visual_revision_count", 0) >= most_revisions:
+            # Out of revisions: the scenes whose staging cannot be built are drawn instead.
+            failing = {issue.split(" ", 1)[0] for issue in staging}
+            unstaged = {"visual_package": unstage(visuals, failing, "its staging did not check")}
+            staging = []
+        issues += staging
+    return {
+        **_decision(
+            "visuals",
+            "repair" if issues else "judge",
+            issues,
+            structural=bool(issues),
+            message=f"Visual structure: {len(issues)} blocking issue(s)",
+        ),
+        **unstaged,
+    }
 
 
 def scene_count_issues(visuals: VisualPackage, allowance: int | None) -> list[str]:

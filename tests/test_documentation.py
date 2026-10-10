@@ -16,6 +16,8 @@ NAMED = {
     "visual.field.reactions": "<reaction>",
     "voice.lexicon": None,  # word → how it is spoken: documented as a whole
     "staging.look_settings": None,  # the look's own settings: its file explains them
+    "staging.moves": "<move>",
+    "staging.moves.<move>.settings": None,  # the move block's settings: the catalogue lists them
 }
 
 

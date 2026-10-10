@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from typing import Annotated
 
 from content.blender.api import Pose, Stage
-from content.blender.blocks.base import About, Action, Range, Ref
+from content.blender.blocks.base import About, Action, ModelName, Range, Ref
 from content.blender.maths import UP, Vec, axis_angle, progress
 from content.blender.sets import resting_on
 
@@ -18,7 +18,7 @@ SHEET = Vec(0.21, 0.297, 0.0006)  # A4
 class Settings:
     onto: Annotated[Ref, About("the mark they land on")]
     count: Annotated[int, Range(1, 200, "how many")] = 12
-    item: Annotated[str, About("a model or prop to drop (empty: sheets of paper)")] = ""
+    item: Annotated[str, ModelName("a model or prop to drop (empty: sheets of paper)")] = ""
     spread: Annotated[float, Range(0.05, 10, "metres round the mark they land within")] = 0.5
     height: Annotated[float, Range(0.2, 20, "metres above the surface they start")] = 1.2
     start: Annotated[float, Range(0, 1, "when the first starts falling")] = 0.0

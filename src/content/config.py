@@ -7,7 +7,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from types import MappingProxyType
-from typing import Any
+from typing import Any, Literal
 
 from content.errors import ConfigurationError
 from content.judging.outcomes import DecisionConfig
@@ -88,6 +88,10 @@ class ProductionConfig:
     references_per_request: int = 2
     # Shorter side, in pixels, below which a reference image is too small to draw from.
     min_reference_side: int = 480
+    # How scenes are pictured: "keyframes" (an image model's still, moved by ffmpeg) or
+    # "staged" (a 3D shot built in Blender, where the toolkit can show the scene; the rest
+    # stay keyframes). Morphs, breathing, colour and texture are the same either way.
+    pictures: Literal["keyframes", "staged"] = "keyframes"
 
 
 @dataclass(frozen=True, slots=True)
@@ -422,7 +426,14 @@ def _production_config(root: Path, data: Mapping[str, Any]) -> ProductionConfig:
         reference_candidates=int(data.get("reference_candidates", 4)),
         references_per_request=int(data.get("references_per_request", 2)),
         min_reference_side=int(data.get("min_reference_side", 480)),
+        pictures=_pictures(data.get("pictures", "keyframes")),
     )
+
+
+def _pictures(value: object) -> Literal["keyframes", "staged"]:
+    if value not in ("keyframes", "staged"):
+        raise ConfigurationError(f"production.pictures must be keyframes or staged, not {value!r}")
+    return value
 
 
 def _learning_config(

@@ -50,10 +50,12 @@ class RehearsalStage:
         seed: int = 1,
         props: Mapping[str, type[Prop]] | None = None,
         model_sizes: Mapping[str, tuple[float, float, float]] | None = None,
+        model_parts: Mapping[str, Sequence[Mapping[str, Any]]] | None = None,
     ) -> None:
         self._frames, self._fps, self._aspect, self._seed = frames, fps, aspect, seed
         self._props = dict(props or {})
         self._model_sizes = dict(model_sizes or {})
+        self._model_parts = dict(model_parts or {})
         self._marks: dict[str, Mark] = {}
         self._paths: dict[str, list[Vec]] = {}
         self._actors: dict[str, Piece] = {}
@@ -127,7 +129,13 @@ class RehearsalStage:
             raise KeyError(f"no model or prop called '{model_id}'")
         w, d, h = self._model_sizes[model_id]
         scale = height / h if height else 1.0
-        return self._new(name, Vec(), Vec(w, d, h) * scale, None)
+        model = self._new(name, Vec(), Vec(w, d, h) * scale, None)
+        for part in self._model_parts.get(model_id, ()):
+            at, size = Vec(*part["at"]) * scale, Vec(*part["size"]) * scale
+            # A part's extent is measured from its base, as every piece's is.
+            piece = self._new(f"{name}.{part['name']}", at - Vec(0, 0, size.z / 2), size, model)
+            piece.turn = heading_rotation(Vec(*part["facing"]))
+        return model
 
     def group(self, name: str, at: Vec = ORIGIN, parent: Thing | None = None) -> Thing:
         self._record("group", name=name, at=at)

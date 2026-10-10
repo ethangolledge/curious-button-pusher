@@ -34,6 +34,14 @@ technical work and show them stills before anything is final.
 5. Generic things a channel will use again and again can be props made in code instead
    (`content staging new prop <name>`): simple shapes with bevels read better than noisy scans.
 
+## A place the layouts do not cover: a set
+
+Build it once in Blender (or download a CC0 one) and add it as a model; the `set` layout then
+uses it by name. Name its parts so shots can refer to them: empties `mark_<name>` (facing their
+−Y), meshes `surface_<name>` (props stand on them), empties `path_<name>_0…`, objects
+`actor_<name>`, and a box `interior` for the camera's space (`docs/staging.md`, "Custom sets").
+Keep it simple and solid: closed walls, real-world size, nothing loose.
+
 ## When an ability is missing: build a block
 
 Only when no block, with any settings, can do it. A block is general (`drive`, not
@@ -50,7 +58,8 @@ Only when no block, with any settings, can do it. A block is general (`drive`, n
    for places, `shapes` for props, `lighting.source`/`flicker` for lights. If two blocks would
    share code, it goes in a helper, not in both. Never import Blender's API (the tests refuse).
 5. Its `example` refers only to what the test stage has: the `centre` mark (a table-top),
-   the `across` and `road` paths, the actors `thing` and `car`.
+   the `across` and `road` paths, the actors `thing` and `car`, and the set `sample_set`.
+   A setting that names a model is a `ModelName`, so the model is checked and sent along.
 6. `pytest -k <name>` writes its snapshot; `content staging preview` a shot using it and look.
 7. If it truly needs a new verb, add it to `Stage` (`api.py`), both stages (`stage.py`,
    `rehearsal.py`) and a test, and say so: it is a change to the foundation.

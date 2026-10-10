@@ -8,6 +8,7 @@ from content.config import ContentConfig
 from content.errors import InputError
 from content.production.media import FakeMediaProvider, MediaProvider
 from content.providers.base import DecisionProvider, ModelProvider
+from content.providers.blender import FakeBlender, LocalBlender, Renderer
 from content.providers.images import FakeImageSource, ImageSource, WikimediaCommons
 from content.workflow.demo import create_demo_decision_provider, create_demo_provider
 
@@ -83,6 +84,16 @@ def build_media_provider(config: ContentConfig) -> MediaProvider | None:
     from content.production.media import OpenRouterMediaProvider
 
     return OpenRouterMediaProvider()
+
+
+def build_renderer(config: ContentConfig) -> Renderer | None:
+    """Blender, for a channel that stages scenes in 3D."""
+    if config.production is None or config.production.pictures != "staged":
+        return None
+    if config.production.provider == "fake":
+        tone = config.theme.spec.visual.tone
+        return FakeBlender(brightness=tone.brightness.neutral, saturation=tone.saturation.neutral)
+    return LocalBlender()
 
 
 def build_image_sources(config: ContentConfig) -> list[ImageSource]:

@@ -38,6 +38,12 @@ class About:
     text: str
 
 
+@dataclass(frozen=True, slots=True)
+class ModelName(About):
+    """A text setting that names a model from the library (or a prop made in code): the
+    model is checked, and its file sent to Blender with the shot."""
+
+
 class SettingError(ValueError):
     pass
 
@@ -172,10 +178,11 @@ def settings(block: type[Block]) -> list[Setting]:
             (e.text for e in extras if isinstance(e, About)), limits.about if limits else ""
         )
         default = None if field.default is dataclasses.MISSING else _text(field.default)
+        names_model = any(isinstance(e, ModelName) for e in extras)
         out.append(
             Setting(
                 name=field.name,
-                type=_type_name(base),
+                type="model" if names_model else _type_name(base),
                 default=default,
                 about=about,
                 options=tuple(str(o) for o in get_args(base))
@@ -260,7 +267,7 @@ def _parse(setting: Setting, text: str) -> Any:
         if text.lower() not in ("yes", "no", "true", "false"):
             raise ValueError(f"must be yes or no, not '{text}'")
         return text.lower() in ("yes", "true")
-    if setting.type == "text":
+    if setting.type in ("text", "model"):
         return text
     try:
         number: float = int(text) if setting.type == "whole number" else float(text)

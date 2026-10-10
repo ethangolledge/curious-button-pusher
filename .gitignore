@@ -231,6 +231,8 @@ themes/starter/voice/
 themes/starter/music/
 themes/starter/learning/
 themes/starter/spend.sqlite
+themes/starter/blender/backlog.jsonl
+themes/starter/assets/
 # The usual folder for keeping channels and videos on this computer (docs/storage.md): private.
 /archive/
 # Downloaded embedding model for the local decision models (labels and models are kept)

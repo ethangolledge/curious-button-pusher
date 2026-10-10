@@ -16,6 +16,7 @@ from content.config import load_config
 from content.production import ffmpeg
 from content.providers.assets import FREE, AssetSource, Candidate, Smithsonian
 from content.providers.blender import LocalBlender
+from content.staging.backlog import most_wanted
 from content.staging.catalogue import Catalogue, check, describe, load_catalogue, with_models
 from content.staging.library import Model
 from content.staging.templates import TEMPLATES, render
@@ -86,6 +87,9 @@ def _staging(arguments: list[str]) -> int:
             shot.add_argument(
                 "--scene", action="store_true", help="Also save the scene to open in Blender"
             )
+    actions.add_parser(
+        "backlog", parents=[common], help="What scenes could not be staged for, most wanted first"
+    )
     new = actions.add_parser("new", parents=[common], help="Start a new block from its template")
     new.add_argument("kind", choices=sorted(TEMPLATES))
     new.add_argument("name", help="lower_case_with_underscores")
@@ -115,6 +119,14 @@ def _staging(arguments: list[str]) -> int:
             look = BlockCall(staging.look, {k: str(v) for k, v in staging.look_settings.items()})
             job = replace(job, look=look, palette=dict(theme.spec.palette))
         return _preview(job, catalogue, args)
+    elif args.action == "backlog":
+        if theme_root is None:
+            parser.error("the backlog is a channel's: pass --config themes/<name>/config.json")
+        wanted = most_wanted(theme_root)
+        if not wanted:
+            print("Nothing yet: every scene the Visual Director wanted to stage could be.")
+        for missing, times in wanted:
+            print(f"{times:3}× {missing}")
     elif args.action == "new":
         return _new(args.kind, args.name, theme_root if args.channel else None, parser)
     return 0
@@ -247,6 +259,7 @@ def _ingest(
         page=candidate.page,
         author=candidate.author,
         file=target.name,
+        parts=tuple(facts.get("parts", ())),
     )
     try:
         library.add(model, alongside=args.alongside)

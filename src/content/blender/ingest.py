@@ -11,8 +11,10 @@ most `max_faces` faces, saved as a binary glTF. Writes its
 size and face count to `facts.json`."""
 
 import json
+import re
 import sys
 from pathlib import Path
+from typing import Any
 
 import bpy  # type: ignore[import-not-found]
 from mathutils import Vector  # type: ignore[import-not-found]
@@ -32,7 +34,9 @@ def main(source: Path, target: Path, facts: Path, height: float, max_faces: int)
     meshes = [obj for obj in bpy.context.scene.objects if obj.type == "MESH"]
     if not meshes:
         raise SystemExit(f"{source} has no meshes")
-    with bpy.context.temp_override(selected_editable_objects=list(bpy.context.scene.objects)):
+    # Meshes take their rotation and scale into their shape; empties keep theirs, because a
+    # set's marks face the way their empties do.
+    with bpy.context.temp_override(selected_editable_objects=meshes):
         bpy.ops.object.transform_apply(location=False, rotation=True, scale=True)
     low, high = _extent(meshes)
     size = high - low
@@ -58,10 +62,38 @@ def main(source: Path, target: Path, facts: Path, height: float, max_faces: int)
                 "depth": round(size.y, 3),
                 "height": round(size.z, 3),
                 "faces": min(faces, max_faces),
+                "parts": _parts(),
             }
         )  # fmt: skip
     )
     return 0
+
+
+PART_PREFIXES = ("mark_", "surface_", "path_", "actor_", "interior")
+
+
+def _parts() -> list[dict[str, Any]]:
+    """A set's named parts (`blocks/layouts/set.py`): where each is, which way it faces, and
+    its size, so a shot using the set can be checked without Blender."""
+    found = []
+    for obj in bpy.context.scene.objects:
+        name = re.sub(r"\.\d+$", "", obj.name)
+        if not name.startswith(PART_PREFIXES):
+            continue
+        location, rotation, _ = obj.matrix_world.decompose()
+        facing = rotation @ Vector((0.0, -1.0, 0.0))
+        low, high = _extent([obj]) if obj.type == "MESH" else (location, location)
+        found.append(
+            {
+                "name": name,
+                "at": [
+                    round(v, 3) for v in (location if obj.type != "MESH" else ((low + high) / 2))
+                ],
+                "facing": [round(v, 3) for v in facing],
+                "size": [round(v, 3) for v in (high - low)],
+            }
+        )
+    return found
 
 
 def _units(tallest: float) -> float:

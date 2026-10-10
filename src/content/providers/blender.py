@@ -4,11 +4,12 @@ reports. Blender 5.2 LTS is the version the blocks are written for; point `BLEND
 it is not on the path. `FakeBlender` stands in for tests."""
 
 import json
+import math
 import os
 import shutil
 import subprocess
 from pathlib import Path
-from typing import Protocol
+from typing import Any, Protocol
 
 from content.blender.job import Job, Report
 
@@ -56,13 +57,13 @@ class LocalBlender:
 
     def ingest(
         self, source: Path, target: Path, *, height: float | None, max_faces: int
-    ) -> dict[str, float]:
+    ) -> dict[str, Any]:
         """Bring a downloaded model into the library's form (`blender/ingest.py`); returns
-        its size and face count."""
+        its size, face count and named parts (a set's marks and paths)."""
         target.parent.mkdir(parents=True, exist_ok=True)
         facts = target.with_suffix(".ingest.json")
         self._run(INGEST, str(source), str(target), str(facts), str(height or 0), str(max_faces))
-        result: dict[str, float] = json.loads(facts.read_text(encoding="utf-8"))
+        result: dict[str, Any] = json.loads(facts.read_text(encoding="utf-8"))
         facts.unlink()
         return result
 
@@ -86,14 +87,35 @@ def _report(path: Path) -> Report:
 
 
 class FakeBlender:
-    """Renders nothing: records each job and reports the frames it would have written."""
+    """Offline stand-in: every frame a flat colour at the given brightness and saturation
+    (give it the theme's neutral tone, as the fake media provider has), each shot a little
+    different; the report is written as the worker writes it. Records each job."""
 
-    def __init__(self) -> None:
+    def __init__(self, *, brightness: float = 128.0, saturation: float = 0.0) -> None:
         self.jobs: list[Job] = []
+        self.brightness = brightness
+        self.saturation = saturation
 
     def render(self, job: Job, out: Path, *, force: bool = False) -> Report:
         self.jobs.append(job)
-        frames = job.frames or tuple(range(1, job.frame_count + 1))
-        return Report(
-            job.shot_id, [str(out / "frames" / f"{f:04d}.png") for f in frames], [], 0.0, 0.0
-        )
+        wanted = job.frames or tuple(range(1, job.frame_count + 1))
+        folder = out / "frames"
+        folder.mkdir(parents=True, exist_ok=True)
+        luma = round(self.brightness) + sum(job.shot_id.encode()) % 3
+        tint = round(128 - self.saturation / math.sqrt(2))
+        subprocess.run(
+            [
+                "ffmpeg", "-hide_banner", "-nostdin", "-y", "-f", "lavfi", "-i",
+                f"color=c=black:s={job.width}x{job.height},format=yuv444p,"
+                f"lutyuv=y={luma}:u={tint}:v={tint}",
+                "-frames:v", str(max(wanted)), str(folder / "%04d.png"),
+            ],
+            check=True,
+            capture_output=True,
+        )  # fmt: skip
+        for path in folder.glob("*.png"):
+            if int(path.stem) not in wanted:
+                path.unlink()
+        report = Report(job.shot_id, [str(folder / f"{f:04d}.png") for f in wanted], [], 0.0, 0.0)
+        (out / "report.json").write_text(report.dumps(), encoding="utf-8")
+        return report

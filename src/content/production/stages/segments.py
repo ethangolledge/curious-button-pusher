@@ -47,8 +47,9 @@ class Segments(Studio):
         tasks = []
         for transition in timeline.transitions:
             scene, following = scenes[transition.from_scene_id], scenes[transition.to_scene_id]
-            first = keyframes[scene.scene_id].path
-            last = keyframes[following.scene_id].path
+            # A staged scene's morphs leave from its shot's last frame and arrive on its first.
+            first = keyframes[scene.scene_id].last_frame or keyframes[scene.scene_id].path
+            last = keyframes[following.scene_id].first_frame or keyframes[following.scene_id].path
             silhouette = keyframes[scene.scene_id].silhouette
             here = fields.get(scene.scene_id)
             # The space changes as the next line will land: tunnelling in, blooming out.
@@ -94,6 +95,7 @@ class Segments(Studio):
                             expected_temperature=None,
                             field_point=None,
                             expected_shift=shift,
+                            shot=None,
                         ),
                     )
                 )

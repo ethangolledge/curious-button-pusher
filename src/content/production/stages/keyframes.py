@@ -1,11 +1,15 @@
 """The pictures: how many the budget affords, each scene's keyframe drawn and judged, then the
 animatic and story sheet for the Pictures sign-off."""
 
+import math
 from collections.abc import Sequence
+from dataclasses import replace
 from pathlib import Path
+from typing import Literal
 
 from langgraph.types import Send
 
+from content.blender.job import Grade, Job
 from content.production import assemble, checks
 from content.production.budget import (
     scene_allowance,
@@ -13,6 +17,7 @@ from content.production.budget import (
 from content.production.media import GenerationRefused
 from content.production.story_sheet import write_story_sheet
 from content.production.studio import (
+    STAGING_LOOK,
     RenderTask,
     Studio,
     anchor_text,
@@ -28,6 +33,11 @@ from content.schemas.media import (
     ColourCheck,
     RenderedAsset,
 )
+from content.schemas.staging import StagedScene
+from content.schemas.story import Feeling
+from content.schemas.visuals import Scene
+from content.staging.backlog import record_gap
+from content.staging.plan import job_for, staged
 from content.state import CallRecord, ContentState
 from content.story.field import (
     circumplex,
@@ -35,6 +45,7 @@ from content.story.field import (
     expected_temperature,
     field_slots,
     look,
+    warmth,
 )
 from content.theme import ToneSpec
 
@@ -65,6 +76,11 @@ class Keyframes(Studio):
         tasks = []
         for scene in visuals.scenes:
             feeling = fields.get(scene.scene_id)
+            shot = self._shot_task(state, scene, feeling, existing.get(scene.scene_id))
+            if shot is not None:
+                if shot != "kept":
+                    tasks.append(Send("produce_keyframe", shot))
+                continue
             slots = field_slots(feeling, spec)
             drawn_from = [
                 (reference.request.kind, Path(path))
@@ -119,10 +135,65 @@ class Keyframes(Studio):
                         expected_temperature=expected_temperature(feeling, spec),
                         field_point=circumplex(feeling, spec),
                         expected_shift=None,
+                        shot=None,
                     ),
                 )
             )
         return tasks or "keyframe_verdict"
+
+    def _shot_task(
+        self,
+        state: ContentState,
+        scene: Scene,
+        feeling: Feeling | None,
+        previous: RenderedAsset | None,
+    ) -> RenderTask | Literal["kept"] | None:
+        """A staged scene's keyframe task: its 3D shot's first, middle and last frames,
+        graded by its feeling. None when the scene is drawn instead: it is not staged, or its
+        shot could not be rendered last time."""
+        staging = self.staging()
+        shot = staged(scene) if staging else None
+        if staging is None or shot is None:
+            if staging is not None and isinstance(scene, StagedScene) and scene.missing:
+                record_gap(self.theme.root, state["topic"], scene.scene_id, scene.missing)
+            return None
+        if previous is not None and previous.shot and not previous.rendered:
+            return None
+        timeline = required(state.get("timeline"), "a timeline")
+        spec = self.theme.spec.visual.field
+        seconds = self.held_seconds(timeline, scene.scene_id)
+        count = max(round(seconds * self.theme.spec.format.fps), 1)
+        grade = Grade(warmth=warmth(feeling, spec))
+        frames = sorted({1, (count + 1) // 2, count})
+        base = job_for(
+            shot, self.theme, staging[1], seconds=seconds, quality="final",
+            frames=frames, grade=grade, seed=self.config.seed,
+        )  # fmt: skip
+        signature = render_signature("blender", STAGING_LOOK, base.dumps())
+        attempt = next_attempt(previous, signature, self.config.keyframe_attempts)
+        if attempt is None:
+            return "kept"
+        job = base
+        if attempt > 0 and previous is not None:
+            job = replace(base, grade=_regraded(grade, previous))
+        return RenderTask(
+            scene_id=scene.scene_id,
+            attempt=attempt,
+            prompt=f"3D shot: {_summary(shot)}",
+            signature=signature,
+            anchor=anchor_text(scene.anchor),
+            next_anchor=None,
+            first_frame=None,
+            last_frame=None,
+            clip_seconds=0,
+            silhouette=False,
+            references=[],
+            expected_framing=look(feeling, spec).framing,
+            expected_temperature=expected_temperature(feeling, spec),
+            field_point=circumplex(feeling, spec),
+            expected_shift=None,
+            shot=job.dumps(),
+        )
 
     def _fixes(self, retry: RenderedAsset) -> list[str]:
         """What a redrawn keyframe is told, from the exact problems code measured."""
@@ -143,6 +214,12 @@ class Keyframes(Studio):
     def produce_keyframe(self, state: RenderTask) -> ContentState:
         task = state
         spec = self.theme.spec
+        if task["shot"]:
+            report = self.render_shot(Job.loads(task["shot"]))
+            if not report.frames:
+                return {"keyframes": {task["scene_id"]: _unrendered(task, report.issues)}}
+            first, image, last = (Path(report.frames[i]) for i in (0, len(report.frames) // 2, -1))
+            return self._judged(task, image, [], shot=(first, last))
         try:
             image, calls = self.fetch(
                 "keyframe",
@@ -161,6 +238,19 @@ class Keyframes(Studio):
             )
         except GenerationRefused as refusal:
             return {"keyframes": {task["scene_id"]: refused(task, refusal)}}
+        return self._judged(task, image, calls)
+
+    def _judged(
+        self,
+        task: RenderTask,
+        image: Path,
+        calls: list[CallRecord],
+        *,
+        shot: tuple[Path, Path] | None = None,
+    ) -> ContentState:
+        """A keyframe, drawn or rendered, measured against its scene's tone and colour,
+        described, and judged."""
+        spec = self.theme.spec
         tone = spec.visual.tone
         signal = checks.measure(image)
         colour = _colour_check(signal, task["field_point"], tone)
@@ -213,6 +303,9 @@ class Keyframes(Studio):
             issues=issues,
             silhouette=task["silhouette"],
             colour=colour,
+            shot=task["shot"] or "",
+            first_frame=str(shot[0]) if shot else "",
+            last_frame=str(shot[1]) if shot else "",
         )
         return {
             "keyframes": {task["scene_id"]: asset},
@@ -277,7 +370,9 @@ class Keyframes(Studio):
         subtitles: timing, music, and colour can be judged before any video is paid for."""
         timeline = required(state.get("timeline"), "a timeline")
         visuals = required(state.get("visual_package"), "a storyboard")
-        picture = self.picture(timeline, visuals.scenes, keyframes, {}, self.fields(state))
+        picture = self.picture(
+            timeline, visuals.scenes, keyframes, {}, self.fields(state), final=False
+        )
         music, calls = self.music(timeline, state.get("arrangement"))
         mix = self.mix(timeline, music)
         animatic = self.derived(
@@ -329,3 +424,43 @@ def _colour_check(
 
 def _is_tone_issue(issue: str) -> bool:
     return "too bright" in issue or "too saturated" in issue
+
+
+def _summary(plan: StagedScene) -> str:
+    staging = plan.staging
+    assert staging is not None
+    things = ", ".join(f"{a.model} as {a.actor_id}" for a in staging.actors) or "nothing added"
+    actions = ", ".join(choice.block for choice in staging.actions) or "no action"
+    return f"{staging.layout.block} with {things}; {actions}; camera {staging.camera.block}"
+
+
+def _regraded(grade: Grade, previous: RenderedAsset) -> Grade:
+    """A shot rendered again, corrected by what its last render measured: exposure towards
+    the scene's brightness target (luma is about 2.2 stops per doubling), warmth away from
+    a temperature it missed."""
+    exposure, warmer = grade.exposure, grade.warmth
+    colour = previous.colour
+    if colour is not None and colour.brightness > 0:
+        exposure += max(
+            -3.0, min(3.0, 2.2 * math.log2(colour.target_brightness / colour.brightness))
+        )
+    if any("too cool" in issue for issue in previous.issues):
+        warmer = min(1.0, warmer + 0.4)
+    if any("too warm" in issue for issue in previous.issues):
+        warmer = max(-1.0, warmer - 0.4)
+    return Grade(exposure=round(exposure, 2), warmth=round(warmer, 2))
+
+
+def _unrendered(task: RenderTask, issues: list[str]) -> RenderedAsset:
+    """A shot the checks stopped before rendering: the scene will be drawn instead."""
+    return RenderedAsset(
+        scene_id=task["scene_id"],
+        attempt=task["attempt"],
+        prompt=task["prompt"],
+        signature=task["signature"],
+        path="",
+        observations=[],
+        judgements=[],
+        issues=[f"{task['scene_id']}: its 3D shot was not rendered ({'; '.join(issues)})"],
+        shot=task["shot"] or "",
+    )

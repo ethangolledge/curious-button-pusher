@@ -2,12 +2,22 @@
 anchor, focus, camera, motion and the bridge into the next, and the reference photographs it
 needs."""
 
-from content.agents.base import Agent
+from typing import Any
+
+from content.agents.base import Agent, load_prompt
+from content.schemas.staging import StagedVisualPackage
 from content.schemas.visuals import Scene, VisualPackage
 from content.state import ContentState, RevisionRecord, merge_warnings
 
 
 class VisualDirector(Agent):
+    # What the storyboard is made of; a director that can stage scenes in 3D returns more.
+    storyboard: type[VisualPackage] = VisualPackage
+
+    def extra_input(self) -> dict[str, Any]:
+        """What this kind of director is shown besides the story."""
+        return {}
+
     def __call__(self, state: ContentState) -> ContentState:
         research_pack = state.get("research_pack")
         editorial_brief = state.get("editorial_brief")
@@ -59,8 +69,9 @@ class VisualDirector(Agent):
                 "corrections": notes if previous is not None else [],
                 "human_review_feedback": feedback,
                 "visual_revision_number": revision_count,
+                **self.extra_input(),
             },
-            VisualPackage,
+            self.storyboard,
             operation="storyboard" if previous is None else "storyboard_revision",
         )
         package, normalization_warnings = self._normalize_scenes(generated_package)
@@ -98,3 +109,23 @@ class VisualDirector(Agent):
             package.model_copy(update={"scenes": normalized}),
             ["Scene IDs or repeated script-unit references were normalized."],
         )
+
+
+class StagedVisualDirector(VisualDirector):
+    """The Visual Director for a channel that stages scenes in 3D (`production.pictures`
+    "staged"): the same storyboard, and for each scene the toolkit can show, its 3D shot,
+    chosen from the catalogue of blocks and models (`staging_prompt.md`, `docs/staging.md`).
+    Scenes it cannot stage stay keyframes, and say what was missing."""
+
+    storyboard = StagedVisualPackage
+
+    def __init__(self, *, catalogue: str, **kwargs: Any) -> None:
+        super().__init__(**kwargs)
+        self.catalogue = catalogue
+
+    def prompt(self, job: str | None = None) -> str:
+        own = load_prompt(self.config.prompt.with_name("staging_prompt.md"))
+        return "\n\n".join(part for part in (super().prompt(job), own) if part)
+
+    def extra_input(self) -> dict[str, Any]:
+        return {"staging_catalogue": self.catalogue}

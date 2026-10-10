@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from typing import Literal
 
 from content.blender.api import Box, Mark, Pose, Stage
-from content.blender.maths import EASES, Arc, Curve, Vec, look_rotation, progress, wobble
+from content.blender.maths import Arc, Curve, Vec, look_rotation, progress, wobble
 
 Framing = Literal["wide", "medium", "close", "detail"]
 # The mark a move leaves for what it films, read by the check before rendering.
@@ -48,6 +48,16 @@ class Shot:
     target: Curve
     lens_from: float = 35.0
     lens_to: float = 35.0
+    # The lens follows the distance instead, so the subject stays one size while what is
+    # behind it stretches or shrinks (the dolly zoom).
+    hold_size: bool = False
+
+    def lens(self, u: float) -> float:
+        if not self.hold_size:
+            return self.lens_from + (self.lens_to - self.lens_from) * u
+        start = (self.target.at(0.0) - self.position.at(0.0)).length()
+        now = (self.target.at(u) - self.position.at(u)).length()
+        return max(8.0, min(300.0, self.lens_from * now / max(start, 1e-6)))
 
 
 def film(
@@ -72,20 +82,14 @@ def film(
     sway = wobble(stage.random("drift").randrange(10**6), stage.frames, stage.fps, drift)
     poses = []
     for index, u in enumerate(amounts):
-        # Whatever a move asks, the camera never leaves the set.
+        # Whatever a move asks, the camera never leaves the set, nor enters what it films.
         at = keep_inside(walls, shot.position.at(u) + (sway[index] if drift else Vec()))
+        if watching is not None:
+            at = keep_away(watching, at)
         look = shot.target.at(u) - at
         poses.append(Pose(index + 1, at, look_rotation(look, roll_degrees)))
     stage.animate(camera, poses)
-    lens = EASES["in_out"]
-    stage.animate_value(
-        camera,
-        "lens",
-        [
-            (index + 1, shot.lens_from + (shot.lens_to - shot.lens_from) * lens(u))
-            for index, u in enumerate(amounts)
-        ],
-    )
+    stage.animate_value(camera, "lens", [(i + 1, shot.lens(u)) for i, u in enumerate(amounts)])
 
 
 @dataclass(frozen=True, slots=True)
@@ -161,6 +165,22 @@ def reach(space: Box, start: Vec, direction: Vec) -> float:
         wall = getattr(space.high if towards > 0 else space.low, axis)
         farthest = min(farthest, max(0.0, (wall - getattr(start, axis)) / towards))
     return farthest
+
+
+# The nearest the camera comes to what it films, as a share of the subject's own radius.
+NEAREST = 1.3
+
+
+def keep_away(subject: Box, point: Vec) -> Vec:
+    """A camera position pushed back out of a subject, along its line to the centre."""
+    offset = point - subject.centre
+    nearest = subject.radius * NEAREST
+    if offset.length() >= nearest:
+        return point
+    return (
+        subject.centre
+        + (offset.normalised() if offset.length() > 1e-6 else Vec(0, -1, 0)) * nearest
+    )
 
 
 def keep_inside(space: Box | None, point: Vec) -> Vec:

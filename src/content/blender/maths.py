@@ -237,7 +237,8 @@ class Line:
 @dataclass(frozen=True, slots=True)
 class Arc:
     """A circle's arc around `centre`, measured in degrees from the centre's front (−Y),
-    anticlockwise seen from above, rising from one height to another."""
+    anticlockwise seen from above, rising from one height to another, and closing in or
+    opening out if its radius changes."""
 
     centre: Vec
     radius: float
@@ -245,12 +246,16 @@ class Arc:
     sweep_degrees: float
     height_from: float
     height_to: float
+    # The radius at the end, if it changes: closing in makes a spiral.
+    radius_to: float | None = None
 
     def at(self, u: float) -> Vec:
         angle = math.radians(self.start_degrees + self.sweep_degrees * u)
+        end = self.radius if self.radius_to is None else self.radius_to
+        radius = self.radius + (end - self.radius) * u
         return Vec(
-            self.centre.x + self.radius * math.sin(angle),
-            self.centre.y - self.radius * math.cos(angle),
+            self.centre.x + radius * math.sin(angle),
+            self.centre.y - radius * math.cos(angle),
             self.centre.z + self.height_from + (self.height_to - self.height_from) * u,
         )
 

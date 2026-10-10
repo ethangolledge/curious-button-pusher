@@ -262,6 +262,13 @@ Two ways:
   and `long` (16:9, YouTube, with a Story plan sign-off) are ready. Remove one they will never
   make; set `format` to the usual one.
 
+**How scenes are pictured.** Explain the choice in `config.json` (`production.pictures`,
+`docs/staging.md`): `keyframes` (each scene drawn by the image model and moved by ffmpeg, the
+default) or `staged` (scenes built and rendered in Blender where the toolkit can show them,
+the rest drawn; pictures free, renders take time; needs Blender, `docs/staging.md`
+"Installing Blender"). Recommend keyframes for a first video unless they want 3D; it can be
+changed for any later video.
+
 ## Stage 11: Check and keep (free)
 
 - `.venv/bin/python -m pytest -q tests/test_theme.py tests/test_rehearsal.py`: the theme is

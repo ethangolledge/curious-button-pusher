@@ -150,15 +150,20 @@ def shift_phrase(before: Feeling | None, after: Feeling | None, spec: FieldSpec)
     return f"{spec.shifts[direction]}, {speed}"
 
 
+def warmth(feeling: Feeling | None, spec: FieldSpec) -> float:
+    """A scene's colour temperature, from −1 (cold) to 1 (warm): its reactions' blended."""
+    if feeling is None:
+        return 0.0
+    return sum(weight * spec.reactions[r].temperature for r, weight in feeling.weights.items())
+
+
 def expected_temperature(
     feeling: Feeling | None, spec: FieldSpec
 ) -> Literal["warm", "cool"] | None:
     """The colour temperature a scene's keyframe should measure, if it should lean at all."""
     if feeling is None:
         return None
-    temperature = sum(
-        weight * spec.reactions[r].temperature for r, weight in feeling.weights.items()
-    )
+    temperature = warmth(feeling, spec)
     if temperature >= 0.3:
         return "warm"
     if temperature <= -0.3:

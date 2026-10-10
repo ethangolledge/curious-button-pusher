@@ -472,13 +472,25 @@ class WritingSpec(ImmutableModel):
     weights: StoryWeights
 
 
+Value = str | float | int | bool
+
+
+class MovePreset(ImmutableModel):
+    """One of the theme's camera moves as a 3D move: a move block and its settings."""
+
+    block: str
+    settings: dict[str, Value] = {}
+
+
 class StagingSpec(ImmutableModel):
     """How the channel's 3D shots are drawn: a look by name (the engine's in
     `content/blender/blocks/looks/`, or the channel's own in `<theme>/blender/looks/`) and
-    the settings it takes, which set the feel."""
+    the settings it takes, which set the feel; and its camera moves (`visual.camera_moves`)
+    as 3D moves, so a staged scene moves the way a keyframe scene would."""
 
     look: str = "plain"
-    look_settings: dict[str, str | float | int | bool] = {}
+    look_settings: dict[str, Value] = {}
+    moves: dict[str, MovePreset] = {}
 
 
 class ThemeSpec(ImmutableModel):

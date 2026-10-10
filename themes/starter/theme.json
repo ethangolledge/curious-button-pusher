@@ -469,6 +469,44 @@
       "saturation": 0.75,
       "shadow": "night",
       "glow": "sun"
+    },
+    "moves": {
+      "push_in": {
+        "block": "dolly",
+        "settings": {
+          "direction": "in"
+        }
+      },
+      "pull_out": {
+        "block": "dolly",
+        "settings": {
+          "direction": "out"
+        }
+      },
+      "orbit": {
+        "block": "orbit",
+        "settings": {
+          "degrees": 40
+        }
+      },
+      "drift": {
+        "block": "hold",
+        "settings": {
+          "drift": 0.05
+        }
+      },
+      "dolly": {
+        "block": "dolly",
+        "settings": {
+          "direction": "right"
+        }
+      },
+      "rise": {
+        "block": "dolly",
+        "settings": {
+          "direction": "up"
+        }
+      }
     }
   }
 }

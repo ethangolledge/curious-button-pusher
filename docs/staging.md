@@ -5,8 +5,32 @@ Last reviewed: 2026-10-10
 Besides keyframes, a scene's pictures can be a 3D shot built and rendered in Blender: a set,
 the things in it, what they do, the light, and a camera move, all chosen by name from a
 catalogue and built by code. It is free to render (render time, not money), repeatable, and
-every model is reused. Today it is a toolkit you use from the command line; joining it to
-the Visual Director and production is the next step (at the end).
+every model is reused. A channel chooses it with `production.pictures: "staged"` in its
+`config.json` (the starter stays on `keyframes`); the Visual Director then stages every scene
+the toolkit can show, and draws the rest as keyframes, as before.
+
+## In a run
+
+Nothing about the rest of the pipeline changes; a staged scene goes through the same steps
+as a keyframe scene, with its picture rendered instead of drawn.
+
+| Step | A keyframe scene | A staged scene |
+|---|---|---|
+| storyboard | anchor, focus, camera, motion, bridge | the same, plus `staging`: the shot from the catalogue (`agents/visual_director/staging_prompt.md`); or `missing`, saying what the toolkit lacks |
+| storyboard gate | structure | also the shot check (`staging.plan.staging_issues`); a shot that still fails after the Visual Director's revisions is drawn instead |
+| keyframe | drawn by the image model | the shot's first, middle and last frames rendered (`production/stages/keyframes.py`); then the same measures and judging: brightness and colour against the scene's feeling, the vision model's description, Jev. A shot measured too dark or too cool is rendered again with a corrected grade; one that cannot be rendered is drawn instead |
+| the feeling | colour words in the prompt, the ripples' tint | a grade on the render (`job.Grade`: exposure, and warmth by white balance), and the same ripples' tint |
+| Pictures sign-off | the animatic moves the stills | the animatic plays a quick draft of the shot (half size, 12 frames a second) |
+| morphs | from keyframe to keyframe | from the shot's last frame, into the next scene's first: the same AI morph and its effects |
+| the cut | the still, moved by ffmpeg, breathing | the shot rendered in full, with the same breathing ripples and tint over it (`assemble.shot_clip`) |
+| texture, joins, music, subtitles | the same | the same |
+
+What a scene could not be staged for is kept in the channel's backlog
+(`content staging backlog`), most wanted first: the next block or model to build. Nothing is
+built at run time.
+
+The budget counts a staged scene's picture as free, so the same cap affords more scenes; the
+morphs between them are still paid.
 
 ## The idea in one picture
 
@@ -35,6 +59,7 @@ audit, then render       the camera inside something, blocked, or snapping: no r
 | check a shot without rendering | `content staging check shot.json` |
 | stills of a shot, and a contact sheet | `content staging preview shot.json [--frames 1,60,120] [--scene] --config …` |
 | start a new block | `content staging new action pour_drink [--channel --config …]` |
+| what scenes could not be staged for, most wanted first | `content staging backlog --config …` |
 
 `preview` renders into `.cache/staging/` (gitignored) and prints the contact sheet's path;
 `--scene` also saves the built scene as a `.blend` to open and look around in Blender. With
@@ -61,10 +86,10 @@ A shot, by hand (in the pipeline the Visual Director will write it):
 
 | Kind | Blocks | Built on |
 |---|---|---|
-| layouts | `room`, `office`, `boardroom`, `corridor`, `street`, `studio`, `open_ground` | `sets.room` (walls, window, blinds, door), `sets.ground`; each layout names its marks and paths |
+| layouts | `room`, `office`, `boardroom`, `corridor`, `street`, `studio`, `open_ground`, and `set` (any hand-built set from the library) | `sets.room` (walls, window, blinds, door), `sets.ground`; each layout names its marks and paths |
 | actors | `prop` (on a mark), `stack` (column, pile, row, tower), `vehicle` (on a road) | `sets.stand` |
 | actions | `travel`, `drive`, `slide`, `turn`, `scatter` (falling sheets), `topple` (real physics) | `motion.travel`: facing the way of travel, leaning into bends, no turn faster than 12° a frame |
-| moves | `orbit` (to a full 360), `dolly` (in, out, sideways, up), `pan` (and panorama), `track`, `fly`, `hold` | `camera.film`: a path for the camera and a path for what it looks at; `camera.around` frames a subject and keeps the camera inside the set |
+| moves | `orbit` (to a full 360, closing into a spiral), `dolly` (in, out, sideways, up), `pan` (and panorama), `track`, `fly`, `hold`, `vertigo` (the dolly zoom) | `camera.film`: a path for the camera and a path for what it looks at; `camera.around` frames a subject and keeps the camera inside the set and out of what it films |
 | lights | `lamp`, `window`, `overhead`, `studio` (three-point), `headlights`, `streetlights`, `sky` | `lighting.source`, `lighting.flicker` (any light can flicker) |
 | props (models made in code) | 34: furniture, paper and money, office things, street and vehicles | `shapes` (legs, slabs, drawers) |
 | looks | `plain` (the engine's); the starter kit's `starter`; a channel's own | `Plain`, whose small methods (colour, sky, tone) a look overrides |
@@ -72,6 +97,29 @@ A shot, by hand (in the pipeline the Visual Director will write it):
 The same pieces build on each other: a pan and an orbit are the same camera code with the
 moving point swapped; driving is travel plus wheels; the office and the boardroom are the room
 plus furniture; the starter look is the plain look with three methods changed.
+
+The theme's camera moves (`visual.camera_moves`: push_in, orbit, drift…) are also 3D moves:
+`staging.moves` in `theme.json` maps each to a move block and its settings, so a staged scene
+moves the way its keyframe scene would, and the Visual Director can name either.
+
+## Custom sets, built by hand
+
+A place the layouts do not cover (a harbour, a bank vault, a particular office) can be built
+once in Blender, or downloaded, and used by name with the `set` layout. Name its parts and
+they become what shots refer to:
+
+| Name in Blender | Becomes |
+|---|---|
+| an empty `mark_<name>` | a mark, facing the empty's −Y (where props stand, where the camera may look from) |
+| a mesh `surface_<name>` | a mark on its top: props stand on it (a counter, a table) |
+| empties `path_<name>_0`, `path_<name>_1`… | a path through them in order (a walk, a road, a flight) |
+| any object `actor_<name>` | an actor that moves and lights can refer to (a door, a lamp) |
+| a box `interior` | the space the camera stays in; it is not rendered |
+
+Export it as `.glb` and add it like any model (`content staging add set.glb --as vault --about
+"…" --licence CC0 --source "hand made" --config …`). Ingest records its named parts in the
+library, so shots on it are checked without Blender, and the catalogue lists them for the
+Visual Director.
 
 ## Models: one library, searched by meaning
 
@@ -134,6 +182,8 @@ assistant's guide to doing it consistently.
 Rules the tests enforce:
 
 - A block file defines one block; its docstring says what it is (the catalogue shows it).
+- A setting that names a model is declared so (`ModelName`): the model is checked and its
+  file sent with the shot.
 - Blocks use `Stage` verbs and the shared helpers (`maths`, `camera`, `motion`, `sets`,
   `shapes`, `lighting`), never Blender's API; only `stage.py`, `worker.py`, `audit.py`,
   `ingest.py` and looks import it, and nothing outside `content/blender/` imports those.
@@ -164,17 +214,23 @@ for it. Renders belong to whoever makes them.
 ## Installing Blender
 
 Blender 5.2 LTS, the version the blocks are written for, from
-[blender.org](https://www.blender.org/download/lts/). On Linux, unpack it anywhere and set
-`BLENDER=/path/to/blender` in `.env` (or put it on the path). `content check` says whether it
-is found.
+[blender.org](https://www.blender.org/download/lts/). `content check` says whether it is
+found.
+
+| Computer | Install | Then |
+|---|---|---|
+| macOS | the `.dmg`, dragged to Applications (Apple silicon renders with Metal) | `BLENDER=/Applications/Blender.app/Contents/MacOS/Blender` in `.env` |
+| Linux, Windows with WSL | the `.tar.xz`, unpacked anywhere | put it on the path (`ln -s …/blender ~/.local/bin/blender`) or set `BLENDER` in `.env` |
+
+Everything else (ffmpeg included) runs on macOS as on Linux; the effects are the same.
 
 ## Not built yet
 
 | Step | What |
 |---|---|
-| the pipeline | `Scene.staging` in the storyboard; the Visual Director choosing from the catalogue (its prompt is a proposed change, for review); `check_visuals` running the shot check; a `find_assets` stage like `find_references`, with Jev judging models; `render_shots` before the Pictures sign-off; staged clips in the cut |
-| figures | people: a CC0 base character and motion library, retargeted; a public figure as a model sheet and image-to-3D (about $1, once) |
-| cloud rendering | finals on a rented GPU, one machine per job that deletes itself |
-| transitions | joins built in 3D (pushing through into the next shot, one continuous take) beside today's dissolves and morphs |
+| figures | people in 3D, each signed off before it is made: a CC0 base character and motion library, retargeted, for anyone generic; a public figure as a model sheet and image-to-3D, rigged (about $1, once, kept in the library). Until then, scenes centred on people stay drawn |
+| finding models in a run | today a missing model makes the scene a keyframe (and a backlog line); next, the run searches free sources and Jev judges the candidates, as reference photos are found |
+| cloud rendering | finals on a rented GPU, one machine per job that deletes itself; this laptop takes seconds a frame |
+| 3D joins | pushing through into the next shot, one continuous take between two framings of a set |
 | more sources | Sketchfab's CC0 models (needs the channel's own token) |
 | imported textures | some museum scans render untextured in the plain look; to look into |

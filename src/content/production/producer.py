@@ -12,7 +12,9 @@ from content.production.stages.keyframes import Keyframes
 from content.production.stages.narration import Narration
 from content.production.stages.references import References
 from content.production.stages.segments import Segments
+from content.providers.blender import Renderer
 from content.providers.images import ImageSource
+from content.staging.catalogue import Catalogue
 from content.theme import Theme
 
 
@@ -28,6 +30,8 @@ class Producer:
         media: MediaProvider,
         judge: Judge,
         image_sources: Sequence[ImageSource],
+        renderer: Renderer | None = None,
+        catalogue: Catalogue | None = None,
     ) -> None:
         parts: dict[str, Any] = {
             "config": config,
@@ -35,6 +39,8 @@ class Producer:
             "media": media,
             "judge": judge,
             "image_sources": image_sources,
+            "renderer": renderer,
+            "catalogue": catalogue,
         }
         self.references = References(**parts)
         self.narration = Narration(**parts)

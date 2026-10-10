@@ -16,7 +16,7 @@ from content.agents.editorial_director.listener import Listener
 from content.agents.fact_checker.agent import FactChecker
 from content.agents.fact_researcher.agent import FactResearcher
 from content.agents.script_writer.agent import ScriptWriter
-from content.agents.visual_director.agent import VisualDirector
+from content.agents.visual_director.agent import StagedVisualDirector, VisualDirector
 from content.config import ContentConfig, WorkflowConfig
 from content.judging.judge import Judge, JudgementTask
 from content.production.media import MediaProvider
@@ -24,8 +24,10 @@ from content.production.music_map import map_for
 from content.production.producer import Producer
 from content.production.studio import NarrationTask, RenderTask
 from content.providers.base import DecisionProvider, ModelProvider
+from content.providers.blender import Renderer
 from content.providers.cache import AssetCache
 from content.providers.images import ImageSource
+from content.staging.catalogue import describe, load_catalogue
 from content.state import ContentInput, ContentOutput, ContentState
 from content.story.faithfulness import OnnxInference
 from content.theme import theme_guidance
@@ -39,6 +41,7 @@ from content.workflow.gates import (
     script_verdict,
     visual_verdict,
 )
+from content.workflow.providers import build_renderer
 from content.workflow.review_requests import mark_review_stopped, request_human_review
 from content.workflow.routing import (
     fan_out_audience,
@@ -87,9 +90,14 @@ def build_graph(
     image_sources: Sequence[ImageSource] = (),
     checkpointer: InMemorySaver | None = None,
     fresh_research: bool = False,
+    renderer: Renderer | None = None,
 ) -> CompiledStateGraph[ContentState, None, ContentInput, ContentOutput]:
     theme = config.theme
     guidance = theme_guidance(theme)
+    # A channel that stages scenes in 3D: Blender, and what its shots can be made of.
+    staged = config.production is not None and config.production.pictures == "staged"
+    catalogue = load_catalogue(theme.root) if staged else None
+    renderer = renderer or build_renderer(config)
     # A run that makes video keeps every paid answer in its asset cache, text included.
     cache = AssetCache(config.production.cache_directory) if config.production else None
 
@@ -109,7 +117,19 @@ def build_graph(
     researcher = agent(FactResearcher, "fact_researcher", themed=False, cached=not fresh_research)
     script_writer = agent(ScriptWriter, "script_writer", themed=True)
     fact_checker = agent(FactChecker, "fact_checker", themed=False)
-    visual_director = agent(VisualDirector, "visual_director", themed=True)
+    visual_director = (
+        StagedVisualDirector(
+            catalogue=describe(catalogue, presets=theme.spec.staging.moves),
+            name="visual_director",
+            config=config.agents["visual_director"],
+            models=config.models,
+            provider=_provider_for("visual_director", config=config, providers=providers),
+            guidance=guidance,
+            cache=cache,
+        )
+        if catalogue is not None
+        else agent(VisualDirector, "visual_director", themed=True)
+    )
     # The Editorial Director's three jobs: the plan, the critic (who holds the work to the
     # theme), and the listener test (a cold viewer who knows nothing, the theme included).
     editorial = agent(EditorialDirector, "editorial_director", themed=True)
@@ -126,6 +146,8 @@ def build_graph(
             media=media_provider,
             judge=judge,
             image_sources=image_sources,
+            renderer=renderer,
+            catalogue=catalogue,
         )
     limits = config.workflow
     # The locked bed's map, when the run makes video: the plan is sized to its edits.
@@ -165,7 +187,15 @@ def build_graph(
     workflow.add_node("check_script", partial(check_script, theme=theme, faithfulness=faithfulness))
     workflow.add_node("script_verdict", partial(script_verdict, theme=theme))
     workflow.add_node("audience_verdict", audience_verdict)
-    workflow.add_node("check_visuals", partial(check_visuals, theme=theme))
+    workflow.add_node(
+        "check_visuals",
+        partial(
+            check_visuals,
+            theme=theme,
+            catalogue=catalogue,
+            most_revisions=limits.max_revisions.visuals,
+        ),
+    )
     workflow.add_node("visual_verdict", visual_verdict)
     # System 2 settles System 1's doubts: the critic reads the whole piece.
     workflow.add_node("critique_script", critic.critique_script)

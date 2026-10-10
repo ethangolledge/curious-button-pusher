@@ -15,6 +15,7 @@ from content.schemas.judgement import Critique
 from content.schemas.plan import EditorialBrief
 from content.schemas.research import ResearchPack
 from content.schemas.script import LineEditPackage, ScriptPackage
+from content.schemas.staging import StagedVisualPackage
 from content.schemas.visuals import VisualPackage
 
 # How each demo unit enters from the one before it; the fake Jev hears the same.
@@ -74,6 +75,8 @@ def demo_response(input_text: str, output_type: type[BaseModel]) -> ResponseValu
         return _fact_check_response(topic)
     if output_type is VisualPackage:
         return _visual_response(topic)
+    if output_type is StagedVisualPackage:
+        return _staged_visual_response(topic)
     raise LookupError(f"No deterministic demo response for {output_type.__name__}")
 
 
@@ -487,3 +490,43 @@ def _visual_response(topic: str) -> dict[str, Any]:
             },
         ],
     }
+
+
+def _staged_visual_response(topic: str) -> dict[str, Any]:
+    """The demo storyboard with two scenes staged in 3D, and one the toolkit cannot stage."""
+    response = _visual_response(topic)
+    scenes = response["scenes"]
+
+    def choice(block: str, **settings: str) -> dict[str, Any]:
+        return {"block": block, "settings": [{"name": k, "value": v} for k, v in settings.items()]}
+
+    scenes[1]["staging"] = {
+        "layout": choice("office"),
+        "actors": [
+            {
+                "actor_id": "ledger",
+                "block": "prop",
+                "model": "book",
+                "settings": [{"name": "at", "value": "desk_top"}],
+            },
+        ],  # fmt: skip
+        "actions": [],
+        "lights": [choice("lamp", at="desk_lamp"), choice("window", time="night")],
+        "camera": choice("push_in", subject="ledger", framing="close"),
+    }
+    scenes[3]["staging"] = {
+        "layout": choice("studio"),
+        "actors": [
+            {
+                "actor_id": "card",
+                "block": "prop",
+                "model": "folder",
+                "settings": [{"name": "at", "value": "plinth_top"}],
+            },
+        ],  # fmt: skip
+        "actions": [],
+        "lights": [choice("studio", subject="card")],
+        "camera": choice("orbit", subject="card", degrees="90"),
+    }
+    scenes[4]["missing"] = "layout: a reading room"
+    return response

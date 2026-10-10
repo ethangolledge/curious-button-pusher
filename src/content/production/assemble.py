@@ -356,7 +356,64 @@ def motion_clip(
     picture itself is never recoloured. All ffmpeg, so free."""
     frames = max(round(seconds * fps), 1)
     (sx, sy), (ex, ey) = landing(focal, start), landing(focal, end)
-    rx, ry = (sx + ex) / 2, (sy + ey) / 2
+    camera = (
+        f"[0:v]scale={width * 2}:{height * 2}:force_original_aspect_ratio=increase,"
+        f"crop={width * 2}:{height * 2},"
+        f"{_zoompan(start, end, frames, frames, width, height, fps, ease=False, breath=breath)},"
+    )
+    graph = _breathing(
+        camera, ((sx + ex) / 2, (sy + ey) / 2), seconds, breath, width, height, fps, tint
+    )
+    ffmpeg.run(
+        "-i", image, "-filter_complex", graph, "-map", "[out]", "-frames:v", str(frames),
+        "-c:v", "libx264", "-preset", "veryfast", "-crf", "18", output,
+    )  # fmt: skip
+    return output
+
+
+def shot_clip(
+    frames: Path,
+    frame_rate: int,
+    seconds: float,
+    focal: tuple[float, float],
+    output: Path,
+    *,
+    breath: BreathSpec,
+    width: int,
+    height: int,
+    fps: int,
+    tint: tuple[str, float] | None = None,
+) -> Path:
+    """A rendered 3D shot (a folder of numbered frames at `frame_rate`) made into a scene's
+    clip: fitted to the frame and the cut's rate, cut or held to `seconds`, with the same
+    breathing ripples and tint a keyframe gets. The camera move is the shot's own."""
+    count = max(round(seconds * fps), 1)
+    source = (
+        f"[0:v]scale={width}:{height}:force_original_aspect_ratio=increase,"
+        f"crop={width}:{height},fps={fps},tpad=stop_mode=clone:stop_duration={seconds:.3f},"
+    )
+    graph = _breathing(source, focal, seconds, breath, width, height, fps, tint)
+    ffmpeg.run(
+        "-framerate", str(frame_rate), "-i", frames / "%04d.png", "-filter_complex", graph,
+        "-map", "[out]", "-frames:v", str(count),
+        "-c:v", "libx264", "-preset", "veryfast", "-crf", "18", output,
+    )  # fmt: skip
+    return output
+
+
+def _breathing(
+    source: str,
+    centre: tuple[float, float],
+    seconds: float,
+    breath: BreathSpec,
+    width: int,
+    height: int,
+    fps: int,
+    tint: tuple[str, float] | None,
+) -> str:
+    """The filter graph that ripples a picture from `centre` (left out at zero), its
+    crests faintly tinted; `source` is the chain that makes the picture, ending in a comma."""
+    rx, ry = centre
     envelope = f"sin(PI*min(T/{seconds:.3f},1))"
     distance = f"hypot(X/W-{rx:.3f},(Y/H-{ry:.3f})*{height / width:.3f})"
     ripple = (
@@ -367,41 +424,30 @@ def motion_clip(
         ripple.replace("AXIS", "X/W").replace("CENTRE", f"{rx:.3f}"),
         ripple.replace("AXIS", "Y/H").replace("CENTRE", f"{ry:.3f}"),
     )
-    camera = (
-        f"[0:v]scale={width * 2}:{height * 2}:force_original_aspect_ratio=increase,"
-        f"crop={width * 2}:{height * 2},"
-        f"{_zoompan(start, end, frames, frames, width, height, fps, ease=False, breath=breath)},"
-    )
     if not breath.ripple_pixels:
-        graph = camera + "setsar=1,format=yuv420p[out]"
-    elif tint is None or tint[1] <= 0:
-        graph = (
-            camera
+        return source + "setsar=1,format=yuv420p[out]"
+    if tint is None or tint[1] <= 0:
+        return (
+            source
             + "format=yuv420p[cam];"
             + _displacement_maps(ripples, seconds, width, height, fps)
             + "[cam][xm][ym]displace=edge=smear,setsar=1,format=yuv420p[out]"
         )
-    else:
-        colour, opacity = tint
-        # How much colour each pixel takes: the ripple's crests, fading in and out with
-        # the clip, never more than `opacity`.
-        crest = f"255*{opacity:.3f}*{envelope}*abs(sin(2*PI*({distance}*6-T/{breath.seconds})))"
-        graph = (
-            camera
-            + "format=yuv420p[cam];"
-            + _displacement_maps(ripples, seconds, width, height, fps)
-            + "[cam][xm][ym]displace=edge=smear[rippled];"
-            + f"nullsrc=s={max(width // 6, 8)}x{max(height // 6, 8)}:r={fps}:d={seconds:.3f},"
-            + f"format=gray,geq=lum='{crest}',scale={width}:{height}:flags=bicubic[crest];"
-            + f"color=c=0x{colour.lstrip('#')}:s={width}x{height}:r={fps}:d={seconds:.3f},"
-            + "format=yuva420p[colour];[colour][crest]alphamerge[tinted];"
-            + "[rippled][tinted]overlay=format=auto,setsar=1,format=yuv420p[out]"
-        )
-    ffmpeg.run(
-        "-i", image, "-filter_complex", graph, "-map", "[out]", "-frames:v", str(frames),
-        "-c:v", "libx264", "-preset", "veryfast", "-crf", "18", output,
-    )  # fmt: skip
-    return output
+    colour, opacity = tint
+    # How much colour each pixel takes: the ripple's crests, fading in and out with the
+    # clip, never more than `opacity`.
+    crest = f"255*{opacity:.3f}*{envelope}*abs(sin(2*PI*({distance}*6-T/{breath.seconds})))"
+    return (
+        source
+        + "format=yuv420p[cam];"
+        + _displacement_maps(ripples, seconds, width, height, fps)
+        + "[cam][xm][ym]displace=edge=smear[rippled];"
+        + f"nullsrc=s={max(width // 6, 8)}x{max(height // 6, 8)}:r={fps}:d={seconds:.3f},"
+        + f"format=gray,geq=lum='{crest}',scale={width}:{height}:flags=bicubic[crest];"
+        + f"color=c=0x{colour.lstrip('#')}:s={width}x{height}:r={fps}:d={seconds:.3f},"
+        + "format=yuva420p[colour];[colour][crest]alphamerge[tinted];"
+        + "[rippled][tinted]overlay=format=auto,setsar=1,format=yuv420p[out]"
+    )
 
 
 def texture(

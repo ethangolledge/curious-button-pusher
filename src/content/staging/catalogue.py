@@ -3,7 +3,7 @@ anything is rendered: every block and model exists, every setting reads, every n
 refers to is in the shot, and every actor can do what its actions need. The check builds the
 whole shot without Blender, so it is fast and free."""
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, replace
 from pathlib import Path
 
@@ -13,6 +13,7 @@ from content.blender.job import BlockCall, Job, ModelFile
 from content.blender.registry import KINDS, Registry, RegistryError, discover
 from content.blender.rehearsal import RehearsalStage
 from content.staging.library import Library, load_library
+from content.theme import MovePreset
 
 
 @dataclass
@@ -30,8 +31,13 @@ def load_catalogue(theme_root: Path | None) -> Catalogue:
     return Catalogue(discover(blocks), library, blocks)
 
 
-def describe(catalogue: Catalogue, kinds: Sequence[str] = KINDS[:-1]) -> str:
-    """The catalogue in words, for a person or a model choosing from it."""
+def describe(
+    catalogue: Catalogue,
+    kinds: Sequence[str] = KINDS[:-1],
+    presets: Mapping[str, MovePreset] | None = None,
+) -> str:
+    """The catalogue in words, for a person or a model choosing from it; a theme's camera
+    moves (`presets`) are listed with the move blocks they use."""
     lines: list[str] = []
     for kind in kinds:
         lines.append(f"## {kind}")
@@ -50,18 +56,52 @@ def describe(catalogue: Catalogue, kinds: Sequence[str] = KINDS[:-1]) -> str:
                     f"{k} must be {', '.join(sorted(v))}" for k, v in block.needs.items()
                 )
                 lines.append(f"  - needs: {needs}")
+        if kind == "moves" and presets:
+            lines.append(
+                "- the theme's own moves (used like the blocks; your settings refine them):"
+            )
+            for name, preset in sorted(presets.items()):
+                fixed = ", ".join(f"{k} {v}" for k, v in preset.settings.items())
+                lines.append(f"  - {name}: {preset.block}" + (f" with {fixed}" if fixed else ""))
         lines.append("")
     lines.append("## models")
     for model in sorted(catalogue.library.models.values(), key=lambda m: m.model_id):
         able = f" [{', '.join(model.capabilities)}]" if model.capabilities else ""
-        lines.append(f"- {model.model_id}{able}: {model.describe}")
+        offers = (
+            f" (a set for the set layout; parts: {', '.join(p['name'] for p in model.parts)})"
+            if model.parts
+            else ""
+        )
+        lines.append(f"- {model.model_id}{able}: {model.describe}{offers}")
     return "\n".join(lines)
+
+
+def _calls(job: Job) -> list[tuple[str, BlockCall]]:
+    """Every block a shot uses, with its kind."""
+    calls = [("layouts", job.layout), ("moves", job.camera)]
+    calls += [("actions", call) for call in job.actions] + [("lights", call) for call in job.lights]
+    return calls + [("actors", BlockCall(a.block, a.settings)) for a in job.actors]
+
+
+def models_named(job: Job, registry: Registry) -> set[str]:
+    """Every model a shot uses: its actors', and any block setting that names one."""
+    wanted = {actor.model for actor in job.actors}
+    for kind, call in _calls(job):
+        try:
+            block = registry.get(kind, call.block)
+        except RegistryError:
+            continue
+        wanted |= {
+            str(call.settings[s.name])
+            for s in settings(block)
+            if s.type == "model" and call.settings.get(s.name)
+        }
+    return wanted
 
 
 def with_models(job: Job, catalogue: Catalogue) -> Job:
     """The job with its library models' files and sizes, and the channel's own blocks."""
-    wanted = {actor.model for actor in job.actors}
-    wanted |= {call.settings.get("item", "") for call in job.actions} - {""}
+    wanted = models_named(job, catalogue.registry)
     files = []
     for model_id in sorted(wanted):
         model = catalogue.library.get(model_id)
@@ -76,14 +116,11 @@ def check(job: Job, catalogue: Catalogue) -> list[str]:
     """Every problem with a shot that can be found without rendering it."""
     issues: list[str] = []
     library = catalogue.library
-    for actor in job.actors:
-        if actor.model not in library.models:
-            issues.append(f"actor {actor.actor_id}: no model '{actor.model}'")
-    calls = [("layouts", job.layout), ("moves", job.camera)]
-    calls += [("actions", call) for call in job.actions] + [("lights", call) for call in job.lights]
-    calls += [("actors", BlockCall(a.block, a.settings)) for a in job.actors]
+    for model_id in sorted(models_named(job, catalogue.registry)):
+        if model_id not in library.models:
+            issues.append(f"no model '{model_id}' (content staging models)")
     models = {actor.actor_id: actor.model for actor in job.actors}
-    for kind, call in calls:
+    for kind, call in _calls(job):
         try:
             block = catalogue.registry.get(kind, call.block)
             chosen = read(block, call.settings)
@@ -110,6 +147,7 @@ def check(job: Job, catalogue: Catalogue) -> list[str]:
         seed=job.seed,
         props=catalogue.registry.props(),
         model_sizes={m.model_id: m.size for m in library.models.values() if m.file},
+        model_parts={m.model_id: m.parts for m in library.models.values() if m.parts},
     )
     try:
         build(stage, job, catalogue.registry)

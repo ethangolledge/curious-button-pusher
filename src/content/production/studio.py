@@ -9,10 +9,12 @@ import json
 import re
 import time
 from collections.abc import Callable, Mapping, Sequence
+from dataclasses import replace
 from pathlib import Path
 from typing import Any, TypedDict
 
 from content.agents.base import load_prompt
+from content.blender.job import Job, Report
 from content.config import ProductionConfig
 from content.judging.judge import Judge
 from content.judging.outcomes import correction_line
@@ -28,6 +30,7 @@ from content.production.score import (
     render,
 )
 from content.providers.base import Usage
+from content.providers.blender import Renderer
 from content.providers.cache import AssetCache, file_digest
 from content.providers.images import ImageSource
 from content.schemas.judgement import JudgedStage
@@ -39,6 +42,7 @@ from content.schemas.media import (
 from content.schemas.perception import Observation
 from content.schemas.story import Feeling
 from content.schemas.visuals import Scene, SceneAnchor
+from content.staging.catalogue import Catalogue
 from content.state import CallRecord, ContentState, call_record
 from content.story.field import (
     ripple_tint,
@@ -50,6 +54,14 @@ from content.theme import Theme
 # texture) changes, so cached clips made the old way are rebuilt. A change to the theme's
 # motion settings rebuilds what it affects on its own: they are part of each clip's key.
 LOOK = "focus-breathing-1"
+# Bumped whenever the code that builds or renders 3D shots changes in a way the job does not
+# show (a block, the foundation, a look), so cached shots are rendered again.
+STAGING_LOOK = "staging-1"
+# A staged scene's picture is shown whole, from its centre; its animatic draft is rendered at
+# half size and this many frames a second (the cut's rate is made up by repeating them).
+CENTRE = (0.5, 0.5)
+WHOLE = assemble.Framing(1.0, 0.5, 0.5)
+DRAFT_FPS = 12
 
 # What the vision model is told when it describes rendered frames for Jev.
 PERCEPTION_PROMPT = Path(__file__).with_name("perception_prompt.md")
@@ -89,6 +101,8 @@ class RenderTask(TypedDict):
     # Keyframes only: the field's (pleasure, arousal), which sets its colour targets.
     field_point: tuple[float, float] | None
     expected_shift: str | None
+    # A staged scene's keyframe: the render job (JSON) instead of a prompt to an image model.
+    shot: str | None
 
 
 class Studio:
@@ -104,6 +118,8 @@ class Studio:
         media: MediaProvider,
         judge: Judge,
         image_sources: Sequence[ImageSource],
+        renderer: Renderer | None = None,
+        catalogue: Catalogue | None = None,
     ) -> None:
         self.config = config
         self.theme = theme
@@ -112,6 +128,9 @@ class Studio:
         self.perception_instructions = load_prompt(PERCEPTION_PROMPT)
         self.image_sources = image_sources
         self.cache = AssetCache(config.cache_directory)
+        # Staged scenes (`production.pictures` "staged"): Blender, and what shots are made of.
+        self.renderer = renderer
+        self.catalogue = catalogue
 
     def perceive(self, images: Sequence[Path]) -> tuple[list[Observation], list[CallRecord]]:
         """Describe rendered frames (cached by their content) so Jev can judge them."""
@@ -250,22 +269,31 @@ class Studio:
         keyframes: Sequence[RenderedAsset],
         segments: dict[str, RenderedAsset],
         fields: Mapping[str, Feeling],
+        *,
+        final: bool = True,
     ) -> Path:
         """The picture track: every scene is its keyframe moved slowly by the scene's
-        camera, and the AI morph into the next scene plays across the join between them,
-        taking its time from both sides so every scene still starts on its words. Joins
-        dissolve, and the last picture holds while the music plays out. The animatic has
-        no morphs yet, so its stills simply dissolve."""
+        camera (or, staged, its 3D shot, whose camera is its own), and the AI morph into the
+        next scene plays across the join between them, taking its time from both sides so
+        every scene still starts on its words. Joins dissolve, and the last picture holds
+        while the music plays out. The animatic has no morphs yet, so its pictures simply
+        dissolve, and its shots are quick drafts (`final` False)."""
         spec = self.theme.spec.format
         motion = self.theme.spec.visual.motion
         images = {asset.scene_id: Path(asset.path) for asset in keyframes}
+        shots = {asset.scene_id: asset for asset in keyframes if asset.shot}
         focals = {
-            scene.scene_id: self.focal(scene, images[scene.scene_id])
+            scene.scene_id: CENTRE
+            if scene.scene_id in shots
+            else self.focal(scene, images[scene.scene_id])
             for scene in scenes
             if scene.scene_id in images
         }
+        # A shot's frame is shown whole: the morphs into and out of it neither zoom nor pan.
         glides = {
-            scene.scene_id: assemble.glide(
+            scene.scene_id: (WHOLE, WHOLE)
+            if scene.scene_id in shots
+            else assemble.glide(
                 self.theme.spec.visual.camera_moves[scene.camera], focals[scene.scene_id]
             )
             for scene in scenes
@@ -297,32 +325,10 @@ class Studio:
             tint = ripple_tint(
                 fields.get(timing.scene_id), self.theme.spec.visual.field, motion.breath.tint
             )
-            still = self.derived(
-                "still",
-                [
-                    file_digest(image),
-                    f"{seconds:.3f}",
-                    repr((start, end, focal)),
-                    motion.breath.model_dump_json(),
-                    repr(tint),
-                    LOOK,
-                ],
-                ".mp4",
-            )
-            if not still.is_file():
-                assemble.motion_clip(
-                    image,
-                    seconds,
-                    start,
-                    end,
-                    focal,
-                    still,
-                    breath=motion.breath,
-                    width=spec.width,
-                    height=spec.height,
-                    fps=spec.fps,
-                    tint=tint,
-                )
+            if timing.scene_id in shots:
+                still = self._shot_clip(shots[timing.scene_id], seconds, tint, final=final)
+            else:
+                still = self._still(image, seconds, start, end, focal, tint)
             if clips:
                 # A morph meets its stills frame to frame; two stills dissolve.
                 joins.append(0.0 if after_morph else motion.dissolve_seconds)
@@ -383,6 +389,79 @@ class Studio:
             )
         return textured
 
+    def _still(
+        self,
+        image: Path,
+        seconds: float,
+        start: assemble.Framing,
+        end: assemble.Framing,
+        focal: tuple[float, float],
+        tint: tuple[str, float] | None,
+    ) -> Path:
+        """A keyframe moved by its camera, breathing, for `seconds`."""
+        spec = self.theme.spec.format
+        breath = self.theme.spec.visual.motion.breath
+        still = self.derived(
+            "still",
+            [
+                file_digest(image),
+                f"{seconds:.3f}",
+                repr((start, end, focal)),
+                breath.model_dump_json(),
+                repr(tint),
+                LOOK,
+            ],
+            ".mp4",
+        )
+        if not still.is_file():
+            assemble.motion_clip(
+                image, seconds, start, end, focal, still, breath=breath,
+                width=spec.width, height=spec.height, fps=spec.fps, tint=tint,
+            )  # fmt: skip
+        return still
+
+    def _shot_clip(
+        self,
+        asset: RenderedAsset,
+        seconds: float,
+        tint: tuple[str, float] | None,
+        *,
+        final: bool,
+    ) -> Path:
+        """A staged scene's clip: its 3D shot rendered whole (a quick draft for the
+        animatic, full quality for the cut), breathing and tinted as a keyframe would be."""
+        spec = self.theme.spec.format
+        breath = self.theme.spec.visual.motion.breath
+        keyed = Job.loads(asset.shot)
+        if final:
+            job = replace(keyed, quality="final", frames=())
+        else:
+            job = replace(
+                keyed, quality="draft", frames=(), fps=DRAFT_FPS,
+                width=keyed.width // 4 * 2, height=keyed.height // 4 * 2,
+            )  # fmt: skip
+        report = self.render_shot(job)
+        if not report.frames:
+            raise ValueError(f"{asset.scene_id}: its 3D shot was not rendered: {report.issues}")
+        clip = self.derived(
+            "shotclip",
+            [
+                job.dumps(),
+                STAGING_LOOK,
+                f"{seconds:.3f}",
+                breath.model_dump_json(),
+                repr(tint),
+                LOOK,
+            ],
+            ".mp4",
+        )
+        if not clip.is_file():
+            assemble.shot_clip(
+                Path(report.frames[0]).parent, job.fps, seconds, CENTRE, clip, breath=breath,
+                width=spec.width, height=spec.height, fps=spec.fps, tint=tint,
+            )  # fmt: skip
+        return clip
+
     def focal(self, scene: Scene, image: Path) -> tuple[float, float]:
         """Where the scene's focus sits in its keyframe, found once and kept."""
         phrase = scene.focus or re.split(r"[,;:]| in a | in the ", scene.anchor.subject)[0]
@@ -401,10 +480,46 @@ class Studio:
         )
         return spent(state.get("call_log", []), past)
 
+    def staging(self) -> tuple[Renderer, Catalogue] | None:
+        """Blender and the catalogue, when this channel stages scenes."""
+        if self.config.pictures != "staged" or self.renderer is None or self.catalogue is None:
+            return None
+        return self.renderer, self.catalogue
+
+    def render_shot(self, job: Job) -> Report:
+        """A 3D shot rendered once: kept by everything it is built from (the job, the block
+        and look code, and the files of its models), as paid assets are."""
+        folder = self.derived("shot", [job.dumps(), STAGING_LOOK], "")
+        report = folder / "report.json"
+        if report.is_file():
+            return Report(**json.loads(report.read_text(encoding="utf-8")))
+        staging = self.staging()
+        if staging is None:
+            raise ValueError("A staged scene needs Blender (production.pictures: staged)")
+        return staging[0].render(job, folder)
+
+    def held_seconds(self, timeline: Timeline, scene_id: str) -> float:
+        """How long a scene's own picture is on screen: its time, less what the morphs into
+        and out of it take from it."""
+        starts = {timing.scene_id: timing.start for timing in timeline.scenes}
+        timing = next(t for t in timeline.scenes if t.scene_id == scene_id)
+        leaving = sum(
+            starts[t.to_scene_id] - t.start
+            for t in timeline.transitions
+            if t.from_scene_id == scene_id
+        )
+        entering = sum(
+            t.seconds - (starts[t.to_scene_id] - t.start)
+            for t in timeline.transitions
+            if t.to_scene_id == scene_id
+        )
+        return timing.end - timing.start - leaving - entering
+
     def pricing(self) -> Pricing:
         return Pricing(
             cap=self.config.max_usd,
-            image_usd=self.config.image_usd,
+            # A staged scene's picture is rendered, not bought.
+            image_usd=0.0 if self.staging() else self.config.image_usd,
             video_usd_per_second=self.config.video_usd_per_second,
             morph_seconds=self.config.transition_seconds,
         )

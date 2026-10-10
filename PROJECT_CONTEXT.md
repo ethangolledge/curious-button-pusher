@@ -72,17 +72,18 @@ with a change). `AGENTS.md` says which applies when a session starts.
   tests in 20 s plus 12 whole-video renders (`pytest -m video`), ruff and strict mypy clean, no
   import cycles and one-way layers (enforced by a test). Validated end to end on a first
   long-form production.
-- 3D shots (Blender 5.2): the foundation, 29 blocks, 34 props made in code, a model library
-  with search and ingest, and `content staging` to check and preview shots; not yet joined to
-  the Visual Director and production ([docs/staging.md](docs/staging.md#not-built-yet)).
+- 3D shots (Blender 5.2): the foundation, 31 blocks (custom hand-built sets included), 34
+  props made in code, a model library with search and ingest, `content staging`; joined to the
+  pipeline: `production.pictures: "staged"` stages what the toolkit can show and draws the rest,
+  with the same judging, colour, morphs and texture ([docs/staging.md](docs/staging.md)). Not
+  yet: figures, finding models during a run, cloud rendering.
 - `content eval` caught all seven failures a director named in a rejected final cut, three runs
   out of three ([docs/narration.md](docs/narration.md#regression-content-eval)); false alarms on an
   approved script are not measured yet.
 
 ## Next Work
 
-1. Join 3D shots to the pipeline: `Scene.staging`, the Visual Director's catalogue (a prompt
-   change, to propose first), the shot check in `check_visuals`, `find_assets`, `render_shots`.
+1. A first staged video, and the toolkit's backlog after it; the channel's own look.
 2. Measure `eval`'s false alarms once a channel has a `positive.json`.
 3. Tune thresholds and the critic from recorded judgements.
 4. The code improvements listed in [docs/codebase.md](docs/codebase.md#where-to-optimise).

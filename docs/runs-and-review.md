@@ -76,7 +76,7 @@ length for long form (an estimate until a long video is measured).
 | – | Story plan (long form) | the story chain and the beats, with each beat's planned length | the script | writing and checks |
 | 2 | Script | the fact-checked script, line by line, with fact-check notes on their lines, and what a first-time listener took from it beside the story the plan meant to tell | narration | about $0.12 a passage: 1.3 takes on average at $0.09 (the voice's measured share of re-takes; [narration.md](narration.md#3-recording)) |
 | 3 | Narration | the narration over the music, passage by passage, with pace notes | pictures | about $0.08 a picture, redraws included |
-| 4 | Pictures | the animatic and every scene's picture with its line | morphs | about $0.17 a morph, retries included |
+| 4 | Pictures | the animatic and every scene's picture with its line (a staged scene: its rendered still, and a quick draft of its shot in the animatic) | morphs | about $0.17 a morph, retries included |
 | 5 | Final cut | the finished video, scene by scene | the finished package | nothing |
 
 Configured in `review.SIGN_OFF_STAGES`; the Script sign-off is `workflow.review_script` (on in

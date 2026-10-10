@@ -37,19 +37,47 @@ from content.blender.maths import (
 )
 from content.blender.registry import KINDS, RegistryError, discover
 from content.blender.rehearsal import RehearsalStage
+from content.schemas.staging import (
+    BlockChoice,
+    Setting,
+    StagedActor,
+    StagedScene,
+    StagedVisualPackage,
+    StagePlan,
+)
+from content.schemas.visuals import VisualPackage
 from content.staging.catalogue import check, load_catalogue
 from content.staging.library import Model, load_library
+from content.staging.plan import job_for, staging_issues, unstage
 from content.staging.templates import TEMPLATES, render
+from content.theme import load_theme
+from content.workflow.demo import demo_response
 
-SNAPSHOTS = Path(__file__).parent / "snapshots" / "staging"
+PROJECT_ROOT = Path(__file__).parents[1]
+SNAPSHOTS = PROJECT_ROOT / "tests" / "snapshots" / "staging"
 REGISTRY = discover()
 BLOCKS = [(kind, name) for kind in KINDS for name in sorted(REGISTRY.blocks[kind])]
 
 
+# A hand-built set, as ingest describes one: what the `set` layout's example loads.
+SAMPLE_SET = [
+    {"name": "mark_door", "at": [-3, -2, 0], "facing": [1, 0, 0], "size": [0, 0, 0]},
+    {"name": "surface_counter", "at": [0, 1.5, 1], "facing": [0, -1, 0], "size": [3, 0.8, 0.02]},
+    {"name": "path_walk_0", "at": [-3, -2, 0], "facing": [0, -1, 0], "size": [0, 0, 0]},
+    {"name": "path_walk_1", "at": [3, -2, 0], "facing": [0, -1, 0], "size": [0, 0, 0]},
+    {"name": "interior", "at": [0, 0, 1.45], "facing": [0, -1, 0], "size": [7.6, 5.6, 2.9]},
+]
+
+
 def _stage(registry: Any = REGISTRY) -> RehearsalStage:
     """A stage with what block examples refer to: a `centre` mark on a table-top, an
-    `across` and a `road` path, a `thing` and a `car` already cast."""
-    stage = RehearsalStage(frames=60, props=registry.props())
+    `across` and a `road` path, a `thing` and a `car` already cast, and a `sample_set`."""
+    stage = RehearsalStage(
+        frames=60,
+        props=registry.props(),
+        model_sizes={"sample_set": (8.0, 6.0, 3.0)},
+        model_parts={"sample_set": SAMPLE_SET},
+    )
     top = Box(Vec(-0.6, -0.4, 0), Vec(0.6, 0.4, 0.75))
     stage.mark(Mark("centre", Vec(0, 0, 0), FRONT, top))
     stage.path("across", [Vec(-3, -1, 0), Vec(0, 0, 0), Vec(3, -1, 0)])
@@ -236,3 +264,60 @@ def test_no_turn_snaps_and_a_path_is_walked_at_an_even_pace() -> None:
 
     assert angle_between(limited[0], limited[1]) == pytest.approx(12)
     assert max(steps) - min(steps) < 0.05
+
+
+def test_a_hand_built_set_offers_its_named_parts_as_the_layout() -> None:
+    stage = _stage()
+
+    _build(REGISTRY.get("layouts", "set"), stage)
+
+    facing = stage.find_mark("door").facing
+    assert facing.x == pytest.approx(1) and facing.y == pytest.approx(0, abs=1e-9)
+    assert stage.find_mark("counter").surface is not None
+    assert stage.find_path("walk") == [Vec(-3, -2, 0), Vec(3, -2, 0)]
+    assert stage.find_mark("interior").surface is not None
+
+
+def _storyboard(camera: str, **settings: str) -> StagedVisualPackage:
+    plan = StagePlan(
+        layout=BlockChoice(block="office"),
+        actors=[StagedActor(actor_id="phone", block="prop", model="telephone",
+                            settings=[Setting(name="at", value="desk_top")])],
+        camera=BlockChoice(
+            block=camera, settings=[Setting(name=k, value=v) for k, v in settings.items()]
+        ),
+    )  # fmt: skip
+    package = _visual_package()
+    scenes = [StagedScene(**package.scenes[0].model_dump(), staging=plan)]
+    return StagedVisualPackage(**{**package.model_dump(), "scenes": scenes})
+
+
+def _visual_package() -> VisualPackage:
+    return VisualPackage.model_validate(
+        demo_response(json.dumps({"topic": "A topic"}), VisualPackage)
+    )
+
+
+def test_a_theme_move_becomes_its_move_block_refined_by_the_plan() -> None:
+    theme = load_theme(PROJECT_ROOT / "themes/starter")
+    scene = _storyboard("push_in", subject="phone", framing="close").scenes[0]
+
+    job = job_for(scene, theme, load_catalogue(None), seconds=4, quality="still")
+
+    assert job.camera == BlockCall(
+        "dolly", {"direction": "in", "subject": "phone", "framing": "close"}
+    )
+    assert job.look.block == theme.spec.staging.look and job.palette == theme.spec.palette
+
+
+def test_staging_that_cannot_be_built_is_sent_back_then_drawn_instead() -> None:
+    theme = load_theme(PROJECT_ROOT / "themes/starter")
+    catalogue = load_catalogue(None)
+    broken = _storyboard("push_in", subject="sofa")
+
+    issues = staging_issues(broken, theme, catalogue)
+    drawn = unstage(broken, {"S1"}, "its staging did not check")
+
+    assert issues and issues[0].startswith("S1 staging:") and "sofa" in issues[0]
+    assert staging_issues(drawn, theme, catalogue) == []
+    assert drawn.scenes[0].staging is None and drawn.scenes[0].missing
