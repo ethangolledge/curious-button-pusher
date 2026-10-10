@@ -1,0 +1,164 @@
+{
+  "application": {
+    "name": "content",
+    "output_directory": "runs",
+    "logging_level": "INFO"
+  },
+  "theme": "themes/starter",
+  "models": {
+    "architect": {
+      "provider": "openrouter",
+      "model": "anthropic/claude-opus-5.5",
+      "effort": "high",
+      "max_output_tokens": 32000
+    },
+    "writer": {
+      "provider": "openrouter",
+      "model": "anthropic/claude-sonnet-5",
+      "effort": "medium",
+      "max_output_tokens": 32000
+    },
+    "editor": {
+      "provider": "openrouter",
+      "model": "anthropic/claude-haiku-4.5",
+      "effort": "low",
+      "max_output_tokens": 8000
+    },
+    "listener": {
+      "provider": "openrouter",
+      "model": "google/gemini-3.8-flash",
+      "effort": "medium",
+      "max_output_tokens": 8000
+    },
+    "auditor": {
+      "provider": "openrouter",
+      "model": "openai/gpt-5.6-sol",
+      "effort": "high",
+      "max_output_tokens": 32000
+    },
+    "auditor_light": {
+      "provider": "openrouter",
+      "model": "openai/gpt-5.6-sol",
+      "effort": "medium",
+      "max_output_tokens": 32000
+    }
+  },
+  "content": {
+    "default_duration_seconds": 60
+  },
+  "workflow": {
+    "allow_provisional_research": false,
+    "review_plan": false,
+    "review_script": true,
+    "max_revisions": {
+      "research": 1,
+      "script": 2,
+      "visuals": 1
+    }
+  },
+  "decisions": {
+    "provider": "openrouter",
+    "model": "typesafe/jev-1.13",
+    "thresholds": {
+      "yes_min": 0.6,
+      "no_max": 0.2,
+      "act_min": 0.5
+    },
+    "blocking": [
+      "opening_hook",
+      "opening_orients",
+      "unit_clear",
+      "transition_why",
+      "unit_meaning",
+      "beat_heard",
+      "story_heard",
+      "unit_supported",
+      "unit_new",
+      "scene_duplication",
+      "scene_meaning",
+      "visual_flow",
+      "bridge_shared",
+      "keyframe_matches_anchor",
+      "keyframe_clean",
+      "keyframe_shows_story",
+      "keyframe_framing",
+      "segment_holds_anchor",
+      "segment_morph",
+      "segment_keeps_style",
+      "scene_concrete"
+    ]
+  },
+  "agents": {
+    "fact_researcher": {
+      "model": "writer",
+      "prompt": "src/content/agents/fact_researcher/prompt.md"
+    },
+    "editorial_director": {
+      "model": "architect",
+      "listener_model": "listener",
+      "critic_model": "writer",
+      "prompt": "src/content/agents/editorial_director/prompt.md"
+    },
+    "script_writer": {
+      "model": "writer",
+      "edit_model": "editor",
+      "prompt": "src/content/agents/script_writer/prompt.md"
+    },
+    "fact_checker": {
+      "model": "auditor",
+      "light_model": "auditor_light",
+      "prompt": "src/content/agents/fact_checker/prompt.md"
+    },
+    "visual_director": {
+      "model": "writer",
+      "prompt": "src/content/agents/visual_director/prompt.md"
+    }
+  },
+  "production": {
+    "provider": "openrouter",
+    "cache_directory": ".cache",
+    "image_model": "bytedance-seed/seedream-5-0-pro",
+    "image_resolution": "2K",
+    "video_model": "google/veo-3.1-lite",
+    "video_resolution": "720p",
+    "video_durations": [
+      4,
+      6,
+      8
+    ],
+    "transition_seconds": 4,
+    "max_usd": 5.0,
+    "image_usd": 0.045,
+    "video_usd_per_second": 0.03,
+    "transcription_model": "openai/whisper-large-v3-turbo",
+    "music_model": "google/lyria-3-pro-preview",
+    "vision_model": "google/gemini-3.8-flash",
+    "seed": 1970,
+    "keyframe_attempts": 2,
+    "segment_attempts": 2,
+    "hard_cut_threshold": 10
+  },
+  "learning": {
+    "directory": "themes/starter/learning",
+    "embedder": "BAAI/bge-small-en-v1.5",
+    "local_questions": [
+      "plan_curiosity",
+      "opening_hook",
+      "unit_pace",
+      "transition_tension",
+      "script_payoff",
+      "scene_duplication",
+      "scene_meaning",
+      "unit_plain",
+      "scene_concrete",
+      "unit_reaction",
+      "unit_intensity",
+      "script_story",
+      "script_voice"
+    ],
+    "teacher": "writer",
+    "min_labels": 12,
+    "min_gold": 8,
+    "nli_model": "Xenova/nli-deberta-v3-small"
+  }
+}

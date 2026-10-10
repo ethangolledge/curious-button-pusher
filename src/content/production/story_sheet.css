@@ -1,0 +1,36 @@
+:root { color-scheme: dark; --ink: #0b0b0e; --panel: #16161b; --text: #e6e1d6;
+  --muted: #9a958b; --accent: #c9a45a; --alert: #8a2a36; }
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--ink); color: var(--text);
+  font: 16px/1.55 Georgia, 'Iowan Old Style', serif; }
+main { max-width: 980px; margin: 0 auto; padding: 32px 18px 80px; }
+h1 { font: 700 30px/1.2 'Archivo Black', 'Helvetica Neue', Arial, sans-serif; margin: 0 0 6px; }
+.question { color: var(--accent); font-size: 19px; margin: 0 0 4px; }
+.meta { color: var(--muted); font: 13px/1.4 system-ui, sans-serif; margin-bottom: 20px; }
+video { width: 100%; max-width: 360px; border-radius: 6px; background: #000; display: block; }
+.beat { display: grid; grid-template-columns: 220px 1fr; gap: 20px; padding: 22px 0;
+  border-top: 1px solid #2a2a31; }
+.beat img.keyframe { width: 220px; border-radius: 4px; display: block; }
+.id { font: 600 12px/1 system-ui, sans-serif; color: var(--muted); letter-spacing: .06em; }
+.line { margin: 8px 0; font-size: 18px; }
+.shows { color: var(--muted); font-size: 14px; margin-top: 10px; }
+.refs { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 12px; }
+.ref { width: 120px; font: 11px/1.3 system-ui, sans-serif; color: var(--muted); }
+.ref img { width: 120px; height: 90px; object-fit: cover; border-radius: 3px; display: block;
+  opacity: .45; }
+.ref.chosen img { opacity: 1; outline: 2px solid var(--accent); }
+.ref a { color: var(--muted); }
+.arc { display: flex; align-items: flex-end; gap: 3px; margin: 4px 0 18px; }
+.arc span { border-radius: 2px; }
+.score { display: flex; gap: 3px; margin: -12px 0 18px; font: 600 10px/16px system-ui,
+  sans-serif; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+.score span { border-radius: 2px; padding-left: 4px; overflow: hidden; white-space: nowrap; }
+.opening { font: 700 11px/1 system-ui, sans-serif; text-transform: uppercase;
+  letter-spacing: .08em; color: var(--ink); background: var(--accent); padding: 3px 6px;
+  border-radius: 3px; margin-right: 6px; vertical-align: 2px; }
+.feel { font-weight: 600; letter-spacing: .04em; }
+.feel.lean_in { color: #c9a45a; } .feel.brace { color: #b0485a; }
+.feel.recoil { color: #8fa3b0; } .feel.settle { color: #cfc8b8; }
+details { margin-top: 36px; color: var(--muted); font: 14px/1.5 system-ui, sans-serif; }
+@media (max-width: 640px) { .beat { grid-template-columns: 1fr; }
+  .beat img.keyframe { width: 100%; max-width: 360px; } }

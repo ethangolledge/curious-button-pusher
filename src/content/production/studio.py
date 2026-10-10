@@ -1,0 +1,462 @@
+"""Production's shared workbench: the stages' common dependencies and steps.
+
+Generation and assembly are code. Taste stays with Jev: after each render a vision model
+describes what was made, and Jev's questions judge that description against the
+storyboard. Every paid call goes through the asset cache."""
+
+import hashlib
+import json
+import re
+import time
+from collections.abc import Callable, Mapping, Sequence
+from pathlib import Path
+from typing import Any, TypedDict
+
+from content.agents.base import load_prompt
+from content.config import ProductionConfig
+from content.judging.judge import Judge
+from content.judging.outcomes import correction_line
+from content.production import assemble, focus
+from content.production.budget import (
+    Pricing,
+    past_averages,
+    spent,
+)
+from content.production.cache import AssetCache, file_digest
+from content.production.media import GenerationRefused, MediaProvider
+from content.production.music_map import MusicMap, map_for
+from content.production.score import (
+    render,
+)
+from content.providers.base import Usage
+from content.providers.images import ImageSource
+from content.schemas.judgement import JudgedStage
+from content.schemas.media import (
+    Arrangement,
+    RenderedAsset,
+    Timeline,
+)
+from content.schemas.perception import Observation
+from content.schemas.story import Feeling
+from content.schemas.visuals import Scene, SceneAnchor
+from content.state import CallRecord, ContentState, call_record
+from content.story.field import (
+    ripple_tint,
+    story_fields,
+)
+from content.theme import Theme
+
+# Bumped whenever the code that renders the local look (glide, breathing, morph effects,
+# texture) changes, so cached clips made the old way are rebuilt. A change to the theme's
+# motion settings rebuilds what it affects on its own: they are part of each clip's key.
+LOOK = "focus-breathing-1"
+
+# What the vision model is told when it describes rendered frames for Jev.
+PERCEPTION_PROMPT = Path(__file__).with_name("perception_prompt.md")
+
+
+class NarrationTask(TypedDict):
+    passage_id: str
+    unit_ids: list[str]
+    spoken_text: str
+    # The rate the take is brought to: the voice's, a little slower for the hook.
+    words_per_minute: float
+    # How the passage is spoken: its beat's direction from the script, and any pause or
+    # emphasis the person asked for.
+    direction: str | None
+    # Where its take numbering starts: past every take a person already heard and rejected.
+    first_take: int
+
+
+class RenderTask(TypedDict):
+    """Everything one keyframe or segment render needs; Send payloads carry no state."""
+
+    scene_id: str
+    attempt: int
+    prompt: str
+    signature: str
+    anchor: str
+    next_anchor: str | None
+    first_frame: str | None
+    last_frame: str | None
+    clip_seconds: int
+    silhouette: bool
+    # Real photographs the keyframe is drawn from, after the theme's style images.
+    references: list[str]
+    # What the scene's emotional field asks of the image, checked after rendering.
+    expected_framing: str
+    expected_temperature: str | None
+    # Keyframes only: the field's (pleasure, arousal), which sets its colour targets.
+    field_point: tuple[float, float] | None
+    expected_shift: str | None
+
+
+class Studio:
+    """What every production stage shares: the configuration, theme, media provider, judge
+    and asset cache, and the steps more than one stage takes (fetching through the cache,
+    describing frames, rendering a still, the music and the mix)."""
+
+    def __init__(
+        self,
+        *,
+        config: ProductionConfig,
+        theme: Theme,
+        media: MediaProvider,
+        judge: Judge,
+        image_sources: Sequence[ImageSource],
+    ) -> None:
+        self.config = config
+        self.theme = theme
+        self.media = media
+        self.judge = judge
+        self.perception_instructions = load_prompt(PERCEPTION_PROMPT)
+        self.image_sources = image_sources
+        self.cache = AssetCache(config.cache_directory)
+
+    def perceive(self, images: Sequence[Path]) -> tuple[list[Observation], list[CallRecord]]:
+        """Describe rendered frames (cached by their content) so Jev can judge them."""
+        model = self.config.vision_model
+
+        def describe() -> tuple[bytes, Usage]:
+            observations, usage = self.media.perceive(
+                model=model, instructions=self.perception_instructions, images=images
+            )
+            return json.dumps([o.model_dump() for o in observations]).encode(), usage
+
+        stored, calls = self.fetch(
+            "perception",
+            {"model": model, "images": [file_digest(path) for path in images]},
+            ".json",
+            "perception",
+            describe,
+        )
+        observations = [Observation.model_validate(item) for item in json.loads(stored.read_text())]
+        if len(observations) != len(images):
+            raise RuntimeError(f"{model} described {len(observations)} of {len(images)} images")
+        return observations, calls
+
+    def theme_look(self) -> str:
+        visual = self.theme.spec.visual
+        palette = ", ".join(self.theme.spec.palette)
+        return f"{visual.style}. {visual.texture}. {visual.lighting}. Palette: {palette}."
+
+    def current(self, state: ContentState, kind: JudgedStage) -> list[RenderedAsset]:
+        """The asset of every current scene, in scene order."""
+        visuals = required(state.get("visual_package"), "a storyboard")
+        assets = state.get("keyframes", {}) if kind == "keyframes" else state.get("segments", {})
+        missing = [scene.scene_id for scene in visuals.scenes if scene.scene_id not in assets]
+        if missing:
+            raise ValueError(f"No {kind} rendered for: {', '.join(missing)}")
+        return [assets[scene.scene_id] for scene in visuals.scenes]
+
+    def video_segments(self, state: ContentState) -> list[RenderedAsset]:
+        """The AI morph of every transition on the timeline, in order (keyed by the scene
+        each one leaves)."""
+        timeline = required(state.get("timeline"), "a timeline")
+        segments = state.get("segments", {})
+        wanted = [transition.from_scene_id for transition in timeline.transitions]
+        if missing := [scene_id for scene_id in wanted if scene_id not in segments]:
+            raise ValueError(f"No transitions rendered after: {', '.join(missing)}")
+        return [segments[scene_id] for scene_id in wanted]
+
+    @staticmethod
+    def retry_possible(assets: Sequence[RenderedAsset], attempts: int) -> bool:
+        return any(asset.failed and asset.attempt + 1 < attempts for asset in assets)
+
+    def fetch(
+        self,
+        kind: str,
+        request: dict[str, Any],
+        suffix: str,
+        operation: str,
+        produce: Callable[[], tuple[bytes, Usage]],
+    ) -> tuple[Path, list[CallRecord]]:
+        started = time.perf_counter()
+        path, usage = self.cache.fetch(kind, request, suffix, produce, refusal=GenerationRefused)
+        if usage is None:
+            return path, []
+        return path, [call_record(operation, usage, time.perf_counter() - started)]
+
+    def derived(self, kind: str, parts: Sequence[str], suffix: str) -> Path:
+        """A cache path for a file computed locally from other files; build it if missing."""
+        key = hashlib.sha256("\x1f".join(parts).encode()).hexdigest()[:24]
+        path = self.cache.root / kind / f"{key}{suffix}"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        return path
+
+    def fields(self, state: ContentState) -> dict[str, Feeling]:
+        return story_fields(
+            state.get("script_package"),
+            state.get("visual_package"),
+            state.get("research_pack"),
+            state.get("unit_feelings", {}),
+            state.get("unit_seconds", {}),
+        )
+
+    def music(
+        self, timeline: Timeline, arrangement: Arrangement | None
+    ) -> tuple[Path | None, list[CallRecord]]:
+        """The theme's locked bed, fitted to this video; generated only when none is locked."""
+        track = self.theme.music_track
+        music = self.music_map()
+        if track is not None and music is not None and arrangement is not None:
+            key = ",".join(str(index) for index in arrangement.phrases)
+            scored = self.derived("score", [file_digest(track), key], ".wav")
+            if not scored.is_file():
+                render(track, music, arrangement, scored)
+            return scored, []
+        if track is not None:
+            bed = self.derived(
+                "music-bed", [file_digest(track), f"{timeline.total_seconds:.3f}"], ".wav"
+            )
+            if not bed.is_file():
+                assemble.music_bed(track, timeline.total_seconds, bed)
+            return bed, []
+        model = self.config.music_model
+        if model is None:
+            return None, []
+        prompt = self.theme.spec.music.prompt
+        return self.fetch(
+            "music",
+            {"model": model, "prompt": prompt, "seconds": round(timeline.total_seconds)},
+            ".audio",
+            "music",
+            lambda: self.media.music(model=model, prompt=prompt, seconds=timeline.total_seconds),
+        )
+
+    def music_map(self) -> MusicMap | None:
+        """The locked bed's beat grid and sections, when it has been mapped."""
+        return map_for(self.theme.music_track)
+
+    def mix(self, timeline: Timeline, music: Path | None) -> Path:
+        spec = self.theme.spec
+        inputs = [file_digest(Path(timeline.narration_path)), file_digest(music) if music else ""]
+        mix = self.derived("mix", [*inputs, spec.music.model_dump_json()], ".m4a")
+        if not mix.is_file():
+            assemble.mix_audio(Path(timeline.narration_path), music, spec.music, mix)
+        return mix
+
+    def picture(
+        self,
+        timeline: Timeline,
+        scenes: Sequence[Scene],
+        keyframes: Sequence[RenderedAsset],
+        segments: dict[str, RenderedAsset],
+        fields: Mapping[str, Feeling],
+    ) -> Path:
+        """The picture track: every scene is its keyframe moved slowly by the scene's
+        camera, and the AI morph into the next scene plays across the join between them,
+        taking its time from both sides so every scene still starts on its words. Joins
+        dissolve, and the last picture holds while the music plays out. The animatic has
+        no morphs yet, so its stills simply dissolve."""
+        spec = self.theme.spec.format
+        motion = self.theme.spec.visual.motion
+        images = {asset.scene_id: Path(asset.path) for asset in keyframes}
+        focals = {
+            scene.scene_id: self.focal(scene, images[scene.scene_id])
+            for scene in scenes
+            if scene.scene_id in images
+        }
+        glides = {
+            scene.scene_id: assemble.glide(
+                self.theme.spec.visual.camera_moves[scene.camera], focals[scene.scene_id]
+            )
+            for scene in scenes
+            if scene.scene_id in focals
+        }
+        starts = {timing.scene_id: timing.start for timing in timeline.scenes}
+        # Each rendered morph, with the seconds it takes from the scene before and after.
+        morphs = {
+            t.from_scene_id: (t, segments[t.from_scene_id], starts[t.to_scene_id] - t.start)
+            for t in timeline.transitions
+            if t.from_scene_id in segments
+        }
+        entering = {t.to_scene_id: t.seconds - taken for t, _, taken in morphs.values()}
+        clips: list[tuple[Path, float]] = []
+        joins: list[float] = []
+        after_morph = False
+        for timing in timeline.scenes:
+            leaving = morphs.get(timing.scene_id)
+            seconds = (
+                timing.end
+                - timing.start
+                - entering.get(timing.scene_id, 0.0)
+                - (leaving[2] if leaving else 0.0)
+            )
+            image = images[timing.scene_id]
+            start, end = glides[timing.scene_id]
+            focal = focals[timing.scene_id]
+            # The ripples take on the scene's emotional colour, faintly.
+            tint = ripple_tint(
+                fields.get(timing.scene_id), self.theme.spec.visual.field, motion.breath.tint
+            )
+            still = self.derived(
+                "still",
+                [
+                    file_digest(image),
+                    f"{seconds:.3f}",
+                    repr((start, end, focal)),
+                    motion.breath.model_dump_json(),
+                    repr(tint),
+                    LOOK,
+                ],
+                ".mp4",
+            )
+            if not still.is_file():
+                assemble.motion_clip(
+                    image,
+                    seconds,
+                    start,
+                    end,
+                    focal,
+                    still,
+                    breath=motion.breath,
+                    width=spec.width,
+                    height=spec.height,
+                    fps=spec.fps,
+                    tint=tint,
+                )
+            if clips:
+                # A morph meets its stills frame to frame; two stills dissolve.
+                joins.append(0.0 if after_morph else motion.dissolve_seconds)
+            clips.append((still, seconds))
+            after_morph = leaving is not None
+            if leaving:
+                transition, segment, _ = leaving
+                source = Path(segment.path)
+                # The camera carries on from this still's last framing to the next one's first.
+                path = (end, glides[transition.to_scene_id][0])
+                morph = self.derived(
+                    "conformed",
+                    [
+                        file_digest(source),
+                        f"{transition.seconds:.3f}",
+                        repr(path),
+                        motion.morph.model_dump_json(),
+                        LOOK,
+                    ],
+                    ".mp4",
+                )
+                if not morph.is_file():
+                    # A morph squeezed between short scenes plays faster.
+                    assemble.conform_segment(
+                        source,
+                        morph,
+                        seconds=transition.seconds,
+                        speed=transition.seconds / self.config.transition_seconds,
+                        start=path[0],
+                        end=path[1],
+                        layer=motion.morph,
+                        width=spec.width,
+                        height=spec.height,
+                        fps=spec.fps,
+                    )
+                joins.append(0.0)
+                clips.append((morph, transition.seconds))
+        parts = [f"{file_digest(clip)}@{seconds:.3f}" for clip, seconds in clips]
+        cut = self.derived("cut", [*parts, repr(joins)], ".mp4")
+        if not cut.is_file():
+            assemble.dissolve_join(clips, cut, joins=joins, fps=spec.fps)
+        coda = timeline.total_seconds - timeline.scenes[-1].end
+        held = cut
+        if coda > 0.05:
+            held = self.derived("held", [*parts, f"{coda:.3f}"], ".mp4")
+            if not held.is_file():
+                assemble.hold_ending(cut, coda, held)
+        textured = self.derived(
+            "textured", [file_digest(held), motion.texture.model_dump_json(), LOOK], ".mp4"
+        )
+        if not textured.is_file():
+            assemble.texture(
+                held,
+                textured,
+                spec=motion.texture,
+                breath_seconds=motion.breath.seconds,
+                fps=spec.fps,
+            )
+        return textured
+
+    def focal(self, scene: Scene, image: Path) -> tuple[float, float]:
+        """Where the scene's focus sits in its keyframe, found once and kept."""
+        phrase = scene.focus or re.split(r"[,;:]| in a | in the ", scene.anchor.subject)[0]
+        person = scene.anchor.figure is not None
+        path = self.derived("focus", [file_digest(image), phrase, str(person)], ".json")
+        if not path.is_file():
+            point = focus.find(image, phrase, person=person)
+            path.write_text(point.model_dump_json(), encoding="utf-8")
+        point = focus.FocalPoint.model_validate_json(path.read_text(encoding="utf-8"))
+        return point.x, point.y
+
+    def spent(self, state: ContentState) -> float:
+        """The run's cost so far; unpriced calls count at past runs' averages."""
+        past = past_averages(
+            self.config.cache_directory.parent.glob("runs/*/.work/session-*.run.json")
+        )
+        return spent(state.get("call_log", []), past)
+
+    def pricing(self) -> Pricing:
+        return Pricing(
+            cap=self.config.max_usd,
+            image_usd=self.config.image_usd,
+            video_usd_per_second=self.config.video_usd_per_second,
+            morph_seconds=self.config.transition_seconds,
+        )
+
+
+def next_attempt(asset: RenderedAsset | None, signature: str, attempts: int) -> int | None:
+    """None when the current asset can stand; otherwise the attempt number to render."""
+    if asset is None or asset.signature != signature:
+        return 0
+    if asset.failed and asset.attempt + 1 < attempts:
+        return asset.attempt + 1
+    return None
+
+
+def refused(task: RenderTask, refusal: GenerationRefused) -> RenderedAsset:
+    return RenderedAsset(
+        scene_id=task["scene_id"],
+        attempt=task["attempt"],
+        prompt=task["prompt"],
+        signature=task["signature"],
+        path="",
+        observations=[],
+        judgements=[],
+        issues=[f"{task['scene_id']}: the model refused to render it ({refusal})"],
+        silhouette=task["silhouette"],
+    )
+
+
+def corrections(assets: Sequence[RenderedAsset]) -> list[str]:
+    return [
+        *(issue for asset in assets for issue in asset.issues),
+        *(
+            correction_line(judgement)
+            for asset in assets
+            for judgement in asset.judgements
+            if judgement.blocking and judgement.outcome != "pass"
+        ),
+    ]
+
+
+def render_signature(*parts: str) -> str:
+    return hashlib.sha256("\x1f".join(parts).encode()).hexdigest()[:24]
+
+
+def anchor_text(anchor: SceneAnchor) -> str:
+    return f"{anchor.subject}, in {anchor.setting}; {', '.join(anchor.key_elements)}"
+
+
+def decision(stage: str, route: str, notes: list[str], *, structural: bool) -> ContentState:
+    return {
+        "current_stage": stage,
+        "routing_decision": route,
+        "revision_notes": notes,
+        "structural_blockers": structural,
+        "events": [{"stage": stage, "message": f"{stage}: {route}"}],
+    }
+
+
+def required(value: Any, what: str) -> Any:
+    if value is None:
+        raise ValueError(f"This production stage requires {what}")
+    return value

@@ -1,0 +1,85 @@
+{
+  "application": {
+    "name": "content",
+    "output_directory": "runs",
+    "logging_level": "INFO"
+  },
+  "theme": "themes/starter",
+  "models": {
+    "accurate": {
+      "provider": "fake",
+      "model": "deterministic-accurate",
+      "max_output_tokens": 5000
+    },
+    "creative": {
+      "provider": "fake",
+      "model": "deterministic-creative",
+      "max_output_tokens": 4000
+    }
+  },
+  "content": {
+    "default_duration_seconds": 45
+  },
+  "workflow": {
+    "allow_provisional_research": true,
+    "review_plan": false,
+    "review_script": false,
+    "max_revisions": {
+      "research": 1,
+      "script": 2,
+      "visuals": 1
+    }
+  },
+  "decisions": {
+    "provider": "fake",
+    "model": "deterministic-jev",
+    "thresholds": {
+      "yes_min": 0.8,
+      "no_max": 0.2,
+      "act_min": 0.7
+    },
+    "blocking": [
+      "opening_hook",
+      "opening_orients",
+      "unit_pace",
+      "unit_supported",
+      "unit_new",
+      "transition_tension",
+      "script_payoff",
+      "scene_duplication",
+      "scene_meaning",
+      "visual_flow",
+      "bridge_shared",
+      "keyframe_matches_anchor",
+      "keyframe_clean",
+      "keyframe_shows_story",
+      "keyframe_framing",
+      "segment_holds_anchor",
+      "segment_morph",
+      "segment_keeps_style",
+      "scene_concrete"
+    ]
+  },
+  "agents": {
+    "fact_researcher": {
+      "model": "accurate",
+      "prompt": "src/content/agents/fact_researcher/prompt.md"
+    },
+    "editorial_director": {
+      "model": "accurate",
+      "prompt": "src/content/agents/editorial_director/prompt.md"
+    },
+    "script_writer": {
+      "model": "creative",
+      "prompt": "src/content/agents/script_writer/prompt.md"
+    },
+    "fact_checker": {
+      "model": "accurate",
+      "prompt": "src/content/agents/fact_checker/prompt.md"
+    },
+    "visual_director": {
+      "model": "creative",
+      "prompt": "src/content/agents/visual_director/prompt.md"
+    }
+  }
+}

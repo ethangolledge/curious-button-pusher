@@ -1,0 +1,74 @@
+{
+  "name": "The Great Stink: a sample script with two failures a person named",
+  "kind": "negative",
+  "audience": "Curious viewers who know London but not its sewers.",
+  "central_question": "Why did London act on its sewage only when Parliament could smell it?",
+  "units": [
+    {
+      "unit_id": "U1",
+      "order": 1,
+      "narrative_function": "hook",
+      "arc_phase_id": "P1",
+      "transition_intent": "build",
+      "text": "In the summer of 1858, the members of Parliament could not breathe.",
+      "claim_ids": []
+    },
+    {
+      "unit_id": "U2",
+      "order": 2,
+      "narrative_function": "orient",
+      "arc_phase_id": "P1",
+      "transition_intent": "build",
+      "text": "The MBW had been warned for years, and still nothing moved.",
+      "claim_ids": []
+    },
+    {
+      "unit_id": "U3",
+      "order": 3,
+      "narrative_function": "context",
+      "arc_phase_id": "P2",
+      "transition_intent": "build",
+      "text": "Every flushing toilet in London emptied, in the end, into the Thames.",
+      "claim_ids": []
+    },
+    {
+      "unit_id": "U4",
+      "order": 4,
+      "narrative_function": "escalation",
+      "arc_phase_id": "P2",
+      "transition_intent": "hold",
+      "text": "People believed bad air carried disease, so the smell itself felt like a death sentence.",
+      "claim_ids": []
+    },
+    {
+      "unit_id": "U5",
+      "order": 5,
+      "narrative_function": "reveal",
+      "arc_phase_id": "P3",
+      "transition_intent": "turn",
+      "text": "Within weeks, the same Parliament that had argued for a decade paid for a new system of sewers.",
+      "claim_ids": []
+    },
+    {
+      "unit_id": "U6",
+      "order": 6,
+      "narrative_function": "ending",
+      "arc_phase_id": "P4",
+      "transition_intent": "release",
+      "text": "So what does it take for a problem to be fixed, rather than merely known?",
+      "claim_ids": []
+    }
+  ],
+  "expected": [
+    {
+      "pattern": "untranslated term",
+      "unit_id": "U2",
+      "note": "'The MBW' is never said in full or explained"
+    },
+    {
+      "pattern": "unexplained reference",
+      "unit_id": "U5",
+      "note": "'argued for a decade' about what? The argument was never set up"
+    }
+  ]
+}

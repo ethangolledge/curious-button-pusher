@@ -1,0 +1,464 @@
+{
+  "name": "starter",
+  "formats": {
+    "short": {
+      "platforms": "YouTube Shorts, TikTok, Instagram Reels",
+      "width": 1080,
+      "height": 1920,
+      "fps": 30,
+      "aspect_ratio": "9:16",
+      "frame": "Vertical 9:16",
+      "orientation": "vertical",
+      "min_seconds": 40,
+      "max_seconds": 180
+    },
+    "long": {
+      "platforms": "YouTube",
+      "width": 1920,
+      "height": 1080,
+      "fps": 30,
+      "aspect_ratio": "16:9",
+      "frame": "Widescreen 16:9",
+      "orientation": "widescreen",
+      "min_seconds": 120,
+      "max_seconds": 1800,
+      "review_plan": true,
+      "subtitle_font_size": 58,
+      "subtitle_max_words": 5,
+      "subtitle_margin_bottom": 110
+    }
+  },
+  "format": "short",
+  "palette": {
+    "night": "#101418",
+    "paper": "#F2F2F0",
+    "sun": "#E8B44A",
+    "slate": "#5B6B78",
+    "sea": "#2E6F73"
+  },
+  "visual": {
+    "style": "clean modern flat illustration: simple confident shapes, soft gradients, a calm limited palette of night blue, slate, warm sun yellow and sea green on paper white, clear and friendly, not photorealistic",
+    "texture": "smooth flat colour with a fine paper grain",
+    "lighting": "soft, even, natural light with gentle shadows and one clear focal point",
+    "morph": "The picture flows smoothly into the next: shapes reshape and slide into place and colours blend, with nothing flashing or cutting. The image stays flat and illustrated, never photographic or 3D",
+    "camera_moves": {
+      "push_in": {
+        "describe": "a slow push-in",
+        "start": {
+          "zoom": 1.06,
+          "toward_centre": 0.5
+        },
+        "end": {
+          "zoom": 1.24
+        }
+      },
+      "pull_out": {
+        "describe": "a slow pull-out",
+        "start": {
+          "zoom": 1.24
+        },
+        "end": {
+          "zoom": 1.06,
+          "toward_centre": 0.5
+        }
+      },
+      "orbit": {
+        "describe": "a slow orbit around the subject, as a flat 2D rotation",
+        "start": {
+          "zoom": 1.12,
+          "x": 0.06,
+          "y": -0.04
+        },
+        "end": {
+          "zoom": 1.2,
+          "x": -0.06,
+          "y": 0.04
+        }
+      },
+      "drift": {
+        "describe": "a gentle floating drift",
+        "start": {
+          "zoom": 1.16,
+          "x": -0.06
+        },
+        "end": {
+          "zoom": 1.18,
+          "x": 0.06
+        }
+      },
+      "dolly": {
+        "describe": "a slow sideways glide across the frame",
+        "start": {
+          "zoom": 1.18,
+          "x": -0.1
+        },
+        "end": {
+          "zoom": 1.18,
+          "x": 0.1
+        }
+      },
+      "rise": {
+        "describe": "a slow vertical rise",
+        "start": {
+          "zoom": 1.18,
+          "y": 0.08
+        },
+        "end": {
+          "zoom": 1.18,
+          "y": -0.08
+        }
+      }
+    },
+    "motion": {
+      "breath": {
+        "seconds": 6.0,
+        "swell": 0.01,
+        "ripple_pixels": 0,
+        "tint": 0.0
+      },
+      "morph": {
+        "warp_pixels": 0,
+        "trails": 0,
+        "mirror": 0,
+        "plate_shift_pixels": 0,
+        "hue_radians": 0,
+        "saturation": 0
+      },
+      "texture": {
+        "fractal": 0,
+        "vignette_swing": 0.03,
+        "fringe_pixels": 0,
+        "grain": 3,
+        "flicker": 0
+      },
+      "dissolve_seconds": 0.6
+    },
+    "figure": "{subject}; the figure is {name}, drawn in the same simple illustration style, not a photograph: recognisable only by {likeness}",
+    "silhouette": "{subject}; the figure as a simple flat silhouette: {silhouette}",
+    "avoid": "photorealistic, photograph, live action, 3D render, CGI, glossy plastic, realistic skin texture, text, letters, logos, watermarks, deformed faces, extra limbs, neon, strobing, generic stock scenery the scene does not ask for",
+    "morph_avoid": "photorealistic, photograph, live action, 3D render, CGI, text, letters, logos, watermarks, deformed faces, extra limbs, strobing or rapid full-frame flashing, camera cuts to unrelated footage",
+    "tone": {
+      "max_mean_brightness": 80,
+      "max_highlight_saturation": 45,
+      "darker": "A little darker and calmer than before: softer light, fewer highlights.",
+      "brightness": {
+        "neutral": 60.0,
+        "per_unit": 10.0,
+        "tolerance": 20.0
+      },
+      "saturation": {
+        "neutral": 9.0,
+        "per_unit": 3.0,
+        "tolerance": 7.0
+      },
+      "lighter": "A little more light than before: the focal point clearly lit.",
+      "richer": "A little more colour than before in the focal point, still within the palette."
+    },
+    "field": {
+      "reactions": {
+        "lean_in": {
+          "aperture": 0.7,
+          "temperature": 0.6,
+          "pleasure": 0.4,
+          "arousal": 0.4,
+          "frame": [
+            "an open frame with space around the focal point",
+            "a wide open frame, the focal point inviting a closer look",
+            "a very open frame, the focal point bright in a spacious scene"
+          ],
+          "light": [
+            "a little warm light on the focal point",
+            "warm light gathering on the focal point",
+            "warm light opening across the scene"
+          ],
+          "motion": [
+            "shapes drift gently apart",
+            "the space slowly opens outward",
+            "the scene opens out and lifts"
+          ],
+          "framing": "an open, spacious frame with the subject surrounded by space",
+          "cameras": [
+            "pull_out",
+            "drift",
+            "rise"
+          ],
+          "ripple_colour": "#E8B44A"
+        },
+        "brace": {
+          "aperture": -0.8,
+          "temperature": -0.5,
+          "pleasure": -0.6,
+          "arousal": 0.6,
+          "frame": [
+            "a slightly tighter frame",
+            "a tight frame, the edges closing in",
+            "a close, enclosed frame around the focal point"
+          ],
+          "light": [
+            "cool light with darker edges",
+            "firm cool light on the focal point",
+            "hard cool light, the edges in shadow"
+          ],
+          "motion": [
+            "the edges ease inward",
+            "the space draws toward the focal point",
+            "the frame closes steadily on the focal point"
+          ],
+          "framing": "a tight, enclosed frame with walls or shadow close around the subject",
+          "cameras": [
+            "push_in",
+            "orbit"
+          ],
+          "ripple_colour": "#2E6F73"
+        },
+        "recoil": {
+          "aperture": -0.3,
+          "temperature": -0.4,
+          "pleasure": -0.6,
+          "arousal": -0.3,
+          "frame": [
+            "the focal point set a little further off",
+            "the focal point receding into the distance",
+            "the focal point small and far away"
+          ],
+          "light": [
+            "greyer, cooler light",
+            "muted cool light, the colour fading",
+            "almost colourless light"
+          ],
+          "motion": [
+            "a slight backward drift",
+            "a slow backward drift",
+            "the space slips away from the focal point"
+          ],
+          "framing": "a receding frame with the subject small and distant",
+          "cameras": [
+            "pull_out",
+            "drift"
+          ],
+          "ripple_colour": "#5B6B78"
+        },
+        "settle": {
+          "aperture": 0.5,
+          "temperature": 0.1,
+          "pleasure": 0.5,
+          "arousal": -0.5,
+          "frame": [
+            "a balanced, steady frame",
+            "an opening frame, the horizon returning",
+            "a wide, calm frame with the surroundings in view"
+          ],
+          "light": [
+            "even daylight",
+            "soft even light, low contrast",
+            "soft, level light, everything visible"
+          ],
+          "motion": [
+            "movement slowing",
+            "a gentle, breathing rhythm",
+            "almost still, a slow settle"
+          ],
+          "framing": "a level, balanced frame with visible surroundings",
+          "cameras": [
+            "drift",
+            "dolly"
+          ],
+          "ripple_colour": "#F2F2F0"
+        }
+      },
+      "neutral": {
+        "aperture": 0.0,
+        "temperature": 0.0,
+        "pleasure": 0.0,
+        "arousal": 0.0,
+        "frame": [
+          "a balanced frame",
+          "a balanced frame",
+          "a balanced frame"
+        ],
+        "light": [
+          "even light",
+          "even light",
+          "even light"
+        ],
+        "motion": [
+          "a slow gentle drift",
+          "a slow gentle drift",
+          "a slow gentle drift"
+        ],
+        "framing": "a balanced frame",
+        "cameras": [
+          "drift"
+        ],
+        "ripple_colour": "#F2F2F0"
+      },
+      "shifts": {
+        "inward": "the space folds gently inward toward the next focal point",
+        "outward": "the frame opens out onto the next focal point",
+        "sideways": "the scene flows sideways into the next"
+      },
+      "speeds": {
+        "slow": "slowly and smoothly",
+        "swift": "swiftly but smoothly, without a cut"
+      },
+      "swift_above": 0.9,
+      "warmer": "Warmer light than before, no cold cast.",
+      "cooler": "Cooler light than before, no warm cast."
+    },
+    "reference_note": "The attached photographs are only for identity and shape: hairline, glasses, build, clothing, the outline of a building or object. Never copy their photographic detail, skin texture, lighting or realism: redraw everything in the illustration style described.",
+    "keyframe_template": "{frame} illustration, full bleed, no borders. Main scene: {subject}, in {setting}. Composition: {composition}; {field_frame}. Key elements: {key_elements}. Colour and light: {light_and_colour}; {field_light}. Drawn as: {style}. {texture}. {lighting}. Avoid: {avoid}.",
+    "segment_template": "One continuous {orientation} 2D animated illustration. It opens exactly on {subject} in {setting}, held for a beat with {camera}; {motion}; {field_motion}. Then the transformation: {shift}, and {morph_bridge} becomes the next scene. {morph}. It lands exactly on {next_subject} in {next_setting} and holds still. Drawn as: {style}. {texture}. Avoid: {avoid}.",
+    "final_segment_template": "One continuous {orientation} shot with no cuts. {subject} in {setting}, with {camera}; {motion}; {field_motion}. The picture slowly settles and fades. {morph}. Drawn as: {style}. {texture}. Avoid: {avoid}."
+  },
+  "references": [],
+  "writing": {
+    "voice": "Clear, curious and fair: plain words that explain, a little warmth, no hype.",
+    "max_weighty_lines": 1,
+    "rhythm": {
+      "sentence_words_mean": 14.0,
+      "sentence_words_spread": 8.0,
+      "short_share": 0.2,
+      "long_share": 0.2,
+      "source": "A general guide for spoken explainers. Replace it with `analyse-narration` on a narrator you admire."
+    },
+    "weights": {
+      "evidence": {
+        "verified": 1.0,
+        "reported": 0.7,
+        "disputed": 0.4,
+        "inference": 0.3,
+        "unsupported": 0.0
+      },
+      "single_source_penalty": 0.1,
+      "full_evidence": 0.7,
+      "assert_from": 0.9,
+      "attribute_from": 0.6,
+      "feeling_from": 0.6,
+      "turn_window": [
+        0.45,
+        0.75
+      ],
+      "role_seconds": {
+        "spine": [
+          12,
+          25
+        ],
+        "essential_context": [
+          5,
+          10
+        ],
+        "supporting_evidence": [
+          3,
+          6
+        ],
+        "colour": [
+          0,
+          4
+        ],
+        "expendable": [
+          0,
+          0
+        ]
+      },
+      "transition_seconds": 2,
+      "beat_floor_seconds": 4
+    }
+  },
+  "voice": {
+    "model": "google/gemini-3.8-flash-tts",
+    "voice": "Algenib",
+    "reference_audio": null,
+    "reference_transcript": null,
+    "direction_style": "google",
+    "words_per_minute": 160,
+    "hook_pace": 0.92,
+    "tempo_range": [
+      0.9,
+      1.2
+    ],
+    "retakes": 2,
+    "direction": "Clear, warm and curious, like explaining something fascinating to a friend.",
+    "pauses": {
+      "build": 0.35,
+      "hold": 0.5,
+      "turn": 0.8,
+      "release": 0.7
+    },
+    "tail_seconds": 1.5,
+    "length_tolerance": 0.15,
+    "lexicon": {},
+    "candidates": [
+      {
+        "model": "hexgrad/kokoro-82m",
+        "voice": "bm_lewis",
+        "direction_style": "none"
+      },
+      {
+        "model": "google/gemini-3.8-flash-tts",
+        "voice": "Algenib",
+        "direction_style": "google"
+      },
+      {
+        "model": "x-ai/grok-voice-tts-1.0",
+        "voice": "rex",
+        "direction_style": "none"
+      },
+      {
+        "model": "minimax/speech-2.8-turbo",
+        "voice": "English_expressive_narrator",
+        "direction_style": "none"
+      },
+      {
+        "model": "mistralai/voxtral-mini-tts-2603",
+        "voice": "gb_oliver_curious",
+        "direction_style": "none"
+      },
+      {
+        "model": "fish-audio/s2.1-pro",
+        "voice": null,
+        "direction_style": "inline",
+        "clone": true
+      },
+      {
+        "model": "bytedance-seed/seed-audio-1-0",
+        "voice": null,
+        "direction_style": "inline",
+        "clone": true
+      }
+    ],
+    "audition_text": "The first bridge across the river took eleven years to build. It lasted four. What went wrong is a story about money, pride, and one missing bolt.",
+    "audition_direction": "A clear, warm narrator explaining something fascinating: brisk through context, slower on the key line, never theatrical.",
+    "designs": []
+  },
+  "subtitles": {
+    "font_file": "fonts/ArchivoBlack-Regular.ttf",
+    "font_name": "Archivo Black",
+    "font_size": 78,
+    "primary_colour": "#E6E1D6",
+    "highlight_colour": "#F2D335",
+    "outline_colour": "#07070A",
+    "outline": 6,
+    "shadow": 2,
+    "max_words": 3,
+    "max_chunk_seconds": 1.8,
+    "uppercase": true,
+    "margin_bottom": 640
+  },
+  "music": {
+    "track": null,
+    "prompt": "Instrumental only, no vocals. A light, curious underscore for a narrated explainer: a soft steady pulse, warm pads, a few gentle plucked notes, slowly evolving, never busy. Sits quietly under a voice; no sudden swells or hits.",
+    "variations": [
+      "Voice it with warm synth pads and soft plucks.",
+      "Voice it with gentle piano and light strings.",
+      "Voice it with mellow mallets and a soft bass.",
+      "Voice it with airy guitar harmonics and a low drone."
+    ],
+    "below_voice_db": 15,
+    "duck_threshold": 0.02,
+    "duck_ratio": 2.0,
+    "duck_attack_ms": 200,
+    "duck_release_ms": 1500,
+    "loudness_lufs": -14,
+    "true_peak_db": -1
+  }
+}
