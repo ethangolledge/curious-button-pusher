@@ -166,7 +166,9 @@ what to do when something goes wrong: [google-cloud.md](google-cloud.md). In sho
 Cloud project with billing on (the free tier needs a card) and a budget alert, the gcloud tool,
 two sign-ins (`gcloud auth login`, `gcloud auth application-default login`), a Standard bucket
 in `us-east1` with public access prevented and soft delete off, the `cloud` extra, and a
-`storage` section in the channel's `config.json`. `content check --config …` confirms it.
+`storage` section in the channel's `config.json`. After the sign-ins, `content cloud setup
+--bucket <name> --config …` does the rest and is safe to run again; `content check --config …`
+confirms it.
 
 There are no key files: only your own sign-in, saved under `~/.config/gcloud/`, outside the
 project. Bucket versioning and Autoclass stay off: the channel's versions are kept by

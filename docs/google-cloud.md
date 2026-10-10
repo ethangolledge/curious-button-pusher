@@ -89,48 +89,40 @@ gcloud config set project YOUR-PROJECT-ID
 The sign-in is saved on your computer (in `~/.config/gcloud/`), never in the project folder,
 and there are no key files to keep safe.
 
-### 7. Make the bucket
+### 7. Make the bucket and connect your channel: one command
 
 Bucket names are shared by everyone on Google Cloud, so yours must be unique: use your channel's
 name with something added (for example `my-channel-videos-2026`). Lower case, numbers and
-hyphens only. The assistant can run this for you:
-
-```bash
-gcloud services enable storage.googleapis.com
-gcloud storage buckets create gs://YOUR-BUCKET --location=us-east1 \
-  --default-storage-class=STANDARD --uniform-bucket-level-access \
-  --public-access-prevention --soft-delete-duration=0
-```
-
-What the options mean:
-
-- `us-east1` and `STANDARD`: the free tier only covers Standard storage in a few US regions.
-  (Your videos are no less private there.)
-- `--public-access-prevention`: nothing in it can ever be made public by accident.
-- `--soft-delete-duration=0`: by default Google keeps deleted files for 7 days and bills for
-  them; replacing a re-cut video would then be paid for twice for a week.
-
-### 8. Connect your channel
-
-The assistant does this, in the project folder:
+hyphens only. The assistant runs this for you, in the project folder:
 
 ```bash
 .venv/bin/pip install -e '.[cloud]'
+.venv/bin/content cloud setup --bucket YOUR-BUCKET --config themes/<name>/config.json
 ```
 
-Then, for a new channel, `content new-channel <name> --bucket YOUR-BUCKET`; for one you already
-have, add this to `themes/<name>/config.json`:
+It checks each step and does the rest, and is safe to run again:
 
-```json
-"storage": {"bucket": "YOUR-BUCKET"}
-```
+| Step | What it does |
+|---|---|
+| gcloud, the two sign-ins, the project, billing | checks them; if one is missing it stops and says exactly what to do (steps 3–6), then you run it again |
+| Cloud Storage | turns it on for the project |
+| the bucket | makes it, or, if it is already there, checks its settings and corrects them |
+| your channel | adds `"storage": {"bucket": "YOUR-BUCKET"}` to its `config.json` |
+| first save | keeps your channel in the bucket for the first time |
 
-Check the connection, and keep the channel for the first time:
+The settings it gives the bucket, and why:
 
-```bash
-.venv/bin/content check --config themes/<name>/config.json      # "Bucket: … reachable"
-.venv/bin/content storage save-theme --config themes/<name>/config.json
-```
+- `us-east1` and Standard storage: the free tier only covers Standard storage in a few US
+  regions (`--location us-west1` or `us-central1` also work). Your videos are no less private
+  there.
+- Public access prevented: nothing in it can ever be made public by accident.
+- Soft delete off: by default Google keeps deleted files for 7 days and bills for them;
+  replacing a re-cut video would then be paid for twice for a week.
+- One way of controlling access (uniform): only your account's permissions apply.
+
+A bucket's region and class cannot change after it is made; the command says so if an existing
+one is outside the free tier. `content check --config themes/<name>/config.json` confirms
+everything ("Bucket: … reachable").
 
 From now on it happens by itself.
 

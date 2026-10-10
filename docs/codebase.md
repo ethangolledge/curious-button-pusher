@@ -171,6 +171,7 @@ Each folder: `agent.py` (the code), `prompt.md` (what its model is told, theme-n
 | `review.py` | `review`, `estimate` |
 | `storage.py` | `storage`, and keeping the channel after any command that changes it (`keep_theme`) |
 | `spend.py` | `spend`, `spend budget`; recording every run's and tool's calls (`record_spend`), reading OpenRouter and the bucket |
+| `cloud.py` | `cloud setup`: the Google Cloud steps after the sign-ins, checked and done in order, safe to run again (gcloud runs through a replaceable function, so it is tested without Google) |
 | `check.py` | `check`: is this machine ready (Python, ffmpeg, extras, the key and its balance, the channel, the bucket), with the fix for anything missing |
 
 ## Tunable Constants

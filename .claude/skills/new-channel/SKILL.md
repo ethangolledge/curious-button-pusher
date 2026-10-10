@@ -119,9 +119,11 @@ now, follow `docs/google-cloud.md`:
 
 - They do steps 1–6: account, terms, project (note the project ID), billing with a $1 budget
   alert, installing gcloud, and the two sign-ins in their own terminal.
-- You do steps 7–8: make the bucket (suggest a unique name like `<channel>-videos-2026`),
-  install the `cloud` extra, and connect it (`--bucket` in stage 4, or `"storage"` in
-  `config.json`).
+- You do step 7, once the channel exists (stage 4): install the `cloud` extra, then
+  `content cloud setup --bucket <name> --config <channel>` (suggest a unique name like
+  `<channel>-videos-2026`). It checks their part (gcloud, both sign-ins, the project, billing)
+  and stops with the exact fix if one is missing; run it again once they have done it. Then it
+  turns on Cloud Storage, makes or corrects the bucket, connects the channel and saves it.
 - If any gcloud command hangs, it is the network quirk at the end of `docs/google-cloud.md`.
 - Ask the amount of the budget alert they set (and any free-trial credit Google gave them),
   and record it after stage 4: `content spend budget google-cloud <amount> --kind monthly

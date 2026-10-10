@@ -83,7 +83,7 @@ so it knows every step. It tells you where you are as it goes ("Stage 3 of 12").
 | 0. Where are we? | it looks at what is already set up | say which computer you have | free |
 | 1. The computer | it installs the project, and offers a free practice video with stand-in models | run a line in your own terminal if it needs your password | free |
 | 2. Your key | you create an OpenRouter account and key; you put the key in a file called `.env` | sign up, add credit, paste the key into `.env` (never into the chat) | your credit |
-| 3. Google Cloud (optional) | it explains, and does most of it | make an account and a project, add a card, sign in twice in your own terminal ([google-cloud.md](google-cloud.md)) | free tier |
+| 3. Google Cloud (optional) | it explains, and does most of it | make an account and a project, add a card, sign in twice in your own terminal; it makes the bucket with one command ([google-cloud.md](google-cloud.md)) | free tier |
 | 4. Your channel | it creates your channel's folder | choose a name | free |
 | 5. The channel in words | it asks what stories, for whom, what feeling, what storyteller, then writes it up | answer, and approve what it wrote | free |
 | 6. The look | it offers styles, colours, light, and how real people are drawn | choose | free |
