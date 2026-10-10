@@ -18,6 +18,8 @@ NAMED = {
     "staging.look_settings": None,  # the look's own settings: its file explains them
     "staging.moves": "<move>",
     "staging.moves.<move>.settings": None,  # the move block's settings: the catalogue lists them
+    "staging.joins.slow.settings": None,
+    "staging.joins.swift.settings": None,
 }
 
 

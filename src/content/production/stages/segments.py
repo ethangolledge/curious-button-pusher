@@ -5,9 +5,11 @@ from pathlib import Path
 
 from langgraph.types import Send
 
+from content.blender.job import Join
 from content.production import assemble, checks
 from content.production.media import GenerationRefused
 from content.production.studio import (
+    STAGING_LOOK,
     RenderTask,
     Studio,
     anchor_text,
@@ -22,10 +24,12 @@ from content.providers.cache import file_digest
 from content.schemas.media import (
     RenderedAsset,
 )
-from content.state import ContentState
+from content.staging.plan import join_for
+from content.state import CallRecord, ContentState
 from content.story.field import (
     field_slots,
     look,
+    shift,
     shift_phrase,
 )
 
@@ -53,25 +57,35 @@ class Segments(Studio):
             silhouette = keyframes[scene.scene_id].silhouette
             here = fields.get(scene.scene_id)
             # The space changes as the next line will land: tunnelling in, blooming out.
-            shift = shift_phrase(here, fields.get(following.scene_id), spec)
-            prompt = self.theme.segment_prompt(
-                scene.anchor,
-                camera=scene.camera,
-                motion=scene.motion,
-                morph_bridge=scene.morph_bridge,
-                next_anchor=following.anchor,
-                silhouette=silhouette,
-                field=field_slots(here, spec),
-                shift=shift,
-            )
-            signature = render_signature(
-                self.config.video_model,
-                self.config.video_resolution,
-                prompt,
-                str(seconds),
-                file_digest(Path(first)),
-                file_digest(Path(last)),
-            )
+            shifted = shift_phrase(here, fields.get(following.scene_id), spec)
+            join = None
+            if self.rendered_joins():
+                _, speed = shift(here, fields.get(following.scene_id), spec)
+                job = join_for(
+                    scene, self.theme, speed=speed, first=first, last=last, seconds=seconds
+                )
+                join = job.dumps()
+                prompt = f"rendered transition: {job.transition.block}"
+                signature = render_signature("blender-join", STAGING_LOOK, join)
+            else:
+                prompt = self.theme.segment_prompt(
+                    scene.anchor,
+                    camera=scene.camera,
+                    motion=scene.motion,
+                    morph_bridge=scene.morph_bridge,
+                    next_anchor=following.anchor,
+                    silhouette=silhouette,
+                    field=field_slots(here, spec),
+                    shift=shifted,
+                )
+                signature = render_signature(
+                    self.config.video_model,
+                    self.config.video_resolution,
+                    prompt,
+                    str(seconds),
+                    file_digest(Path(first)),
+                    file_digest(Path(last)),
+                )
             attempt = next_attempt(
                 existing.get(scene.scene_id), signature, self.config.segment_attempts
             )
@@ -94,8 +108,9 @@ class Segments(Studio):
                             expected_framing=look(here, spec).framing,
                             expected_temperature=None,
                             field_point=None,
-                            expected_shift=shift,
+                            expected_shift=shifted,
                             shot=None,
+                            join=join,
                         ),
                     )
                 )
@@ -103,6 +118,8 @@ class Segments(Studio):
 
     def produce_segment(self, state: RenderTask) -> ContentState:
         task = state
+        if task["join"]:
+            return self._judged(task, self.render_join(Join.loads(task["join"])), [])
         first = Path(required(task["first_frame"], "a first frame"))
         last = Path(task["last_frame"]) if task["last_frame"] else None
         try:
@@ -125,6 +142,11 @@ class Segments(Studio):
             )
         except GenerationRefused as refusal:
             return {"segments": {task["scene_id"]: refused(task, refusal)}}
+        return self._judged(task, video, calls)
+
+    def _judged(self, task: RenderTask, video: Path, calls: list[CallRecord]) -> ContentState:
+        """A morph, generated or rendered, checked for cuts and frozen frames, described at
+        three moments, and judged."""
         issues = [
             f"{task['scene_id']}: {issue}"
             for issue in checks.segment_issues(

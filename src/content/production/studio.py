@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import Any, TypedDict
 
 from content.agents.base import load_prompt
-from content.blender.job import Job, Report
+from content.blender.job import Job, Join, Report
 from content.config import ProductionConfig
 from content.judging.judge import Judge
 from content.judging.outcomes import correction_line
@@ -103,6 +103,8 @@ class RenderTask(TypedDict):
     expected_shift: str | None
     # A staged scene's keyframe: the render job (JSON) instead of a prompt to an image model.
     shot: str | None
+    # A rendered join: the transition job (JSON) instead of a prompt to the video model.
+    join: str | None
 
 
 class Studio:
@@ -486,6 +488,23 @@ class Studio:
             return None
         return self.renderer, self.catalogue
 
+    def rendered_joins(self) -> Renderer | None:
+        """Blender, when this channel renders its joins instead of buying AI morphs."""
+        return self.renderer if self.config.joins == "rendered" else None
+
+    def render_join(self, join: Join) -> Path:
+        """A transition rendered once and encoded, kept by everything it is made from."""
+        video = self.derived("join", [join.dumps(), STAGING_LOOK], ".mp4")
+        if video.is_file():
+            return video
+        renderer = self.rendered_joins()
+        if renderer is None:
+            raise ValueError("A rendered join needs Blender (production.joins: rendered)")
+        folder = self.derived("joinframes", [join.dumps(), STAGING_LOOK], "")
+        report = renderer.render(join, folder)
+        assemble.encode_frames(Path(report.frames[0]).parent, join.fps, video)
+        return video
+
     def render_shot(self, job: Job) -> Report:
         """A 3D shot rendered once: kept by everything it is built from (the job, the block
         and look code, and the files of its models), as paid assets are."""
@@ -518,9 +537,9 @@ class Studio:
     def pricing(self) -> Pricing:
         return Pricing(
             cap=self.config.max_usd,
-            # A staged scene's picture is rendered, not bought.
+            # A staged scene's picture, and a rendered join, are rendered, not bought.
             image_usd=0.0 if self.staging() else self.config.image_usd,
-            video_usd_per_second=self.config.video_usd_per_second,
+            video_usd_per_second=0.0 if self.rendered_joins() else self.config.video_usd_per_second,
             morph_seconds=self.config.transition_seconds,
         )
 

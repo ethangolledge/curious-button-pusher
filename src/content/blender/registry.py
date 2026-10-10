@@ -16,7 +16,7 @@ from types import ModuleType
 from content.blender.blocks.base import Block, Prop
 
 ENGINE = Path(__file__).parent / "blocks"
-KINDS = ("layouts", "actors", "actions", "moves", "lights", "props")
+KINDS = ("layouts", "actors", "actions", "moves", "lights", "transitions", "props")
 # Only inside Blender: looks import its API.
 LOOKS = ("looks",)
 

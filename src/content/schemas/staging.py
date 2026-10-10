@@ -42,6 +42,9 @@ class StagedScene(Scene):
     """A scene that may be a 3D shot. Without `staging` it is drawn as a keyframe."""
 
     staging: StagePlan | None = None
+    # How this scene turns into the next, when joins are rendered: a transition from the
+    # catalogue. Empty leaves it to the theme.
+    transition: BlockChoice | None = None
     # What the toolkit lacks to stage this scene, when it is left as a keyframe because of
     # it: kept so the missing ability or model can be built later.
     missing: str = ""

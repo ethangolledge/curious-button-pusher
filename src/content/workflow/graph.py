@@ -119,7 +119,9 @@ def build_graph(
     fact_checker = agent(FactChecker, "fact_checker", themed=False)
     visual_director = (
         StagedVisualDirector(
-            catalogue=describe(catalogue, presets=theme.spec.staging.moves),
+            catalogue=describe(
+                catalogue, presets=theme.spec.staging.moves, joins=theme.spec.staging.joins
+            ),
             name="visual_director",
             config=config.agents["visual_director"],
             models=config.models,

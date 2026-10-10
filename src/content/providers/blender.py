@@ -11,7 +11,7 @@ import subprocess
 from pathlib import Path
 from typing import Any, Protocol
 
-from content.blender.job import Job, Report
+from content.blender.job import Job, Join, Report
 
 WORKER = Path(__file__).parents[1] / "blender" / "worker.py"
 INGEST = Path(__file__).parents[1] / "blender" / "ingest.py"
@@ -23,7 +23,7 @@ class BlenderError(RuntimeError):
 
 
 class Renderer(Protocol):
-    def render(self, job: Job, out: Path, *, force: bool = False) -> Report: ...
+    def render(self, job: Job | Join, out: Path, *, force: bool = False) -> Report: ...
 
 
 def blender_path() -> Path | None:
@@ -48,7 +48,7 @@ class LocalBlender:
         self.program = found
         self.seconds = seconds
 
-    def render(self, job: Job, out: Path, *, force: bool = False) -> Report:
+    def render(self, job: Job | Join, out: Path, *, force: bool = False) -> Report:
         out.mkdir(parents=True, exist_ok=True)
         job_file = out / "job.json"
         job_file.write_text(job.dumps(), encoding="utf-8")
@@ -92,16 +92,17 @@ class FakeBlender:
     different; the report is written as the worker writes it. Records each job."""
 
     def __init__(self, *, brightness: float = 128.0, saturation: float = 0.0) -> None:
-        self.jobs: list[Job] = []
+        self.jobs: list[Job | Join] = []
         self.brightness = brightness
         self.saturation = saturation
 
-    def render(self, job: Job, out: Path, *, force: bool = False) -> Report:
+    def render(self, job: Job | Join, out: Path, *, force: bool = False) -> Report:
         self.jobs.append(job)
         wanted = job.frames or tuple(range(1, job.frame_count + 1))
         folder = out / "frames"
         folder.mkdir(parents=True, exist_ok=True)
-        luma = round(self.brightness) + sum(job.shot_id.encode()) % 3
+        name = job.shot_id if isinstance(job, Job) else job.join_id
+        luma = round(self.brightness) + sum(name.encode()) % 3
         tint = round(128 - self.saturation / math.sqrt(2))
         subprocess.run(
             [
@@ -116,6 +117,6 @@ class FakeBlender:
         for path in folder.glob("*.png"):
             if int(path.stem) not in wanted:
                 path.unlink()
-        report = Report(job.shot_id, [str(folder / f"{f:04d}.png") for f in wanted], [], 0.0, 0.0)
+        report = Report(name, [str(folder / f"{f:04d}.png") for f in wanted], [], 0.0, 0.0)
         (out / "report.json").write_text(report.dumps(), encoding="utf-8")
         return report

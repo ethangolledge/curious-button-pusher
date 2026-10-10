@@ -21,31 +21,32 @@ import bpy  # type: ignore[import-not-found]  # noqa: E402
 from mathutils import Vector  # type: ignore[import-not-found]  # noqa: E402
 
 from content.blender.audit import audit  # noqa: E402
-from content.blender.blocks.base import Look, read  # noqa: E402
+from content.blender.blocks.base import Look, Transition, read  # noqa: E402
+from content.blender.blocks.looks.plain import ENGINE  # noqa: E402
 from content.blender.camera import SUBJECT  # noqa: E402
+from content.blender.canvas import BlenderCanvas  # noqa: E402
 from content.blender.direct import build  # noqa: E402
-from content.blender.job import Grade, Job, Report  # noqa: E402
+from content.blender.job import Grade, Job, Join, Report  # noqa: E402
 from content.blender.registry import KINDS, LOOKS, discover  # noqa: E402
 from content.blender.stage import BlenderStage  # noqa: E402
 
 # How far full warmth (or cold) moves the white balance from daylight.
 WARMTH_KELVIN = 2500
+# Samples for a transition: enough to smooth the edges its programs draw.
+JOIN_SAMPLES = 8
 
 
 def main(job_path: Path, out: Path, *, force: bool) -> int:
-    job = Job.read(job_path)
+    text = job_path.read_text(encoding="utf-8")
+    if "transition" in json.loads(text):
+        return _join(Join.loads(text), out)
+    job = Job.loads(text)
     started = time.perf_counter()
-    bpy.ops.wm.read_factory_settings(use_empty=True)
-    bpy.context.preferences.edit.keyframe_new_interpolation_type = "LINEAR"
+    scene = _reset(job.width, job.height, job.fps, job.frame_count)
     registry = discover([Path(folder) for folder in job.channel_blocks], [*KINDS, *LOOKS])
     look_block = registry.get("looks", job.look.block)
     assert issubclass(look_block, Look)
     look = look_block(read(look_block, job.look.settings), job.palette)
-    scene = bpy.context.scene
-    scene.render.resolution_x, scene.render.resolution_y = job.width, job.height
-    scene.render.fps = job.fps
-    scene.frame_start, scene.frame_end = 1, job.frame_count
-    scene.render.image_settings.file_format = "PNG"
     look.world(scene)
     look.render(scene, job.quality)
     _grade(scene, job.grade)
@@ -82,6 +83,50 @@ def main(job_path: Path, out: Path, *, force: bool) -> int:
     return 0 if frames else 2
 
 
+def _reset(width: int, height: int, fps: int, frames: int) -> Any:
+    """An empty scene at the job's size, rate and length, rendering PNG frames."""
+    bpy.ops.wm.read_factory_settings(use_empty=True)
+    bpy.context.preferences.edit.keyframe_new_interpolation_type = "LINEAR"
+    scene = bpy.context.scene
+    scene.render.resolution_x, scene.render.resolution_y = width, height
+    scene.render.fps = fps
+    scene.frame_start, scene.frame_end = 1, frames
+    scene.render.image_settings.file_format = "PNG"
+    return scene
+
+
+def _join(join: Join, out: Path) -> int:
+    """A transition between two pictures, drawn by its program on a canvas that fills the
+    frame. Its colours are the pictures' own: no look, no tone curve."""
+    started = time.perf_counter()
+    scene = _reset(join.width, join.height, join.fps, join.frame_count)
+    registry = discover([Path(folder) for folder in join.channel_blocks], ("transitions",))
+    block = registry.get("transitions", join.transition.block)
+    assert issubclass(block, Transition)
+    canvas = BlenderCanvas(
+        frames=join.frame_count,
+        fps=join.fps,
+        aspect=join.width / join.height,
+        pictures={"from": join.first, "to": join.last},
+    )
+    block().build(canvas, read(block, join.transition.settings))
+    scene.render.engine = ENGINE
+    scene.eevee.taa_render_samples = JOIN_SAMPLES
+    scene.view_settings.view_transform = "Standard"
+    built = time.perf_counter()
+    frames = _render(join, out / "frames")
+    report = Report(
+        shot_id=join.join_id,
+        frames=frames,
+        issues=[],
+        seconds_building=round(built - started, 2),
+        seconds_rendering=round(time.perf_counter() - built, 2),
+    )
+    out.mkdir(parents=True, exist_ok=True)
+    (out / "report.json").write_text(report.dumps())
+    return 0
+
+
 def _grade(scene: Any, grade: Grade) -> None:
     """The scene's feeling on top of the look: exposure, and warmth through the white
     balance (a warmer scene is balanced for bluer light, so it renders warmer)."""
@@ -99,7 +144,7 @@ def _subject(stage: BlenderStage) -> tuple[Vector, float] | None:
     return (Vector(box.centre.tuple()), box.radius) if box else None
 
 
-def _render(job: Job, folder: Path) -> list[str]:
+def _render(job: Job | Join, folder: Path) -> list[str]:
     scene = bpy.context.scene
     folder.mkdir(parents=True, exist_ok=True)
     wanted = job.frames or tuple(range(1, job.frame_count + 1))

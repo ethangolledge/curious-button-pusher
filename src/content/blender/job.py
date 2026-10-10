@@ -108,6 +108,40 @@ class Job:
 
 
 @dataclass(frozen=True, slots=True)
+class Join:
+    """A transition rendered between two pictures: the last frame of one scene and the first
+    of the next, both at the frame's size."""
+
+    join_id: str
+    seconds: float
+    transition: BlockCall
+    first: str
+    last: str
+    width: int = 1080
+    height: int = 1920
+    fps: int = 30
+    # A channel's own transitions (`themes/<name>/blender`), beside the engine's.
+    channel_blocks: tuple[str, ...] = ()
+    # The frames to render for a still; empty renders every frame.
+    frames: tuple[int, ...] = ()
+
+    @property
+    def frame_count(self) -> int:
+        return max(1, round(self.seconds * self.fps))
+
+    def dumps(self) -> str:
+        return json.dumps(asdict(self), indent=2, sort_keys=True)
+
+    @classmethod
+    def loads(cls, text: str) -> "Join":
+        data: dict[str, Any] = json.loads(text)
+        data["transition"] = BlockCall(**data["transition"])
+        data["channel_blocks"] = tuple(data.get("channel_blocks", ()))
+        data["frames"] = tuple(data.get("frames", ()))
+        return cls(**data)
+
+
+@dataclass(frozen=True, slots=True)
 class Report:
     """What the worker writes beside the frames."""
 

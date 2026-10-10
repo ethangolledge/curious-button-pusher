@@ -92,8 +92,14 @@ def test_dependencies_run_one_way_from_the_data_up_to_the_command_line() -> None
 
 # Inside `content.blender`, only these use Blender's own API; everything else there is plain
 # Python, so the rest of the project (and the tests) can build shots without Blender.
-USES_BLENDER = ("content.blender.stage", "content.blender.worker", "content.blender.audit",
-                "content.blender.ingest", "content.blender.blocks.looks.")  # fmt: skip
+USES_BLENDER = (
+    "content.blender.stage", "content.blender.canvas", "content.blender.worker",
+    "content.blender.audit", "content.blender.ingest", "content.blender.blocks.looks.",
+)  # fmt: skip
+
+
+def _is_blender_module(module: str) -> bool:
+    return any(module == m or (m.endswith(".") and module.startswith(m)) for m in USES_BLENDER)
 
 
 def _uses_blender(path: Path) -> bool:
@@ -116,9 +122,9 @@ def test_only_the_foundation_and_looks_touch_blender_and_nothing_outside_imports
         for module, targets in graph.items()
         if not module.startswith("content.blender")
         for target in targets
-        if target.startswith(USES_BLENDER)
+        if _is_blender_module(target)
     ]
-    assert [m for m in touching if not m.startswith(USES_BLENDER)] == [], (
+    assert [m for m in touching if not _is_blender_module(m)] == [], (
         "blocks use Stage verbs, never Blender's API (only looks may)"
     )
     assert not reaching_in, "\n".join(reaching_in)

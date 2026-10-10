@@ -135,9 +135,11 @@ def aperture(feeling: Feeling | None, spec: FieldSpec) -> float:
     return sum(weight * spec.reactions[r].aperture for r, weight in feeling.weights.items())
 
 
-def shift_phrase(before: Feeling | None, after: Feeling | None, spec: FieldSpec) -> str:
+def shift(
+    before: Feeling | None, after: Feeling | None, spec: FieldSpec
+) -> tuple[Literal["inward", "outward", "sideways"], Literal["slow", "swift"]]:
     """How the space changes into the next scene: tunnelling in, blooming out, or flowing
-    on, swiftly when the feeling changes a lot, slowly when it barely does."""
+    on; swiftly when the feeling changes a lot, slowly when it barely does."""
     change = aperture(after, spec) - aperture(before, spec)
     direction: Literal["inward", "outward", "sideways"] = (
         "inward" if change <= -0.5 else "outward" if change >= 0.5 else "sideways"
@@ -146,8 +148,13 @@ def shift_phrase(before: Feeling | None, after: Feeling | None, spec: FieldSpec)
         abs(change)
         + abs((after.intensity if after else 1) - (before.intensity if before else 1)) / 2
     )
-    speed = spec.speeds["swift" if swing >= spec.swift_above else "slow"]
-    return f"{spec.shifts[direction]}, {speed}"
+    return direction, "swift" if swing >= spec.swift_above else "slow"
+
+
+def shift_phrase(before: Feeling | None, after: Feeling | None, spec: FieldSpec) -> str:
+    """The shift in words, for a morph's prompt."""
+    direction, speed = shift(before, after, spec)
+    return f"{spec.shifts[direction]}, {spec.speeds[speed]}"
 
 
 def warmth(feeling: Feeling | None, spec: FieldSpec) -> float:

@@ -475,8 +475,9 @@ class WritingSpec(ImmutableModel):
 Value = str | float | int | bool
 
 
-class MovePreset(ImmutableModel):
-    """One of the theme's camera moves as a 3D move: a move block and its settings."""
+class BlockPreset(ImmutableModel):
+    """A block by name with settings the theme fixes: a camera move as a 3D move, or the
+    transition a join uses."""
 
     block: str
     settings: dict[str, Value] = {}
@@ -490,7 +491,13 @@ class StagingSpec(ImmutableModel):
 
     look: str = "plain"
     look_settings: dict[str, Value] = {}
-    moves: dict[str, MovePreset] = {}
+    moves: dict[str, BlockPreset] = {}
+    # The transition a rendered join uses (`production.joins` "rendered") when the storyboard
+    # does not choose one: by how much the feeling changes between the two scenes.
+    joins: dict[Literal["slow", "swift"], BlockPreset] = {
+        "slow": BlockPreset(block="flow"),
+        "swift": BlockPreset(block="zoom_through"),
+    }
 
 
 class ThemeSpec(ImmutableModel):

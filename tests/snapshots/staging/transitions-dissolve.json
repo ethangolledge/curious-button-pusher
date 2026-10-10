@@ -1,0 +1,7 @@
+[
+["canvas",{"steps":["coords",[]]}],
+["canvas",{"steps":["picture",["from",0,"extend"]]}],
+["canvas",{"steps":["picture",["to",0,"extend"]]}],
+["canvas",{"steps":["progress",["in_out"]]}],
+["canvas",{"steps":["mix",[1,2,3]]}]
+]

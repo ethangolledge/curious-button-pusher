@@ -6,6 +6,7 @@ whole shot without Blender, so it is fast and free."""
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, replace
 from pathlib import Path
+from typing import Any
 
 from content.blender.blocks.base import SettingError, read, refs, settings, summary
 from content.blender.direct import build
@@ -13,7 +14,7 @@ from content.blender.job import BlockCall, Job, ModelFile
 from content.blender.registry import KINDS, Registry, RegistryError, discover
 from content.blender.rehearsal import RehearsalStage
 from content.staging.library import Library, load_library
-from content.theme import MovePreset
+from content.theme import BlockPreset
 
 
 @dataclass
@@ -34,7 +35,8 @@ def load_catalogue(theme_root: Path | None) -> Catalogue:
 def describe(
     catalogue: Catalogue,
     kinds: Sequence[str] = KINDS[:-1],
-    presets: Mapping[str, MovePreset] | None = None,
+    presets: Mapping[str, BlockPreset] | None = None,
+    joins: Mapping[Any, BlockPreset] | None = None,
 ) -> str:
     """The catalogue in words, for a person or a model choosing from it; a theme's camera
     moves (`presets`) are listed with the move blocks they use."""
@@ -63,6 +65,9 @@ def describe(
             for name, preset in sorted(presets.items()):
                 fixed = ", ".join(f"{k} {v}" for k, v in preset.settings.items())
                 lines.append(f"  - {name}: {preset.block}" + (f" with {fixed}" if fixed else ""))
+        if kind == "transitions" and joins:
+            usual = "; ".join(f"{speed} changes: {preset.block}" for speed, preset in joins.items())
+            lines.append(f"- the theme's usual joins, when a scene names none: {usual}")
         lines.append("")
     lines.append("## models")
     for model in sorted(catalogue.library.models.values(), key=lambda m: m.model_id):

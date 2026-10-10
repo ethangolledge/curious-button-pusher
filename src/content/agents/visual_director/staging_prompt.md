@@ -22,6 +22,8 @@ A scene left unstaged is drawn as a keyframe, as before; `missing` is how the to
 - **lights**: one to three, matching the anchor's `light_and_colour`: a practical lamp, a window, overhead, or outdoor sky; at night, the sources in the scene.
 - **camera**: one move, usually the theme move named in the scene's `camera` (the catalogue lists the theme's moves with the move blocks), with its `subject`: the anchor's actor, or the layout's actor that carries the scene.
 
+- **transition** (any scene, staged or drawn, but the last): how it turns into the next scene, when the channel renders its joins: a transition from the catalogue, chosen for the change your `morph_bridge` describes (a calm change flows, a sudden turn rushes through, a descent spirals inward). Leave it empty for the theme's usual join.
+
 Every name a setting refers to must exist in the shot: a mark or path the layout offers, an actor the layout places, or an actor you added. Numbers stay within the ranges given.
 
 ## Example

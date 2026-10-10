@@ -20,6 +20,7 @@ from content.blender.blocks.base import (
     Light,
     Move,
     Prop,
+    Transition,
     read,
     settings,
     summary,
@@ -36,7 +37,7 @@ from content.blender.maths import (
     limit_turn,
 )
 from content.blender.registry import KINDS, RegistryError, discover
-from content.blender.rehearsal import RehearsalStage
+from content.blender.rehearsal import RecordingCanvas, RehearsalStage
 from content.schemas.staging import (
     BlockChoice,
     Setting,
@@ -89,7 +90,13 @@ def _stage(registry: Any = REGISTRY) -> RehearsalStage:
 
 def _build(block: type[Block], stage: RehearsalStage) -> None:
     example = block.example
-    if issubclass(block, Actor):
+    if issubclass(block, Transition):
+        # A transition writes a program on a canvas; recorded, it is snapshot like the rest.
+        canvas = RecordingCanvas()
+        block().build(canvas, example)
+        assert canvas.shown is not None, f"{block.name} never shows anything"
+        stage.calls.extend(("canvas", {"steps": step}) for step in canvas.steps)
+    elif issubclass(block, Actor):
         block().build(stage, example, "actor", "desk")
     elif issubclass(block, Prop):
         block().build(stage, f"{block.name}_built")

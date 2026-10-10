@@ -13,6 +13,7 @@ from dataclasses import dataclass
 from typing import Any, ClassVar, Literal, get_args, get_origin, get_type_hints
 
 from content.blender.api import Stage, Thing
+from content.blender.canvas_api import Canvas
 
 
 @dataclass(frozen=True, slots=True)
@@ -122,6 +123,16 @@ class Prop(Block):
     capabilities: ClassVar[frozenset[str]] = frozenset()
 
     def build(self, stage: Stage, name: str) -> Thing:
+        raise NotImplementedError
+
+
+class Transition(Block):
+    """How one picture becomes the next: a small program on the frame, written with `Canvas`
+    verbs (`canvas_api.py`) and the shared `patterns`."""
+
+    kind = "transitions"
+
+    def build(self, canvas: Canvas, p: Any) -> None:
         raise NotImplementedError
 
 

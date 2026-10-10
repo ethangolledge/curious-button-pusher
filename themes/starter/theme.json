@@ -507,6 +507,14 @@
           "direction": "up"
         }
       }
+    },
+    "joins": {
+      "slow": {
+        "block": "flow"
+      },
+      "swift": {
+        "block": "zoom_through"
+      }
     }
   }
 }

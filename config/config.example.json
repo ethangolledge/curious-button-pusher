@@ -117,6 +117,7 @@
   "production": {
     "provider": "openrouter",
     "pictures": "keyframes",
+    "joins": "ai",
     "cache_directory": ".cache",
     "image_model": "bytedance-seed/seedream-5-0-pro",
     "image_resolution": "2K",

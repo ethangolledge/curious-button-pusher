@@ -92,6 +92,9 @@ class ProductionConfig:
     # "staged" (a 3D shot built in Blender, where the toolkit can show the scene; the rest
     # stay keyframes). Morphs, breathing, colour and texture are the same either way.
     pictures: Literal["keyframes", "staged"] = "keyframes"
+    # How one scene turns into the next: "ai" (the video model morphs between the two
+    # pictures, paid) or "rendered" (a transition drawn in Blender from them, free).
+    joins: Literal["ai", "rendered"] = "ai"
 
 
 @dataclass(frozen=True, slots=True)
@@ -426,13 +429,18 @@ def _production_config(root: Path, data: Mapping[str, Any]) -> ProductionConfig:
         reference_candidates=int(data.get("reference_candidates", 4)),
         references_per_request=int(data.get("references_per_request", 2)),
         min_reference_side=int(data.get("min_reference_side", 480)),
-        pictures=_pictures(data.get("pictures", "keyframes")),
+        pictures=_choice(data, "pictures", ("keyframes", "staged")),
+        joins=_choice(data, "joins", ("ai", "rendered")),
     )
 
 
-def _pictures(value: object) -> Literal["keyframes", "staged"]:
-    if value not in ("keyframes", "staged"):
-        raise ConfigurationError(f"production.pictures must be keyframes or staged, not {value!r}")
+def _choice(data: Mapping[str, Any], key: str, options: tuple[str, ...]) -> Any:
+    """A production setting that takes one of a few words; the first is its default."""
+    value = data.get(key, options[0])
+    if value not in options:
+        raise ConfigurationError(
+            f"production.{key} must be one of {', '.join(options)}, not {value!r}"
+        )
     return value
 
 

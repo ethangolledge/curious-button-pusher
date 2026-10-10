@@ -2,13 +2,15 @@
 can be built: the bridge between the Visual Director's plan and the Blender toolkit."""
 
 from collections.abc import Mapping, Sequence
-from typing import TypeVar
+from typing import Any, TypeVar
 
-from content.blender.job import NEUTRAL, ActorCall, BlockCall, Grade, Job, Quality
+from content.blender.blocks.base import SettingError, read
+from content.blender.job import NEUTRAL, ActorCall, BlockCall, Grade, Job, Join, Quality
+from content.blender.registry import RegistryError
 from content.schemas.staging import BlockChoice, Setting, StagedScene, StagedVisualPackage
-from content.schemas.visuals import VisualPackage
+from content.schemas.visuals import Scene, VisualPackage
 from content.staging.catalogue import Catalogue, check, with_models
-from content.theme import MovePreset, Theme
+from content.theme import BlockPreset, Theme
 
 Package = TypeVar("Package", bound=VisualPackage)
 
@@ -20,7 +22,7 @@ def _settings(given: Sequence[Setting]) -> dict[str, str]:
     return {setting.name: setting.value for setting in given}
 
 
-def _call(choice: BlockChoice, presets: Mapping[str, MovePreset] | None = None) -> BlockCall:
+def _call(choice: BlockChoice, presets: Mapping[Any, BlockPreset] | None = None) -> BlockCall:
     """A block call; a camera move may be one of the theme's moves, whose settings the plan's
     own settings refine."""
     preset = (presets or {}).get(choice.block)
@@ -79,6 +81,35 @@ def job_for(
     return with_models(job, catalogue)
 
 
+def join_for(
+    scene: Scene,
+    theme: Theme,
+    *,
+    speed: str,
+    first: str,
+    last: str,
+    seconds: float,
+) -> Join:
+    """The rendered transition out of a scene: the one its storyboard chose, or the theme's
+    for how swiftly the feeling changes into the next scene."""
+    chosen = scene.transition if isinstance(scene, StagedScene) else None
+    presets = theme.spec.staging.joins
+    call = _call(chosen, presets) if chosen else _call(BlockChoice(block=speed), presets)
+    spec = theme.spec.format
+    folder = theme.root / "blender"
+    return Join(
+        join_id=scene.scene_id,
+        seconds=seconds,
+        transition=call,
+        first=first,
+        last=last,
+        width=spec.width,
+        height=spec.height,
+        fps=spec.fps,
+        channel_blocks=(str(folder),) if folder.is_dir() else (),
+    )
+
+
 def _even(pixels: float) -> int:
     return max(2, int(pixels) // 2 * 2)
 
@@ -102,6 +133,15 @@ def staging_issues(visuals: VisualPackage, theme: Theme, catalogue: Catalogue) -
             issues.append(f"{scene.scene_id} staging: {str(exc).strip(chr(39))}")
             continue
         issues += [f"{scene.scene_id} staging: {issue}" for issue in check(job, catalogue)]
+    for scene in visuals.scenes:
+        chosen = scene.transition if isinstance(scene, StagedScene) else None
+        if chosen is None:
+            continue
+        try:
+            block = catalogue.registry.get("transitions", chosen.block)
+            read(block, _settings(chosen.settings))
+        except (RegistryError, SettingError) as exc:
+            issues.append(f"{scene.scene_id} transition: {exc}")
     return issues
 
 

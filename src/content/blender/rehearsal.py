@@ -250,3 +250,62 @@ class RehearsalStage:
         self._record(
             "simulate", bodies=[b.name for b in bodies], start=start_frame, push=dict(push)
         )
+
+
+@dataclass(frozen=True)
+class Recorded:
+    """A value in a recorded transition program: the number of the step that made it."""
+
+    step: int
+
+
+class RecordingCanvas:
+    """A canvas without Blender: it writes down the transition's program, step by step, so a
+    transition can be checked and tested without rendering."""
+
+    def __init__(self, *, aspect: float = 9 / 16, seconds: float = 4.0) -> None:
+        self._aspect, self._seconds = aspect, seconds
+        self.steps: list[tuple[str, tuple[Any, ...]]] = []
+        self.shown: Recorded | None = None
+
+    @property
+    def aspect(self) -> float:
+        return self._aspect
+
+    @property
+    def seconds(self) -> float:
+        return self._seconds
+
+    def _step(self, verb: str, *inputs: Any) -> Recorded:
+        self.steps.append((verb, tuple(i.step if isinstance(i, Recorded) else i for i in inputs)))
+        return Recorded(len(self.steps) - 1)
+
+    def progress(self, ease: str = "in_out") -> Recorded:
+        return self._step("progress", ease)
+
+    def coords(self) -> Recorded:
+        return self._step("coords")
+
+    def picture(self, which: str, at: Any, edge: str = "extend") -> Recorded:
+        return self._step("picture", which, at, edge)
+
+    def math(self, operation: str, a: Any, b: Any = 0.0) -> Recorded:
+        return self._step("math", operation, a, b)
+
+    def point(self, x: Any, y: Any) -> Recorded:
+        return self._step("point", x, y)
+
+    def parts(self, point: Any) -> tuple[Recorded, Recorded]:
+        return self._step("x", point), self._step("y", point)
+
+    def noise(self, at: Any, scale: Any, detail: float = 2.0) -> Recorded:
+        return self._step("noise", at, scale, detail)
+
+    def mix(self, first: Any, second: Any, amount: Any) -> Recorded:
+        return self._step("mix", first, second, amount)
+
+    def colour(self, hex_colour: str) -> Recorded:
+        return self._step("colour", hex_colour)
+
+    def output(self, colour: Any) -> None:
+        self.shown = colour

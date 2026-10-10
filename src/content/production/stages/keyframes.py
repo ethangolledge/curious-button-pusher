@@ -136,6 +136,7 @@ class Keyframes(Studio):
                         field_point=circumplex(feeling, spec),
                         expected_shift=None,
                         shot=None,
+                        join=None,
                     ),
                 )
             )
@@ -193,6 +194,7 @@ class Keyframes(Studio):
             field_point=circumplex(feeling, spec),
             expected_shift=None,
             shot=job.dumps(),
+            join=None,
         )
 
     def _fixes(self, retry: RenderedAsset) -> list[str]:

@@ -371,6 +371,15 @@ def motion_clip(
     return output
 
 
+def encode_frames(frames: Path, frame_rate: int, output: Path) -> Path:
+    """A folder of numbered frames as a video."""
+    ffmpeg.run(
+        "-framerate", str(frame_rate), "-i", frames / "%04d.png",
+        "-c:v", "libx264", "-preset", "veryfast", "-crf", "16", "-pix_fmt", "yuv420p", output,
+    )  # fmt: skip
+    return output
+
+
 def shot_clip(
     frames: Path,
     frame_rate: int,

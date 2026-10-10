@@ -10,6 +10,7 @@ from langchain_core.runnables import RunnableConfig
 from langgraph.types import Command
 from pydantic import BaseModel
 
+from content.blender.job import Job, Join
 from content.choices import RunChoices, configure_run
 from content.config import ContentConfig, load_config
 from content.production import ffmpeg
@@ -82,7 +83,7 @@ def test_a_staged_channel_renders_the_scenes_it_can_stage_and_draws_the_rest(
     # Their pictures cost nothing: only the four drawn scenes asked the image model.
     assert media.calls.count("image") == 4
     # Stills to judge, then a draft for the animatic, then the final shot for the cut.
-    qualities = [(job.shot_id, job.quality) for job in blender.jobs]
+    qualities = [(job.shot_id, job.quality) for job in blender.jobs if isinstance(job, Job)]
     assert qualities.count(("S2", "final")) == 2 and ("S2", "draft") in qualities
     # The morphs into and out of a staged scene start and end on its shot's own frames.
     morph_into = next(t for t in result["segments"].values() if t.scene_id == "S1")
@@ -92,6 +93,26 @@ def test_a_staged_channel_renders_the_scenes_it_can_stage_and_draws_the_rest(
     assert info.duration == pytest.approx(package.production.scenes[-1].end, abs=0.2)
     assert [review.stage for review in reviews] == ["storyboard", "final_cut"]
     assert most_wanted(root) == [("layout: a reading room", 1)]
+
+
+@pytest.mark.video
+def test_rendered_joins_replace_every_paid_morph(video_config: ContentConfig) -> None:
+    assert video_config.production is not None
+    config = replace(video_config, production=replace(video_config.production, joins="rendered"))
+    media, blender = FakeMediaProvider(), FakeBlender()
+
+    result, _ = _run(config, media, renderer=blender)
+
+    package = result["final_package"]
+    assert package is not None and package.production is not None
+    assert "video" not in media.calls
+    joins = [job for job in blender.jobs if isinstance(job, Join)]
+    timeline = result["timeline"]
+    assert timeline is not None and len(joins) == len(timeline.transitions) > 0
+    # Each join's transition is the theme's for how the feeling shifts.
+    presets = {preset.block for preset in config.theme.spec.staging.joins.values()}
+    assert {join.transition.block for join in joins} <= presets
+    assert all(asset.rendered for asset in result["segments"].values())
 
 
 @pytest.mark.video
