@@ -14,7 +14,8 @@ from pydantic import BaseModel
 
 from content.config import AgentConfig
 from content.models import ModelRegistry
-from content.providers.base import ModelProvider
+from content.providers.base import ModelProvider, Usage
+from content.providers.cache import AssetCache
 from content.state import CallRecord, call_record
 
 T = TypeVar("T", bound=BaseModel)
@@ -45,12 +46,16 @@ class Agent:
         models: ModelRegistry,
         provider: ModelProvider,
         guidance: str | None = None,
+        cache: AssetCache | None = None,
     ) -> None:
         self.name = name
         self.config = config
         self.models = models
         self.provider = provider
         self.guidance = guidance
+        # Every paid answer is kept by its full request: asking the same thing again (a
+        # resumed run, the same research for another video) costs nothing.
+        self.cache = cache
         self.instructions = self.prompt(self.job)
         self.logger = logging.getLogger(f"content.agents.{name}")
 
@@ -80,16 +85,41 @@ class Agent:
         """One structured call: this class's model and instructions unless a narrower job
         names its own."""
         model = self.models.get(model_alias or self.model_alias)
-        self.logger.info("Running %s with %s", operation, model.model)
+        instructions = instructions or self.instructions
+        input_text = json.dumps(payload, indent=indent, default=_json_default)
         started = time.perf_counter()
-        result, usage = self.provider.generate_structured(
-            instructions=instructions or self.instructions,
-            input_text=json.dumps(payload, indent=indent, default=_json_default),
-            output_type=output_type,
-            model=model,
-            web_search=web_search,
-        )
-        output = output_type.model_validate(result)
+
+        def ask() -> tuple[bytes, Usage]:
+            self.logger.info("Running %s with %s", operation, model.model)
+            result, usage = self.provider.generate_structured(
+                instructions=instructions,
+                input_text=input_text,
+                output_type=output_type,
+                model=model,
+                web_search=web_search,
+            )
+            answer = output_type.model_validate(result)
+            return answer.model_dump_json(exclude_computed_fields=True).encode(), usage
+
+        if self.cache is None:
+            content, usage = ask()
+        else:
+            request = {
+                "model": model.model,
+                "effort": model.effort,
+                "max_output_tokens": model.max_output_tokens,
+                "output": output_type.__name__,
+                "web_search": web_search,
+                "instructions": instructions,
+                "input": input_text,
+            }
+            path, paid = self.cache.fetch(
+                f"text/{operation}", request, ".json", ask, about=f"{self.name}: {operation}"
+            )
+            content = path.read_bytes()
+            # Served from the cache: nothing was spent.
+            usage = paid or Usage(model=model.model, cost_usd=0.0)
+        output = output_type.model_validate_json(content)
         return output, call_record(
             operation,
             usage,

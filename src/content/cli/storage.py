@@ -1,5 +1,6 @@
-"""`content storage`: keep finished runs and the channel in the cloud bucket, and bring them
-back; and keeping the channel after any command that changes it."""
+"""`content storage`: keep runs (in progress and finished) and the channel in the cloud
+bucket, see what is kept, and bring it back; and keeping the channel after any command that
+changes it."""
 
 import argparse
 from collections.abc import Callable
@@ -21,6 +22,7 @@ from content.storage import (
     pull_theme,
     restore_run,
     save_theme,
+    show,
 )
 from content.theme import load_theme
 
@@ -30,12 +32,15 @@ def _storage(arguments: list[str]) -> int:
     common.add_argument("--config", type=Path, help="Runtime configuration JSON")
     parser = argparse.ArgumentParser(
         prog="content storage",
-        description="Keep finished runs and the channel's theme in the cloud bucket, and bring "
-        "them back. Only signed-off files are kept; work in progress stays in .cache/.",
+        description="Keep runs and the channel's theme in the cloud bucket, and bring them "
+        "back. A run keeps its building blocks and what was signed off; the working cache "
+        "stays in .cache/.",
     )
     actions = parser.add_subparsers(dest="action", required=True)
     archive = actions.add_parser(
-        "archive", parents=[common], help="Keep a finished run's signed-off files"
+        "archive",
+        parents=[common],
+        help="Keep a run: finished once it has its final cut, otherwise in progress",
     )
     archive.add_argument("run", type=Path, help="The run folder, e.g. runs/<topic>")
     restore = actions.add_parser("restore", parents=[common], help="Bring a kept run back")
@@ -58,6 +63,10 @@ def _storage(arguments: list[str]) -> int:
     pull.add_argument("--channel", help="The channel's folder name in themes/")
     actions.add_parser("versions", parents=[common], help="The theme's earlier versions")
     actions.add_parser("list", parents=[common], help="What the bucket keeps")
+    show_kept = actions.add_parser(
+        "show", parents=[common], help="One kept run or channel, by file"
+    )
+    show_kept.add_argument("name", help="As `list` prints it, e.g. runs/finished/<topic>")
     args = parser.parse_args(arguments)
     try:
         if args.action == "pull" and args.bucket and args.channel:
@@ -74,6 +83,11 @@ def _storage(arguments: list[str]) -> int:
             print(f"Kept: {describe(save_theme(store, load_theme(theme_root).root))}")
         elif args.action == "pull":
             print(f"Restored: {describe(pull_theme(store, theme_root, args.version))}")
+        elif args.action == "show":
+            manifest = show(store, args.name)
+            for path, stored in manifest.files.items():
+                print(f"{stored.bytes / 1e6:9.2f} MB  {path}")
+            print(f"Kept {manifest.saved[:19].replace('T', ' ')}: {describe(manifest)}")
         elif args.action == "versions":
             print("\n".join(kept_versions(store, theme_root.name)) or "No earlier versions yet.")
         else:

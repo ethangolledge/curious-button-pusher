@@ -12,7 +12,6 @@ from content.production.budget import (
     morph_timings,
     project,
 )
-from content.production.cache import file_digest
 from content.production.score import (
     arranged_beats,
     arrangements,
@@ -31,6 +30,7 @@ from content.production.studio import (
 from content.production.subtitles import chunk, to_ass
 from content.production.timing import lay_out, passage_starts, scene_timings
 from content.providers.base import Usage
+from content.providers.cache import file_digest
 from content.schemas.media import (
     NarrationClip,
     Timeline,
@@ -136,6 +136,7 @@ class Narration(Studio):
             ".json",
             "transcription",
             transcribe,
+            about="transcript of a narration take",
         )
         heard = [Word.model_validate(word) for word in json.loads(transcript.read_text())]
         issues = []
@@ -199,6 +200,7 @@ class Narration(Studio):
                 direction=direction,
                 direction_style=voice.direction_style,
             ),
+            about=f"narration take {take}: {text}",
         )
         untouched = self.derived("speech", [file_digest(raw), "1.000"], ".wav")
         if not untouched.is_file():

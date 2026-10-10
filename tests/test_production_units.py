@@ -26,7 +26,6 @@ from content.production.budget import (
     scene_allowance,
     spent,
 )
-from content.production.cache import AssetCache
 from content.production.checks import (
     integrated_loudness,
     listen_issues,
@@ -47,6 +46,7 @@ from content.production.subtitles import align, chunk, to_ass
 from content.production.timing import lay_out, passage_starts, scene_timings
 from content.production.voice_lock import lock_voice
 from content.providers.base import Usage
+from content.providers.cache import AssetCache
 from content.providers.images import WikimediaCommons
 from content.schemas.media import NarrationClip, SceneTiming, Word
 from content.schemas.script import ScriptPackage

@@ -10,7 +10,6 @@ from content.production import assemble, checks
 from content.production.budget import (
     scene_allowance,
 )
-from content.production.cache import file_digest
 from content.production.media import GenerationRefused
 from content.production.story_sheet import write_story_sheet
 from content.production.studio import (
@@ -24,6 +23,7 @@ from content.production.studio import (
     render_signature,
     required,
 )
+from content.providers.cache import file_digest
 from content.schemas.media import (
     ColourCheck,
     RenderedAsset,
@@ -157,6 +157,7 @@ class Keyframes(Studio):
                     resolution=self.config.image_resolution,
                     seed=self.config.seed + task["attempt"],
                 ),
+                about=f"{task['scene_id']} keyframe, attempt {task['attempt']}: {task['prompt']}",
             )
         except GenerationRefused as refusal:
             return {"keyframes": {task["scene_id"]: refused(task, refusal)}}

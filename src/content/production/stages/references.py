@@ -168,6 +168,7 @@ class References(Studio):
                     ".png",
                     "reference_download",
                     partial(_download, source, image.image_url),
+                    about=f"reference photo: {image.image_url}",
                 )
                 found.append(image)
                 paths.append(path)

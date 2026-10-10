@@ -1,31 +1,47 @@
 # Storage: What Is Kept for Good, and Where
 
-Last reviewed: 2026-10-09
+Last reviewed: 2026-10-10
 
 Two places hold files, with different jobs:
 
 | Place | Job | Holds |
 |---|---|---|
-| `.cache/` (this machine) | the workbench | every paid generation and every render, keyed by its request, so nothing is paid for twice while a video is being made |
-| your cloud bucket | the archive | only what a finished video was made of, and your channel's folder |
+| `.cache/` (this machine) | the workbench | every paid generation (pictures, voices, video, and the text: research, plan, script, fact check, storyboard) and every render, keyed by its request, so nothing is paid for twice; `INDEX.csv` lists what each paid file is |
+| `runs/<topic>/` (this machine) | the run | what each sign-off approved, and `building-blocks/`: each stage's output, readable (`.md`) and exact (`.json`) |
+| your cloud bucket | the archive | runs in progress and finished, and your channel's folder |
 
-The bucket is not a cache and never holds work in progress. A run that is abandoned, or is still
-being made, never reaches it. Clearing the local cache after a final sign-off is a separate step
+The bucket is not a cache: the working cache (every keyframe drawn, every take spoken, every
+render) never reaches it. Clearing the local cache after a final sign-off is a separate step
 (not built yet).
 
-## What a finished run keeps
+## What a run keeps
 
 At every sign-off the run folder gets only what was approved (`RunFolder.publish`): a run may
-draw dozens of keyframes and its folder holds only the ones it used. So a finished run's folder is what is
-kept, minus what was only there to decide (`storage.RUN_FILES`, `RUN_SCENES`):
+draw dozens of keyframes and its folder holds only the ones it used. So a run folder is what is
+kept, minus what was only there to decide (`storage.RUN_FILES`, `RUN_PATTERNS`):
 
 | Kept | Left out |
 |---|---|
-| `4-final.mp4`, the video | `3-scenes/animatic.mp4` and `story-sheet/`: previews, superseded by the final |
+| `building-blocks/`: research, plan, script, fact check, storyboard, as `.md` and `.json` (a few hundred KB) | `3-scenes/animatic.mp4` and `story-sheet/`: previews |
 | `3-scenes/S*`: each scene's signed-off keyframe (or clip) | `review.html`: the review page |
-| `2-narration.m4a`, `1-script.md`, `brief.md` | `.work/` except the two files beside, and all of `.cache/` |
+| `2-narration.m4a`, `1-script.md`, `brief.md`, and `4-final.mp4` once there is one | `.work/` except the files beside, and all of `.cache/` |
 | `decisions.md`, `cost.csv`: how it was made and what it cost | |
-| `.work/resume.json`, `.work/choices.json`: the approved state (a few KB), so a re-cut can start from it | |
+| `.work/resume.json`, `.work/choices.json`: the approved state, so a re-cut can start from it | |
+| `.work/steps.jsonl` while the run is unfinished: what `--resume` carries on from, on any machine | |
+
+**In progress and finished, never both.** An unfinished run is kept in
+`runs/in-progress/<topic>/`, updated at every sign-off (only the files that changed are
+uploaded). When it passes the Final cut it moves to `runs/finished/<topic>/`: what the
+in-progress copy already holds is copied inside the bucket rather than uploaded again, the
+finished copy is checked, and only then is the in-progress copy deleted. It held nothing the
+finished copy lacks but the step log, which a finished run no longer needs. If the finished copy
+is not whole, the in-progress copy stays and the run says so.
+
+**Research is the expensive block, so it is kept three ways:** in the run's
+`building-blocks/research.json`, in the text cache (the same request is never paid twice, across
+runs too), and in the bucket. A new video can start from it:
+`content "<topic>" --research runs/<earlier>/building-blocks/research.json`
+([runs-and-review.md](runs-and-review.md)).
 
 ## Your channel is private
 
@@ -63,17 +79,21 @@ well under 100 MB.
 One bucket (`storage.bucket` in your channel's `config.json`):
 
 ```
-blobs/<sha256>        the bytes of every kept file, named by their hash
-runs/<slug>.json      a finished run's manifest: each file's path, hash, size and type
-themes/<name>.json    a channel's theme folder, the same way
+runs/in-progress/<topic>/...   an unfinished run, under its own file names, and manifest.json
+runs/finished/<topic>/...      a finished run, the same way
+blobs/<sha256>                 the channel's files, named by their hash
+themes/<name>.json             the channel's manifest: each file's path, hash, size and type
 themes/<name>/versions/<saved>.json
-                      every earlier state of the theme, never deleted
+                               every earlier state of the channel, never deleted
 ```
 
-- **Nothing is stored twice.** A file's name is its hash, and a hash already in the bucket is not
-  uploaded again: a re-cut that keeps the keyframes adds only its new files.
-- **Nothing is left behind.** Keeping a run again (after a re-cut) replaces its manifest and
-  deletes the blobs no manifest uses any more.
+- **Runs are browsable.** Their files keep their names, so the Google Cloud console shows
+  `building-blocks/research.md`, not a hash. `content storage show runs/finished/<topic>` lists
+  one by file.
+- **The channel is stored by hash** so that every version shares the files that did not change:
+  a hundred versions cost little more than one. `content storage show themes/<name>` lists it.
+- **Nothing is left behind.** Keeping a run again uploads what changed and deletes what the run
+  no longer has; replacing a channel file deletes the blob nothing uses any more.
 - **What comes back is what went in.** Restoring checks every file against its hash, and the
   client checks every upload against its CRC32C checksum.
 
@@ -81,12 +101,13 @@ themes/<name>/versions/<saved>.json
 
 | When | What | Command to do it by hand |
 |---|---|---|
-| the run finishes after the Final cut sign-off | the run is kept | `content storage archive runs/<topic> --config themes/<name>/config.json` |
+| every sign-off of an unfinished run | the run so far is kept in progress | `content storage archive runs/<topic> --config themes/<name>/config.json` |
+| the run finishes after the Final cut sign-off | the run moves to finished | the same command |
 | anything that changes the theme: `voice-lock`, `music-lock`, `music-map`, `harvest`, `label`, `verdict`, `train`, and the learning after each run | the theme is kept | `content storage save-theme --config …` (also after editing `theme.json` or `SKILL.md` by hand) |
 | a fresh clone, or a new machine | the channel comes back, its configuration included | `content storage pull --bucket <bucket> --channel <name>` |
 | a theme edit you regret | an earlier version comes back | `content storage versions --config …`, then `pull --version <saved> --config …` |
-| you want an old run back | its kept files return to `runs/<slug>/` | `content storage restore <slug> --config …` |
-| | what the bucket holds | `content storage list --config …` |
+| you want a run back (to watch it, re-cut it, or carry it on) | its kept files return to `runs/<topic>/`: the finished copy, or the run in progress | `content storage restore <topic> --config …` |
+| | what the bucket holds; one run or channel by file | `content storage list --config …`, `content storage show <name> --config …` |
 
 Keeping never fails the command it follows: if the bucket cannot be reached, the files are still
 complete on this machine and the message gives the command to keep them later. Without a

@@ -3,12 +3,12 @@
 from pathlib import Path
 
 from content.production import assemble, checks, ffmpeg
-from content.production.cache import file_digest
 from content.production.studio import (
     Studio,
     decision,
     required,
 )
+from content.providers.cache import file_digest
 from content.schemas.media import (
     ProductionResult,
     Timeline,

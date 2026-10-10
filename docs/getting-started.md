@@ -138,12 +138,18 @@ close the terminal; tell Claude Code "carry on with my video" later and it picks
 stopped, without paying again for anything already made.
 
 The finished video is `runs/<your-topic>/4-final.mp4`, ready for TikTok, Reels, Shorts or
-YouTube.
+YouTube. Everything that went into it is beside it in `building-blocks/`: the research, the
+plan, the script, the fact check and the storyboard, each as a readable `.md` file. Research is
+the expensive part, so it is never paid for twice: ask Claude Code for "another video from the
+research in <your-topic>", and it starts there. `.cache/INDEX.csv` lists everything you have
+ever paid for, with its cost.
 
 ## 6. Keep your channel safe (optional)
 
-Your channel lives only on your computer unless you give it a bucket. With one, every change is
-saved with its history, and a new computer gets everything back with one command. Ask Claude
+Your channel and your videos live only on your computer unless you give them a bucket. With
+one, every change to the channel is saved with its history, every unfinished video is kept at
+each sign-off, every finished one is kept for good, and a new computer gets everything back with
+one command. Ask Claude
 Code: "set up Google Cloud storage for my channel", or follow
 [storage.md](storage.md#setting-it-up-once).
 

@@ -128,6 +128,13 @@ happy with your recommendation, a one-word answer is enough: write it as their d
 
 Start a video only after the intake above; its answers set the flags.
 
+**Never pay for research twice.** Before a run on a story already made, look for an earlier
+run's `runs/<topic>/building-blocks/research.json` (or restore it: `content storage restore
+<topic>`) and offer to start from it with `--research <that file>`; research is the most
+expensive single step. Fresh research (`--fresh-research`) only when the person asks or the
+story has moved on. Each run's `building-blocks/` holds every stage's output to read, and
+`.cache/INDEX.csv` everything paid for, with its cost.
+
 - Always run with `--detach`: your tools cannot keep a process waiting for the person (they
   are stopped after 30 minutes, and anything they start ends with them). With it, the run
   saves every step and exits at each review, printing which one.

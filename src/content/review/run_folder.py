@@ -7,6 +7,9 @@
       2-narration.m4a  the narration over the music, at the Narration sign-off
       3-scenes/        a picture per scene, the animatic and the story sheet, at Pictures
       4-final.mp4      the finished video, at the Final cut sign-off
+      building-blocks/ what each stage made, readable (.md) and exact (.json): research,
+                       plan, script, fact check, storyboard; a later video can start from
+                       the research (`--research building-blocks/research.json`)
       decisions.md     every review answered, by whom, in order
       cost.csv         what each session spent, by stage
       calls.csv        every paid call: what it made, on which model, how long, what it cost
@@ -23,6 +26,7 @@ import csv
 import json
 import re
 import shutil
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -31,6 +35,14 @@ from typing import Any
 from content.choices import RunChoices
 from content.production.budget import NARRATION_TAKE_USD
 from content.review.page import review_page, review_title
+from content.review.render import (
+    render_fact_check,
+    render_plan,
+    render_research,
+    render_script,
+    render_visuals,
+)
+from content.schemas.package import FinalContentPackage, ReviewHandoff
 from content.schemas.review import ReviewItem, ReviewRequest, ReviewResponse
 
 
@@ -86,6 +98,37 @@ class RunFolder:
     def steps(self) -> Path:
         """Every step of the run so far, so it can carry on after its process ends."""
         return self.work / "steps.jsonl"
+
+    @property
+    def blocks(self) -> Path:
+        """What each stage made, readable and exact: written at every save."""
+        return self.root / "building-blocks"
+
+    def write_building_blocks(self, made: ReviewHandoff | FinalContentPackage) -> None:
+        """Each stage's output so far as `<block>.md` (to read) and `<block>.json` (exact,
+        to start another video from). Paid for once; kept with the run, and with it in the
+        bucket."""
+        if isinstance(made, ReviewHandoff):
+            script, storyboard = made.script_package, made.visual_package
+        else:
+            script, storyboard = made.approved_script, made.visual_plan
+        blocks: dict[str, tuple[Any, Callable[[Any], list[str]]]] = {
+            "research": (made.research_pack, render_research),
+            "plan": (made.editorial_brief, render_plan),
+            "script": (script, render_script),
+            "fact-check": (made.fact_check_report, render_fact_check),
+            "storyboard": (storyboard, render_visuals),
+        }
+        self.blocks.mkdir(parents=True, exist_ok=True)
+        for name, (block, render) in blocks.items():
+            if block is None:
+                continue
+            (self.blocks / f"{name}.json").write_text(
+                block.model_dump_json(indent=2) + "\n", encoding="utf-8"
+            )
+            (self.blocks / f"{name}.md").write_text(
+                "\n".join(render(block)) + "\n", encoding="utf-8"
+            )
 
     @property
     def choices_file(self) -> Path:

@@ -24,6 +24,7 @@ from content.production.music_map import map_for
 from content.production.producer import Producer
 from content.production.studio import NarrationTask, RenderTask
 from content.providers.base import DecisionProvider, ModelProvider
+from content.providers.cache import AssetCache
 from content.providers.images import ImageSource
 from content.state import ContentInput, ContentOutput, ContentState
 from content.story.faithfulness import OnnxInference
@@ -85,20 +86,27 @@ def build_graph(
     media_provider: MediaProvider | None = None,
     image_sources: Sequence[ImageSource] = (),
     checkpointer: InMemorySaver | None = None,
+    fresh_research: bool = False,
 ) -> CompiledStateGraph[ContentState, None, ContentInput, ContentOutput]:
     theme = config.theme
     guidance = theme_guidance(theme)
+    # A run that makes video keeps every paid answer in its asset cache, text included.
+    cache = AssetCache(config.production.cache_directory) if config.production else None
 
-    def agent(node_type: type[AgentNode], name: str, *, themed: bool) -> AgentNode:
+    def agent(
+        node_type: type[AgentNode], name: str, *, themed: bool, cached: bool = True
+    ) -> AgentNode:
         return node_type(
             name=name,
             config=config.agents[name],
             models=config.models,
             provider=_provider_for(name, config=config, providers=providers),
             guidance=guidance if themed else None,
+            cache=cache if cached else None,
         )
 
-    researcher = agent(FactResearcher, "fact_researcher", themed=False)
+    # Fresh research asks the researcher again even for a request it has answered before.
+    researcher = agent(FactResearcher, "fact_researcher", themed=False, cached=not fresh_research)
     script_writer = agent(ScriptWriter, "script_writer", themed=True)
     fact_checker = agent(FactChecker, "fact_checker", themed=False)
     visual_director = agent(VisualDirector, "visual_director", themed=True)
@@ -171,7 +179,9 @@ def build_graph(
     )
     workflow.add_node("review_stopped", mark_review_stopped)
 
-    workflow.add_conditional_edges(START, route_start, ["fact_researcher", "human_review"])
+    workflow.add_conditional_edges(
+        START, route_start, ["fact_researcher", "editorial_plan", "human_review"]
+    )
     workflow.add_conditional_edges(
         "fact_researcher",
         partial(route_research, workflow=limits),

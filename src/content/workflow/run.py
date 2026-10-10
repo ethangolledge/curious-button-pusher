@@ -21,7 +21,7 @@ from content.providers.base import DecisionProvider, ModelProvider
 from content.review.reviewer import HumanReviewer, ReviewDetached
 from content.schemas.media import Arrangement
 from content.schemas.package import FinalContentPackage, ReviewHandoff
-from content.schemas.research import SourceMaterial
+from content.schemas.research import ResearchPack, SourceMaterial
 from content.schemas.review import ReviewRequest
 from content.state import ContentInput, ContentOutput
 from content.story.field import unit_feelings
@@ -83,6 +83,7 @@ def create_initial_state(
     config: ContentConfig,
     duration_seconds: int | None = None,
     scenes: int | None = None,
+    research: ResearchPack | None = None,
 ) -> ContentInput:
     if not topic.strip():
         raise InputError("Topic must not be empty")
@@ -114,6 +115,8 @@ def create_initial_state(
         "arrangement": arrangement,
         "aspect_ratio": config.theme.spec.format.aspect_ratio,
         "scenes_wanted": scenes,
+        # Research already paid for, from an earlier run: the run starts at the plan.
+        "research_pack": research,
     }
 
 
@@ -249,10 +252,14 @@ def run_workflow(
     steps: Path | None = None,
     on_review: OnReview | None = None,
     choices: RunChoices | None = None,
+    research: ResearchPack | None = None,
+    fresh_research: bool = False,
 ) -> WorkflowResult:
     """Run from a topic, or reopen a saved review (`resume`). With `steps`, every step is
     also written to that file (started afresh), so `continue_workflow` can carry on after
-    the process ends. `choices` shape this video: format, length, scenes, cap."""
+    the process ends. `choices` shape this video: format, length, scenes, cap. `research`
+    starts from research already paid for; `fresh_research` asks again even when the same
+    research request is in the cache."""
     choices = choices or RunChoices()
     config = configure_run(load_config(config_path), choices)
     logging.getLogger("content").setLevel(config.application.logging_level)
@@ -266,11 +273,14 @@ def run_workflow(
             duration_seconds=duration_seconds or choices.seconds,
             config=config,
             scenes=choices.scenes,
+            research=research,
         )
     )
     if steps is not None:
         steps.unlink(missing_ok=True)
-    config, graph = _graph(config, providers, decision_provider, media_provider, steps)
+    config, graph = _graph(
+        config, providers, decision_provider, media_provider, steps, fresh_research
+    )
     return _drive(config, graph, initial_state, reviewer, on_review)
 
 
@@ -304,6 +314,7 @@ def _graph(
     decision_provider: DecisionProvider | None,
     media_provider: MediaProvider | None,
     steps: Path | None,
+    fresh_research: bool = False,
 ) -> tuple[ContentConfig, CompiledStateGraph[Any, Any, Any, Any]]:
     if providers is None:
         config = fit_cap_to_openrouter_credit(config)
@@ -318,6 +329,7 @@ def _graph(
         ),
         image_sources=build_image_sources(config),
         checkpointer=create_checkpointer(steps),
+        fresh_research=fresh_research,
     )
     return config, graph
 

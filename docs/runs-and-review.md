@@ -5,7 +5,7 @@ comes back once with recommendations (format, length, scenes, angle, with costs)
 answers the run takes off. It stops for you only at its sign-offs, each before money is spent
 on the next step, and a window opens on your screen when it does.
 
-Last reviewed: 2026-10-09.
+Last reviewed: 2026-10-10.
 
 ## One Channel, Several Shapes of Video
 
@@ -40,6 +40,9 @@ length for long form (an estimate until a long video is measured).
   --brief path/to/brief.md --format short --seconds 90 --config themes/my-channel/config.json
 .venv/bin/content --resume runs/<topic>                 # carry on from where it stopped
 .venv/bin/content --resume runs/<topic> --at fact_check # reopen an earlier review
+.venv/bin/content "A new angle" --research runs/<earlier>/building-blocks/research.json
+                                                         # start from research already paid for
+.venv/bin/content ... --fresh-research                  # research again, even if cached
 .venv/bin/content ... --detach                          # stop at each review, don't wait
 .venv/bin/content review runs/<topic>                   # serve a waiting review's page
 ```
@@ -49,6 +52,11 @@ length for long form (an estimate until a long video is measured).
   avoid; see `fixtures/example_brief.md`) and `--sources` (facts and documents you already have,
   as JSON; see `fixtures/example_input.json`) are optional evidence and direction, never limits.
 - A run already in that folder is never overwritten; resume it instead.
+- `--research <file>` starts from a research pack an earlier run paid for (its
+  `building-blocks/research.json`) and goes straight to the plan: no research is paid for. Use
+  it for a new angle, length or format on a story already researched. Without it, research
+  with exactly the same request (topic, brief, sources, model and prompt) comes from the cache
+  for free anyway; `--fresh-research` asks again regardless.
 - Every step of the run is saved as it finishes (`.work/steps.jsonl`). `--resume` carries on
   exactly where the run stopped: at the review it was waiting for (taking the answer if you
   already gave it), or by redoing the step it failed in. Nothing finished is made or paid for
@@ -149,6 +157,8 @@ runs/<topic>/
 ├── 2-narration.m4a   the narration over the music
 ├── 3-scenes/         S1.png…, animatic.mp4, story-sheet/
 ├── 4-final.mp4       the finished video
+├── building-blocks/  each stage's output, readable (.md) and exact (.json): research, plan,
+│                     script, fact-check, storyboard; written at every sign-off and at the end
 ├── decisions.md      every review answered, by whom, in order
 ├── cost.csv          what each session spent, by stage (opens in any spreadsheet)
 ├── calls.csv         every call: session, stage, what it made, model, seconds, tokens, cost
@@ -182,8 +192,16 @@ and `"person"`), or for its own reviews (`"assistant"`).
 
 ## Costs and Caching
 
-- Every paid asset is cached by its full request in `.cache/` (gitignored; deleting it means
-  paying again).
+- Every paid generation is cached by its full request in `.cache/` (gitignored; deleting it
+  means paying again): pictures, voices, video, and every agent's text answer (research, plan,
+  script, fact check, storyboard, critic, listener) under `.cache/text/<operation>/`. Asking
+  the same thing again, in this run or another, costs nothing; any change to the request (the
+  topic, the brief, the model, the prompt) is a new request.
+- `.cache/INDEX.csv` lists everything that was paid for, one line each: when, what (scene S4
+  keyframe attempt 1 and its prompt, passage P2 take 0 and its words, research), which model,
+  the cost, and the file. Open it in any spreadsheet.
+- With a bucket, the run so far is kept at every sign-off (`runs/in-progress/<topic>/`), and
+  moves to `runs/finished/<topic>/` at the end ([storage.md](storage.md)).
 - A resume reuses: every finished step (from `steps.jsonl`, or research and writing from
   `resume.json` with `--at`), chosen reference photos, every
   narration take, keyframe, morph and refusal with an unchanged request.

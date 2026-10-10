@@ -41,9 +41,14 @@ HumanReviewRoute = Literal[
 # Graph edges
 
 
-def route_start(state: ContentState) -> Literal["fact_researcher", "human_review"]:
-    """A resumed run reopens its saved review; a new run starts with research."""
-    return "human_review" if state.get("current_stage") else "fact_researcher"
+def route_start(
+    state: ContentState,
+) -> Literal["fact_researcher", "editorial_plan", "human_review"]:
+    """A resumed run reopens its saved review; a new run starts with research, or with the
+    plan when it was given research already paid for (`--research`)."""
+    if state.get("current_stage"):
+        return "human_review"
+    return "editorial_plan" if state.get("research_pack") else "fact_researcher"
 
 
 def route_research(state: ContentState, *, workflow: WorkflowConfig) -> ResearchRoute:

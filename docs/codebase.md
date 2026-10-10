@@ -53,7 +53,7 @@ Every file in `src/content`.
 | `choices.py` | one video's format, length, scenes and cap (`RunChoices`, saved in `.work/choices.json`), and `configure_run` | The theme's look, voice and music never change per video |
 | `theme.py` | `Theme` and its spec, prompt building, spoken text, `new_theme` | `themes/<name>/theme.json` is the data |
 | `state.py` | the graph state (`ContentState`), its reducers, `CallRecord` and `call_record` | Judgements, decisions, calls and events append; assets merge per key; everything else replaces |
-| `storage.py` | the person's bucket: finished runs and the channel folder, stored by hash under manifests, with every version of the channel | [storage.md](storage.md) |
+| `storage.py` | the person's bucket: runs in progress and finished under their own names (finishing moves a run, never keeping both), and the channel folder by hash, with every version | [storage.md](storage.md) |
 
 ### Providers (`providers/`)
 
@@ -64,6 +64,7 @@ Every file in `src/content`.
 | `images.py` | `ImageSource`: Wikimedia Commons, and a fake source | Add a source here |
 | `http.py` | the shared wait-and-retry for rate-limited outside services | |
 | `fake.py` | deterministic providers that record every call | The rehearsal and tests use them |
+| `cache.py` | `AssetCache.fetch`: request → file, refusals remembered, one `INDEX.csv` line per paid item | Media and text alike; keys are hashes of the full request |
 
 ### Judging (`judging/`)
 
@@ -94,7 +95,7 @@ Each folder: `agent.py` (the code), `prompt.md` (what its model is told, theme-n
 
 | Folder | Owns |
 |---|---|
-| `base.py` | `Agent`: its prompt (plus the theme's guidance when it shapes the look), its model, and `generate()`, one timed and recorded structured call; `load_prompt` |
+| `base.py` | `Agent`: its prompt (plus the theme's guidance when it shapes the look), its model, and `generate()`, one timed, recorded and cached structured call (`.cache/text/<operation>/` when the run makes video); `load_prompt` |
 | `fact_researcher/` | the research pack: sources, classified claims, timeline, cast; the only web search |
 | `editorial_director/agent.py` | the plan (the story ledger) and story decisions after the listener test |
 | `editorial_director/critic.py` | the critic: settles Jev's doubts on a whole script or storyboard; sorts untargeted notes (`critic_prompt.md`) |
@@ -115,7 +116,6 @@ Each folder: `agent.py` (the code), `prompt.md` (what its model is told, theme-n
 | `stages/segments.py` | the morphs, judged from sampled frames | |
 | `stages/assembly.py` | the final cut | |
 | `media.py` | `MediaProvider`: OpenRouter speech, images, video, vision, transcription, music; the fake one | Retries 429/5xx for about 2 minutes |
-| `cache.py` | `AssetCache.fetch`: request → file, refusals remembered | Keys are hashes of the full request |
 | `assemble.py` | glide, breathing, morph layer, texture, joins, held ending, mix, finish | All ffmpeg; every look value from the theme |
 | `ffmpeg.py`, `timing.py`, `score.py`, `music_map.py`, `subtitles.py`, `checks.py`, `budget.py`, `focus.py` | ffmpeg calls; scene windows; fitting the narration to the music; beats and phrases; subtitles; exact media checks; prices and the cap; focal points | |
 | `story_sheet.py` (+ `story_sheet.css`) | the HTML story sheet at the Pictures sign-off | |
@@ -138,7 +138,7 @@ Each folder: `agent.py` (the code), `prompt.md` (what its model is told, theme-n
 |---|---|---|
 | `reviewer.py` | the reviewer interface and the file reviewer (`request-N.json` → `response-N.json`) | Only a person's response answers a sign-off |
 | `items.py` | each sign-off's cards with plain-English flags and what approving costs | |
-| `run_folder.py` | the run folder: publishing, `decisions.md`, `cost.csv`, `calls.csv` | |
+| `run_folder.py` | the run folder: publishing, `building-blocks/`, `decisions.md`, `cost.csv`, `calls.csv` | |
 | `page.py` (+ `assets/review.js`, `review.css`) | the review page | Inlined, so it is one file |
 | `server.py` | the local review server (`/respond`, `/draft`), `serve`, desktop notifications | Standard library only |
 | `render.py` | plain-text renderings of each stage's output | |

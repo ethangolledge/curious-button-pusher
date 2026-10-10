@@ -20,7 +20,7 @@ from content.review.reviewer import ReviewDetached
 from content.review.run_folder import RunFolder, slug
 from content.review.server import RunFolderReviewer
 from content.schemas.package import ReviewHandoff
-from content.schemas.research import SourceMaterial
+from content.schemas.research import ResearchPack, SourceMaterial
 from content.schemas.review import ReviewRequest
 from content.state import ContentOutput
 from content.storage import (
@@ -86,6 +86,16 @@ def _parser() -> argparse.ArgumentParser:
         type=Path,
         help="Text or Markdown file with your story points and direction",
     )
+    parser.add_argument(
+        "--research",
+        type=Path,
+        help="Start from research already paid for: a run's building-blocks/research.json",
+    )
+    parser.add_argument(
+        "--fresh-research",
+        action="store_true",
+        help="Research again even if the same research request is in the cache",
+    )
     parser.add_argument("--config", type=Path, help="Runtime configuration JSON")
     parser.add_argument(
         "--runs",
@@ -132,6 +142,9 @@ def _write_results(
         if reviewed and (state.get("status") == "human_review" or error):
             paths = write_review_outputs(state, session)
             shutil.copyfile(paths.json, folder.resume_file)
+            folder.write_building_blocks(
+                ReviewHandoff.model_validate_json(paths.json.read_text(encoding="utf-8"))
+            )
             last = state.get("human_review_request")
             if error and folder.steps.is_file():
                 print(f"Carry on from the failed step: --resume {folder.root}")
@@ -143,6 +156,7 @@ def _write_results(
         print("Nothing to resume from yet.")
         return 2
     write_outputs(package, session)
+    folder.write_building_blocks(package)
     if package.production is not None:
         shutil.copyfile(package.production.video_path, folder.root / "4-final.mp4")
         print(f"Video: {folder.root / '4-final.mp4'}")
@@ -172,6 +186,11 @@ def main(arguments: list[str]) -> int:
             format=args.format, seconds=args.seconds, scenes=args.scenes, max_usd=args.max_usd
         )
         brief = args.brief.read_text(encoding="utf-8").strip() if args.brief else None
+        research = (
+            ResearchPack.model_validate_json(args.research.read_text(encoding="utf-8"))
+            if args.research
+            else None
+        )
         if args.resume:
             folder = RunFolder(args.resume)
             brief = brief or _saved_brief(folder)
@@ -215,6 +234,15 @@ def main(arguments: list[str]) -> int:
         # Saved before every review is asked, so a review is never the place a run is lost.
         handoff = build_review_handoff(state, waiting)
         folder.resume_file.write_text(review_handoff_to_json(handoff) + "\n", encoding="utf-8")
+        folder.write_building_blocks(handoff)
+        if config.storage is not None:
+            bucket = config.storage.bucket
+            # The run so far is kept in the bucket at every stop: building blocks, its
+            # saved state, and what has been signed off (never the working cache).
+            keep(
+                lambda: archive_run(GcsStore(bucket), folder.root),
+                f"content storage archive {folder.root}",
+            )
 
     if resume is None and not carry_on:
         try:
@@ -253,6 +281,8 @@ def main(arguments: list[str]) -> int:
                 steps=folder.steps,
                 on_review=save,
                 choices=choices,
+                research=research,
+                fresh_research=args.fresh_research,
             )
     except (ConfigurationError, InputError) as exc:
         parser.error(str(exc))

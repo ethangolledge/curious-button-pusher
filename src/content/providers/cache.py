@@ -1,14 +1,18 @@
-"""Content-addressed storage for generated media.
+"""Content-addressed storage for every paid generation: media and text.
 
-Every paid generation is keyed by its full request, including the digests of any
-input files. Asking again for the same thing returns the stored file for free, so a
-rerun, a crash, or a revision of one scene never pays twice for unchanged assets.
+Every paid generation is keyed by its full request, including the digests of any input
+files. Asking again for the same thing returns the stored file for free, so a rerun, a
+crash, or a revision of one scene never pays twice for unchanged work. `INDEX.csv` at the
+cache's root lists everything that was paid for, readably: when, what, which model, the
+cost, and the file.
 """
 
+import csv
 import hashlib
 import json
 import uuid
 from collections.abc import Callable, Mapping
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -31,6 +35,7 @@ class AssetCache:
         produce: Callable[[], tuple[bytes, Usage]],
         *,
         refusal: type[Exception] | None = None,
+        about: str = "",
     ) -> tuple[Path, Usage | None]:
         """Return the stored asset, or produce and store it. Usage is None on a cache hit.
 
@@ -57,4 +62,24 @@ class AssetCache:
         partial = path.with_suffix(f"{suffix}.{uuid.uuid4().hex}.partial")
         partial.write_bytes(content)
         partial.replace(path)
+        self._index(kind, about, usage, path)
         return path, usage
+
+    def _index(self, kind: str, about: str, usage: Usage, path: Path) -> None:
+        """One readable line per paid generation, so what the cache holds can be seen."""
+        index = self.root / "INDEX.csv"
+        new = not index.is_file()
+        with index.open("a", newline="", encoding="utf-8") as handle:
+            writer = csv.writer(handle)
+            if new:
+                writer.writerow(["when", "kind", "about", "model", "cost_usd", "file"])
+            writer.writerow(
+                [
+                    datetime.now(UTC).isoformat(timespec="seconds"),
+                    kind,
+                    " ".join(about.split())[:200],
+                    usage.model,
+                    "" if usage.cost_usd is None else f"{usage.cost_usd:.4f}",
+                    path.relative_to(self.root).as_posix(),
+                ]
+            )

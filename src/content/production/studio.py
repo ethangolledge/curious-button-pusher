@@ -22,13 +22,13 @@ from content.production.budget import (
     past_averages,
     spent,
 )
-from content.production.cache import AssetCache, file_digest
 from content.production.media import GenerationRefused, MediaProvider
 from content.production.music_map import MusicMap, map_for
 from content.production.score import (
     render,
 )
 from content.providers.base import Usage
+from content.providers.cache import AssetCache, file_digest
 from content.providers.images import ImageSource
 from content.schemas.judgement import JudgedStage
 from content.schemas.media import (
@@ -129,6 +129,7 @@ class Studio:
             ".json",
             "perception",
             describe,
+            about=f"{len(images)} frame(s) described for Jev",
         )
         observations = [Observation.model_validate(item) for item in json.loads(stored.read_text())]
         if len(observations) != len(images):
@@ -170,9 +171,14 @@ class Studio:
         suffix: str,
         operation: str,
         produce: Callable[[], tuple[bytes, Usage]],
+        about: str = "",
     ) -> tuple[Path, list[CallRecord]]:
+        """A paid generation through the cache; `about` says what it is, for the cache's
+        readable index."""
         started = time.perf_counter()
-        path, usage = self.cache.fetch(kind, request, suffix, produce, refusal=GenerationRefused)
+        path, usage = self.cache.fetch(
+            kind, request, suffix, produce, refusal=GenerationRefused, about=about
+        )
         if usage is None:
             return path, []
         return path, [call_record(operation, usage, time.perf_counter() - started)]
@@ -222,6 +228,7 @@ class Studio:
             ".audio",
             "music",
             lambda: self.media.music(model=model, prompt=prompt, seconds=timeline.total_seconds),
+            about=f"music bed, {timeline.total_seconds:.0f} s: {prompt}",
         )
 
     def music_map(self) -> MusicMap | None:

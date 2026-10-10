@@ -6,7 +6,6 @@ from pathlib import Path
 from langgraph.types import Send
 
 from content.production import assemble, checks
-from content.production.cache import file_digest
 from content.production.media import GenerationRefused
 from content.production.studio import (
     RenderTask,
@@ -19,6 +18,7 @@ from content.production.studio import (
     render_signature,
     required,
 )
+from content.providers.cache import file_digest
 from content.schemas.media import (
     RenderedAsset,
 )
@@ -119,6 +119,7 @@ class Segments(Studio):
                     aspect_ratio=self.theme.spec.format.aspect_ratio,
                     seed=self.config.seed + task["attempt"],
                 ),
+                about=f"{task['scene_id']} morph, attempt {task['attempt']}: {task['prompt']}",
             )
         except GenerationRefused as refusal:
             return {"segments": {task["scene_id"]: refused(task, refusal)}}

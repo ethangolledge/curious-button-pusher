@@ -25,14 +25,14 @@ class MemoryStore:
 
     def __init__(self) -> None:
         self.objects: dict[str, bytes] = {}
-        self.uploads = 0
+        self.uploaded: list[str] = []
 
     def exists(self, name: str) -> bool:
         return name in self.objects
 
     def upload(self, name: str, source: Path, content_type: str) -> None:
         self.objects[name] = source.read_bytes()
-        self.uploads += 1
+        self.uploaded.append(name)
 
     def download(self, name: str, target: Path) -> None:
         target.write_bytes(self.objects[name])
@@ -43,16 +43,25 @@ class MemoryStore:
     def delete(self, name: str) -> None:
         del self.objects[name]
 
+    def copy(self, source: str, target: str) -> None:
+        self.objects[target] = self.objects[source]
+
     def blobs(self) -> list[str]:
         return self.names("blobs/")
 
 
-def _finished_run(root: Path, final: bytes = b"final cut") -> Path:
+class LosesCopies(MemoryStore):
+    """A bucket whose copies silently go missing, as a failed copy would."""
+
+    def copy(self, source: str, target: str) -> None:
+        pass
+
+
+def _run(root: Path, *, final: bytes | None = b"final cut") -> Path:
     files = {
         "brief.md": b"# Topic",
         "1-script.md": b"## Script",
         "2-narration.m4a": b"narration",
-        "4-final.mp4": final,
         "decisions.md": b"# Decisions",
         "cost.csv": b"session,total",
         "review.html": b"<html>",
@@ -60,53 +69,99 @@ def _finished_run(root: Path, final: bytes = b"final cut") -> Path:
         "3-scenes/S2.mp4": b"moving scene two",
         "3-scenes/animatic.mp4": b"animatic",
         "3-scenes/story-sheet/index.html": b"<html>",
+        "building-blocks/research.json": b"{}",
+        "building-blocks/research.md": b"# Research",
         ".work/resume.json": b"{}",
         ".work/choices.json": b"{}",
         ".work/steps.jsonl": b"steps",
         ".work/reviews/request-1.json": b"{}",
     }
+    if final is not None:
+        files["4-final.mp4"] = final
     for name, content in files.items():
         (root / name).parent.mkdir(parents=True, exist_ok=True)
         (root / name).write_bytes(content)
     return root
 
 
-def test_a_finished_run_keeps_only_its_signed_off_files(tmp_path: Path) -> None:
-    store = MemoryStore()
-    manifest = archive_run(store, _finished_run(tmp_path / "the-dam"))
+KEPT = [
+    ".work/choices.json",
+    ".work/resume.json",
+    "1-script.md",
+    "2-narration.m4a",
+    "3-scenes/S1.png",
+    "3-scenes/S2.mp4",
+    "brief.md",
+    "building-blocks/research.json",
+    "building-blocks/research.md",
+    "cost.csv",
+    "decisions.md",
+]
 
-    assert sorted(manifest.files) == [
-        ".work/choices.json",
-        ".work/resume.json",
-        "1-script.md",
-        "2-narration.m4a",
-        "3-scenes/S1.png",
-        "3-scenes/S2.mp4",
-        "4-final.mp4",
-        "brief.md",
-        "cost.csv",
-        "decisions.md",
+
+def test_an_unfinished_run_is_kept_in_progress_under_its_own_names(tmp_path: Path) -> None:
+    store = MemoryStore()
+
+    manifest = archive_run(store, _run(tmp_path / "the-dam", final=None))
+
+    # Its building blocks and what was signed off, and the step log to carry on from.
+    assert sorted(manifest.files) == sorted([*KEPT, ".work/steps.jsonl"])
+    assert kept(store) == ["runs/in-progress/the-dam"]
+    assert store.objects["runs/in-progress/the-dam/building-blocks/research.md"] == b"# Research"
+
+
+def test_finishing_moves_a_run_without_uploading_what_is_already_kept(tmp_path: Path) -> None:
+    store = MemoryStore()
+    run = _run(tmp_path / "the-dam", final=None)
+    archive_run(store, run)
+    store.uploaded.clear()
+
+    (run / "4-final.mp4").write_bytes(b"final cut")
+    manifest = archive_run(store, run)
+
+    assert sorted(manifest.files) == sorted([*KEPT, "4-final.mp4"])
+    assert kept(store) == ["runs/finished/the-dam"]
+    assert store.names("runs/in-progress/") == []
+    # Only the final cut and the manifest were uploaded; the rest was copied in the bucket.
+    assert store.uploaded == [
+        "runs/finished/the-dam/4-final.mp4",
+        "runs/finished/the-dam/manifest.json",
     ]
-    assert kept(store) == ["runs/the-dam.json"]
-    assert manifest.files["4-final.mp4"].content_type == "video/mp4"
 
 
-def test_the_same_file_is_kept_once_whichever_runs_use_it(tmp_path: Path) -> None:
+def test_an_in_progress_copy_is_never_deleted_before_the_finished_one_is_whole(
+    tmp_path: Path,
+) -> None:
+    store = LosesCopies()
+    run = _run(tmp_path / "the-dam", final=None)
+    archive_run(store, run)
+    (run / "4-final.mp4").write_bytes(b"final cut")
+
+    with pytest.raises(StorageError, match="in-progress copy stays"):
+        archive_run(store, run)
+    assert "runs/in-progress/the-dam/2-narration.m4a" in store.objects
+
+
+def test_keeping_a_run_again_uploads_only_what_changed_and_drops_what_it_lost(
+    tmp_path: Path,
+) -> None:
     store = MemoryStore()
-    archive_run(store, _finished_run(tmp_path / "the-dam"))
-    blobs = store.blobs()
-    uploads = store.uploads
+    run = _run(tmp_path / "the-dam", final=None)
+    archive_run(store, run)
+    store.uploaded.clear()
 
-    archive_run(store, _finished_run(tmp_path / "the-dam-v2"))
+    (run / "1-script.md").write_bytes(b"## Script, revised")
+    (run / "3-scenes/S2.mp4").unlink()
+    archive_run(store, run)
 
-    # A second run with the same files adds its manifest and nothing else.
-    assert store.blobs() == blobs
-    assert store.uploads == uploads + 1
+    prefix = "runs/in-progress/the-dam/"
+    assert store.uploaded == [prefix + "1-script.md", prefix + "manifest.json"]
+    assert prefix + "3-scenes/S2.mp4" not in store.objects
 
 
 def test_a_kept_run_comes_back_byte_for_byte(tmp_path: Path) -> None:
     store = MemoryStore()
-    original = _finished_run(tmp_path / "the-dam")
+    original = _run(tmp_path / "the-dam")
     archive_run(store, original)
 
     restored = tmp_path / "elsewhere" / "the-dam"
@@ -117,37 +172,14 @@ def test_a_kept_run_comes_back_byte_for_byte(tmp_path: Path) -> None:
     assert not (restored / "3-scenes/animatic.mp4").exists()
 
 
-def test_a_blob_that_comes_back_different_is_refused(tmp_path: Path) -> None:
+def test_a_file_that_comes_back_different_is_refused(tmp_path: Path) -> None:
     store = MemoryStore()
-    archive_run(store, _finished_run(tmp_path / "the-dam"))
-    store.objects[store.blobs()[0]] = b"damaged"
+    archive_run(store, _run(tmp_path / "the-dam"))
+    store.objects["runs/finished/the-dam/4-final.mp4"] = b"damaged"
 
     with pytest.raises(StorageError, match="came back different"):
         restore_run(store, "the-dam", tmp_path / "restored")
     assert not list((tmp_path / "restored").rglob("*.partial"))
-
-
-def test_rekeeping_a_changed_run_drops_only_the_blobs_nothing_uses(tmp_path: Path) -> None:
-    store = MemoryStore()
-    archive_run(store, _finished_run(tmp_path / "the-dam"))
-    archive_run(store, _finished_run(tmp_path / "other", final=b"other cut"))
-    first_cut = archive_run(store, _finished_run(tmp_path / "the-dam")).files["4-final.mp4"]
-
-    recut = archive_run(store, _finished_run(tmp_path / "the-dam", final=b"re-cut"))
-
-    assert f"blobs/{first_cut.sha256}" not in store.objects
-    assert f"blobs/{recut.files['4-final.mp4'].sha256}" in store.objects
-    # The keyframes the other run shares are still there for it.
-    restore_run(store, "other", tmp_path / "check")
-    assert (tmp_path / "check/3-scenes/S1.png").read_bytes() == b"keyframe one"
-
-
-def test_only_a_finished_run_is_archived(tmp_path: Path) -> None:
-    run = _finished_run(tmp_path / "the-dam")
-    (run / "4-final.mp4").unlink()
-
-    with pytest.raises(StorageError, match="only a finished run"):
-        archive_run(MemoryStore(), run)
 
 
 def _channel_theme(root: Path) -> Theme:
