@@ -1,0 +1,9 @@
+[
+["group",{"name":"desk_lamp_built","at":{"x":0.0,"y":0.0,"z":0.0}}],
+["shape",{"kind":"cylinder","name":"desk_lamp_built.base","size":{"x":0.17,"y":0.17,"z":0.03},"at":{"x":0.0,"y":0.0,"z":0.0},"role":"metal"}],
+["shape",{"kind":"cylinder","name":"desk_lamp_built.arm_low","size":{"x":0.018,"y":0.018,"z":0.36},"at":{"x":0,"y":0,"z":0.03},"role":"metal"}],
+["shape",{"kind":"cylinder","name":"desk_lamp_built.arm_high","size":{"x":0.018,"y":0.018,"z":0.36},"at":{"x":0,"y":0.111,"z":0.372},"role":"metal"}],
+["shape",{"kind":"sphere","name":"desk_lamp_built.joint","size":{"x":0.04,"y":0.04,"z":0.04},"at":{"x":0,"y":0.111,"z":0.352},"role":"metal"}],
+["shape",{"kind":"funnel","name":"desk_lamp_built.shade","size":{"x":0.17,"y":0.17,"z":0.16},"at":{"x":0,"y":-0.227,"z":0.391},"role":"lamp_shade"}],
+["shape",{"kind":"sphere","name":"desk_lamp_built.bulb","size":{"x":0.05,"y":0.05,"z":0.05},"at":{"x":0,"y":-0.257,"z":0.401},"role":"bulb"}]
+]

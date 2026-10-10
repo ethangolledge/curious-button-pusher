@@ -1,0 +1,5 @@
+[
+["group",{"name":"envelope_built","at":{"x":0.0,"y":0.0,"z":0.0}}],
+["shape",{"kind":"box","name":"envelope_built.body","size":{"x":0.22,"y":0.11,"z":0.004},"at":{"x":0.0,"y":0.0,"z":0.0},"role":"paper"}],
+["shape",{"kind":"cylinder","name":"envelope_built.seal","size":{"x":0.02,"y":0.02,"z":0.002},"at":{"x":0,"y":0.03,"z":0.004},"role":"leather"}]
+]

@@ -1,0 +1,4 @@
+[
+["light",{"kind":"spot","name":"car_headlight_0","at":{"x":-0.597,"y":-2.37,"z":0.58},"colour":"#fff1d6","power":1500.0}],
+["light",{"kind":"spot","name":"car_headlight_2","at":{"x":0.597,"y":-2.37,"z":0.58},"colour":"#fff1d6","power":1500.0}]
+]

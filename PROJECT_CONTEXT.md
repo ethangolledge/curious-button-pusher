@@ -56,6 +56,12 @@ with a change). `AGENTS.md` says which applies when a session starts.
   left open (`--detach`) and answered later, on its own page server or in chat
   ([docs/runs-and-review.md](docs/runs-and-review.md)).
 - **A run is capped** at `production.max_usd`, lowered to the key's remaining credit.
+- **3D shots are composed, never improvised.** A shot is names and settings from a catalogue of
+  blocks (one file each, using only the `Stage` verbs); the foundation (`content/blender/
+  stage.py`) is the only shot code that touches Blender. A missing ability falls back to a
+  keyframe scene and is built later as a block, by people and the assistant, never generated at
+  run time. A channel's look and models are its own, in its private folder
+  ([docs/staging.md](docs/staging.md)).
 - **Out of scope:** publishing, caption and hashtag copy, thumbnails, sound effects, production
   infrastructure, and integrations not explicitly requested. The bucket is the person's own
   permanent storage, not infrastructure the pipeline needs: without one, everything stays local.
@@ -66,14 +72,19 @@ with a change). `AGENTS.md` says which applies when a session starts.
   tests in 20 s plus 12 whole-video renders (`pytest -m video`), ruff and strict mypy clean, no
   import cycles and one-way layers (enforced by a test). Validated end to end on a first
   long-form production.
+- 3D shots (Blender 5.2): the foundation, 29 blocks, 34 props made in code, a model library
+  with search and ingest, and `content staging` to check and preview shots; not yet joined to
+  the Visual Director and production ([docs/staging.md](docs/staging.md#not-built-yet)).
 - `content eval` caught all seven failures a director named in a rejected final cut, three runs
   out of three ([docs/narration.md](docs/narration.md#regression-content-eval)); false alarms on an
   approved script are not measured yet.
 
 ## Next Work
 
-1. Measure `eval`'s false alarms once a channel has a `positive.json`.
-2. Tune thresholds and the critic from recorded judgements.
-3. The code improvements listed in [docs/codebase.md](docs/codebase.md#where-to-optimise).
+1. Join 3D shots to the pipeline: `Scene.staging`, the Visual Director's catalogue (a prompt
+   change, to propose first), the shot check in `check_visuals`, `find_assets`, `render_shots`.
+2. Measure `eval`'s false alarms once a channel has a `positive.json`.
+3. Tune thresholds and the critic from recorded judgements.
+4. The code improvements listed in [docs/codebase.md](docs/codebase.md#where-to-optimise).
 
 Never store credentials or complete provider payloads containing secrets in tracked files.

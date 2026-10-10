@@ -1,0 +1,4 @@
+[
+["light",{"kind":"sun","name":"centre_sun","at":{"x":-2.132,"y":3.198,"z":3.198},"colour":"#fff1dc","power":4.0}],
+["light",{"kind":"area","name":"centre_sky","at":{"x":0.0,"y":-0.2,"z":0.7},"colour":"#bcd3ea","power":60.0}]
+]

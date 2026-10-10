@@ -1,0 +1,13 @@
+[
+["group",{"name":"bench_built","at":{"x":0.0,"y":0.0,"z":0.0}}],
+["shape",{"kind":"box","name":"bench_built.leg_0","size":{"x":0.06,"y":0.5,"z":0.45},"at":{"x":-0.8,"y":0,"z":0},"role":"metal"}],
+["shape",{"kind":"box","name":"bench_built.post_0","size":{"x":0.06,"y":0.06,"z":0.45},"at":{"x":-0.8,"y":0.22,"z":0.45},"role":"metal"}],
+["shape",{"kind":"box","name":"bench_built.leg_2","size":{"x":0.06,"y":0.5,"z":0.45},"at":{"x":0.8,"y":0,"z":0},"role":"metal"}],
+["shape",{"kind":"box","name":"bench_built.post_2","size":{"x":0.06,"y":0.06,"z":0.45},"at":{"x":0.8,"y":0.22,"z":0.45},"role":"metal"}],
+["shape",{"kind":"box","name":"bench_built.seat_0","size":{"x":1.8,"y":0.1,"z":0.035},"at":{"x":0,"y":-0.18,"z":0.45},"role":"wood"}],
+["shape",{"kind":"box","name":"bench_built.seat_1","size":{"x":1.8,"y":0.1,"z":0.035},"at":{"x":0,"y":-0.06,"z":0.45},"role":"wood"}],
+["shape",{"kind":"box","name":"bench_built.seat_2","size":{"x":1.8,"y":0.1,"z":0.035},"at":{"x":0,"y":0.06,"z":0.45},"role":"wood"}],
+["shape",{"kind":"box","name":"bench_built.seat_3","size":{"x":1.8,"y":0.1,"z":0.035},"at":{"x":0,"y":0.18,"z":0.45},"role":"wood"}],
+["shape",{"kind":"box","name":"bench_built.back_0","size":{"x":1.8,"y":0.035,"z":0.1},"at":{"x":0,"y":0.24,"z":0.62},"role":"wood"}],
+["shape",{"kind":"box","name":"bench_built.back_1","size":{"x":1.8,"y":0.035,"z":0.1},"at":{"x":0,"y":0.24,"z":0.76},"role":"wood"}]
+]

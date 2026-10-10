@@ -25,6 +25,7 @@ Otherwise, start with the one you need:
 | know what any model does, costs, and how it fails (Jev, the LLMs, media models, local models) | [models.md](models.md) |
 | go deep on the local and learned models (taste models, colour, NLI, beat tracking) | [machine-learning.md](machine-learning.md) |
 | find my way around the code, its trade-offs and quirks, and where to optimise | [codebase.md](codebase.md) |
+| build 3D shots in Blender: sets, models, movement, looks, and how to add to them | [staging.md](staging.md) |
 
 Also:
 

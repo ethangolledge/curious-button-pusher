@@ -1,0 +1,6 @@
+[
+["group",{"name":"barrel_built","at":{"x":0.0,"y":0.0,"z":0.0}}],
+["shape",{"kind":"cylinder","name":"barrel_built.body","size":{"x":0.58,"y":0.58,"z":0.88},"at":{"x":0.0,"y":0.0,"z":0.0},"role":"paint"}],
+["shape",{"kind":"cylinder","name":"barrel_built.ring_29","size":{"x":0.6,"y":0.6,"z":0.02},"at":{"x":0,"y":0,"z":0.29},"role":"metal"}],
+["shape",{"kind":"cylinder","name":"barrel_built.ring_59","size":{"x":0.6,"y":0.6,"z":0.02},"at":{"x":0,"y":0,"z":0.59},"role":"metal"}]
+]

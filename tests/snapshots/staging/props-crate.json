@@ -1,0 +1,8 @@
+[
+["group",{"name":"crate_built","at":{"x":0.0,"y":0.0,"z":0.0}}],
+["shape",{"kind":"box","name":"crate_built.body","size":{"x":0.768,"y":0.768,"z":0.768},"at":{"x":0,"y":0,"z":0.016},"role":"wood"}],
+["shape",{"kind":"box","name":"crate_built.band_0","size":{"x":0.8,"y":0.8,"z":0.04},"at":{"x":0,"y":0,"z":0.0},"role":"dark_wood"}],
+["shape",{"kind":"box","name":"crate_built.band_1","size":{"x":0.8,"y":0.8,"z":0.04},"at":{"x":0,"y":0,"z":0.267},"role":"dark_wood"}],
+["shape",{"kind":"box","name":"crate_built.band_2","size":{"x":0.8,"y":0.8,"z":0.04},"at":{"x":0,"y":0,"z":0.533},"role":"dark_wood"}],
+["shape",{"kind":"box","name":"crate_built.band_3","size":{"x":0.8,"y":0.8,"z":0.04},"at":{"x":0,"y":0,"z":0.76},"role":"dark_wood"}]
+]

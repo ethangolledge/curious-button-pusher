@@ -1,0 +1,7 @@
+[
+["group",{"name":"briefcase_built","at":{"x":0.0,"y":0.0,"z":0.0}}],
+["shape",{"kind":"box","name":"briefcase_built.body","size":{"x":0.45,"y":0.11,"z":0.33},"at":{"x":0.0,"y":0.0,"z":0.0},"role":"leather"}],
+["shape",{"kind":"box","name":"briefcase_built.handle","size":{"x":0.12,"y":0.025,"z":0.035},"at":{"x":0,"y":0,"z":0.33},"role":"leather"}],
+["shape",{"kind":"box","name":"briefcase_built.latch_0","size":{"x":0.03,"y":0.115,"z":0.02},"at":{"x":-0.13,"y":0,"z":0.29},"role":"metal"}],
+["shape",{"kind":"box","name":"briefcase_built.latch_2","size":{"x":0.03,"y":0.115,"z":0.02},"at":{"x":0.13,"y":0,"z":0.29},"role":"metal"}]
+]

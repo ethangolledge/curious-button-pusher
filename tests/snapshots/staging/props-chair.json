@@ -1,0 +1,11 @@
+[
+["group",{"name":"chair_built","at":{"x":0.0,"y":0.0,"z":0.0}}],
+["shape",{"kind":"box","name":"chair_built.leg_0","size":{"x":0.035,"y":0.035,"z":0.42},"at":{"x":-0.182,"y":-0.182,"z":0},"role":"wood"}],
+["shape",{"kind":"box","name":"chair_built.leg_1","size":{"x":0.035,"y":0.035,"z":0.42},"at":{"x":0.182,"y":-0.182,"z":0},"role":"wood"}],
+["shape",{"kind":"box","name":"chair_built.leg_2","size":{"x":0.035,"y":0.035,"z":0.42},"at":{"x":-0.182,"y":0.182,"z":0},"role":"wood"}],
+["shape",{"kind":"box","name":"chair_built.leg_3","size":{"x":0.035,"y":0.035,"z":0.42},"at":{"x":0.182,"y":0.182,"z":0},"role":"wood"}],
+["shape",{"kind":"box","name":"chair_built.seat","size":{"x":0.44,"y":0.44,"z":0.035},"at":{"x":0,"y":0,"z":0.415},"role":"dark_wood"}],
+["shape",{"kind":"box","name":"chair_built.post_0","size":{"x":0.035,"y":0.035,"z":0.43},"at":{"x":-0.182,"y":0.182,"z":0.45},"role":"wood"}],
+["shape",{"kind":"box","name":"chair_built.post_2","size":{"x":0.035,"y":0.035,"z":0.43},"at":{"x":0.182,"y":0.182,"z":0.45},"role":"wood"}],
+["shape",{"kind":"box","name":"chair_built.back","size":{"x":0.4,"y":0.025,"z":0.16},"at":{"x":0,"y":0.185,"z":0.68},"role":"dark_wood"}]
+]

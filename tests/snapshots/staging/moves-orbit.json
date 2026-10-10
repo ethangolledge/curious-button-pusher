@@ -1,0 +1,5 @@
+[
+["mark",{"name":"camera_subject","at":{"x":0.0,"y":0.0,"z":0.0}}],
+["animate",{"name":"camera","first":{"frame":1,"at":{"x":-0.355,"y":-0.615,"z":0.151},"rotation":{"w":0.751,"x":0.608,"y":-0.163,"z":-0.201}},"last":{"frame":60,"at":{"x":0.355,"y":-0.615,"z":0.151},"rotation":{"w":0.751,"x":0.608,"y":0.163,"z":0.201}},"count":60}],
+["animate_value",{"name":"camera","channel":"lens","first":[1,35.0],"last":[60,35.0]}]
+]

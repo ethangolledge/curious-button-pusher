@@ -213,6 +213,7 @@ def test_a_fresh_clone_gets_the_whole_channel_theme_back(tmp_path: Path) -> None
     assert sorted(manifest.files) == [
         "README.md",
         "SKILL.md",
+        "blender/looks/starter.py",
         "examples/README.md",
         "examples/the-great-stink/negative.json",
         "fonts/ArchivoBlack-Regular.ttf",

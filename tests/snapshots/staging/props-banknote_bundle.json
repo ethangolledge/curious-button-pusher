@@ -1,0 +1,5 @@
+[
+["group",{"name":"banknote_bundle_built","at":{"x":0.0,"y":0.0,"z":0.0}}],
+["shape",{"kind":"box","name":"banknote_bundle_built.notes","size":{"x":0.156,"y":0.066,"z":0.012},"at":{"x":0.0,"y":0.0,"z":0.0},"role":"money"}],
+["shape",{"kind":"box","name":"banknote_bundle_built.band","size":{"x":0.03,"y":0.068,"z":0.013},"at":{"x":0.0,"y":0.0,"z":0.0},"role":"card"}]
+]

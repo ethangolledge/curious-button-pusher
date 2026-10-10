@@ -15,6 +15,7 @@ from typing import Literal
 
 from content.config import ContentConfig, load_config
 from content.errors import ConfigurationError
+from content.providers.blender import VERSION, blender_path
 from content.workflow.providers import MIN_RUN_USD
 
 Status = Literal["ready", "missing", "optional"]
@@ -44,8 +45,22 @@ def checks(config_path: Path | None) -> list[Check]:
         _extra("learn", "fastembed", "local taste models that learn from your labels"),
         _extra("music", "beat_this", "cutting stories to a locked music bed's beats"),
         _extra("vision", "transformers", "aiming the camera at each picture's focal point"),
+        _blender(),
     ]
     return found
+
+
+def _blender() -> Check:
+    found = blender_path()
+    if found is None or not found.exists():
+        return Check(
+            "Blender",
+            "optional",
+            "not found",
+            f"For 3D shots: install Blender {VERSION} LTS (docs/staging.md) and put it on the "
+            "path, or set BLENDER=/path/to/blender in .env.",
+        )
+    return Check("Blender", "ready", f"{found} (3D shots)")
 
 
 def _python() -> Check:

@@ -1,0 +1,7 @@
+[
+["group",{"name":"podium_built","at":{"x":0.0,"y":0.0,"z":0.0}}],
+["shape",{"kind":"box","name":"podium_built.body","size":{"x":0.65,"y":0.5,"z":1.1},"at":{"x":0.0,"y":0.0,"z":0.0},"role":"dark_wood"}],
+["shape",{"kind":"box","name":"podium_built.top","size":{"x":0.7,"y":0.45,"z":0.04},"at":{"x":0,"y":0.02,"z":1.1},"role":"dark_wood"}],
+["shape",{"kind":"cylinder","name":"podium_built.stalk","size":{"x":0.01,"y":0.01,"z":0.32},"at":{"x":0,"y":-0.12,"z":1.12},"role":"metal"}],
+["shape",{"kind":"cylinder","name":"podium_built.microphone","size":{"x":0.03,"y":0.03,"z":0.06},"at":{"x":0,"y":-0.26,"z":1.4},"role":"metal"}]
+]

@@ -1,0 +1,8 @@
+[
+["group",{"name":"monitor_built","at":{"x":0.0,"y":0.0,"z":0.0}}],
+["shape",{"kind":"box","name":"monitor_built.foot","size":{"x":0.22,"y":0.16,"z":0.01},"at":{"x":0,"y":0.08,"z":0},"role":"plastic"}],
+["shape",{"kind":"box","name":"monitor_built.neck","size":{"x":0.04,"y":0.03,"z":0.18},"at":{"x":0,"y":0.1,"z":0.01},"role":"plastic"}],
+["shape",{"kind":"box","name":"monitor_built.frame","size":{"x":0.56,"y":0.03,"z":0.34},"at":{"x":0,"y":0.08,"z":0.15},"role":"plastic"}],
+["shape",{"kind":"box","name":"monitor_built.screen","size":{"x":0.53,"y":0.002,"z":0.3},"at":{"x":0,"y":0.064,"z":0.17},"role":"screen"}],
+["shape",{"kind":"box","name":"monitor_built.keyboard","size":{"x":0.44,"y":0.14,"z":0.02},"at":{"x":0,"y":-0.15,"z":0},"role":"plastic"}]
+]

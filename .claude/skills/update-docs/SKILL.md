@@ -23,6 +23,7 @@ is wrong is worse than none. Update the docs **in the same change** as the code.
 | installing, the quick start, the docs map | `README.md` (kept short: it links out) |
 | module structure, a new module or package, a design trade-off, a new quirk, a fixed quirk | `docs/codebase.md` (and `LAYERS` in `tests/test_architecture.py` for a new package) |
 | a decision made after a run, or a failure that cost money | the channel's `themes/<name>/notes/` (private: the run, the problem, the fix), the general lesson in the area's doc with neutral wording, and `PROJECT_CONTEXT.md` if it changes the engine's current state |
+| 3D shots: `content/blender/`, `content/staging/`, a block, a look, a model source, `content staging` | `docs/staging.md` (what there is, rules, checks, not built yet), `.claude/skills/staging/SKILL.md`, and a renewed snapshot for a block whose build changed on purpose |
 | configuration keys or defaults (`config.py`, `config/*.json`) | `docs/configuration.md`, the doc for that area, and `config/config.example.json` |
 
 ## How to write it

@@ -1,0 +1,7 @@
+[
+["group",{"name":"safe_built","at":{"x":0.0,"y":0.0,"z":0.0}}],
+["shape",{"kind":"box","name":"safe_built.body","size":{"x":0.6,"y":0.6,"z":0.75},"at":{"x":0.0,"y":0.0,"z":0.0},"role":"metal"}],
+["shape",{"kind":"box","name":"safe_built.door","size":{"x":0.5,"y":0.02,"z":0.62},"at":{"x":0,"y":-0.3,"z":0.06},"role":"metal"}],
+["shape",{"kind":"cylinder","name":"safe_built.dial","size":{"x":0.12,"y":0.12,"z":0.03},"at":{"x":0.05,"y":-0.32,"z":0.45},"role":"metal"}],
+["shape",{"kind":"box","name":"safe_built.handle","size":{"x":0.04,"y":0.06,"z":0.16},"at":{"x":-0.15,"y":-0.33,"z":0.32},"role":"metal"}]
+]

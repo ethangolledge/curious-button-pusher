@@ -19,3 +19,12 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+---
+
+Files that use Blender's own Python API (each marked `SPDX-License-Identifier:
+GPL-3.0-or-later` in its first line: the 3D foundation, worker, checks, model ingest and
+looks) are derived from Blender and are licensed under the GNU General Public License,
+version 3 or later, instead. The rest of the project does not import them: it writes job
+files and runs Blender as a separate program, so it stays under the MIT licence above.
+Pictures and videos rendered with them belong to whoever makes them.

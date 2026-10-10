@@ -1,0 +1,5 @@
+[
+["group",{"name":"book_built","at":{"x":0.0,"y":0.0,"z":0.0}}],
+["shape",{"kind":"box","name":"book_built.cover","size":{"x":0.16,"y":0.24,"z":0.035},"at":{"x":0.0,"y":0.0,"z":0.0},"role":"leather"}],
+["shape",{"kind":"box","name":"book_built.pages","size":{"x":0.152,"y":0.232,"z":0.031},"at":{"x":0.006,"y":0,"z":0.002},"role":"paper"}]
+]

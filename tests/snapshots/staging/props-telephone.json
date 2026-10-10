@@ -1,0 +1,9 @@
+[
+["group",{"name":"telephone_built","at":{"x":0.0,"y":0.0,"z":0.0}}],
+["shape",{"kind":"box","name":"telephone_built.base","size":{"x":0.2,"y":0.22,"z":0.08},"at":{"x":0.0,"y":0.0,"z":0.0},"role":"plastic"}],
+["shape",{"kind":"cylinder","name":"telephone_built.dial","size":{"x":0.11,"y":0.11,"z":0.012},"at":{"x":0,"y":-0.04,"z":0.075},"role":"metal"}],
+["group",{"name":"telephone_built.handset","at":{"x":0,"y":0.05,"z":0.095}}],
+["shape",{"kind":"box","name":"telephone_built.grip","size":{"x":0.22,"y":0.045,"z":0.03},"at":{"x":0.0,"y":0.0,"z":0.0},"role":"plastic"}],
+["shape",{"kind":"cylinder","name":"telephone_built.cup_0","size":{"x":0.06,"y":0.06,"z":0.04},"at":{"x":-0.1,"y":0,"z":-0.005},"role":"plastic"}],
+["shape",{"kind":"cylinder","name":"telephone_built.cup_2","size":{"x":0.06,"y":0.06,"z":0.04},"at":{"x":0.1,"y":0,"z":-0.005},"role":"plastic"}]
+]

@@ -1,0 +1,8 @@
+[
+["group",{"name":"laptop_built","at":{"x":0.0,"y":0.0,"z":0.0}}],
+["shape",{"kind":"box","name":"laptop_built.base","size":{"x":0.32,"y":0.22,"z":0.015},"at":{"x":0.0,"y":0.0,"z":0.0},"role":"metal"}],
+["shape",{"kind":"box","name":"laptop_built.keys","size":{"x":0.27,"y":0.1,"z":0.002},"at":{"x":0,"y":-0.02,"z":0.015},"role":"plastic"}],
+["group",{"name":"laptop_built.lid","at":{"x":0,"y":0.11,"z":0.015}}],
+["shape",{"kind":"box","name":"laptop_built.lid_back","size":{"x":0.32,"y":0.008,"z":0.21},"at":{"x":0.0,"y":0.0,"z":0.0},"role":"metal"}],
+["shape",{"kind":"box","name":"laptop_built.screen","size":{"x":0.29,"y":0.002,"z":0.18},"at":{"x":0,"y":-0.006,"z":0.014},"role":"screen"}]
+]

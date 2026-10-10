@@ -1,0 +1,5 @@
+[
+["group",{"name":"folder_built","at":{"x":0.0,"y":0.0,"z":0.0}}],
+["shape",{"kind":"box","name":"folder_built.cover","size":{"x":0.24,"y":0.32,"z":0.012},"at":{"x":0.0,"y":0.0,"z":0.0},"role":"card"}],
+["shape",{"kind":"box","name":"folder_built.papers","size":{"x":0.21,"y":0.297,"z":0.008},"at":{"x":0.01,"y":0.005,"z":0.002},"role":"paper"}]
+]

@@ -1,0 +1,5 @@
+[
+["light",{"kind":"area","name":"key_centre","at":{"x":-1.061,"y":-1.061,"z":0.9},"colour":"#fff3e2","power":250.0}],
+["light",{"kind":"area","name":"fill_centre","at":{"x":0.882,"y":-1.214,"z":0.3},"colour":"#fff3e2","power":83.333}],
+["light",{"kind":"area","name":"rim_centre","at":{"x":0.26,"y":1.477,"z":1.35},"colour":"#fff3e2","power":200.0}]
+]

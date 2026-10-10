@@ -1,0 +1,7 @@
+[
+["group",{"name":"armchair_built","at":{"x":0.0,"y":0.0,"z":0.0}}],
+["shape",{"kind":"box","name":"armchair_built.base","size":{"x":0.85,"y":0.85,"z":0.42},"at":{"x":0.0,"y":0.0,"z":0.0},"role":"leather"}],
+["shape",{"kind":"box","name":"armchair_built.back","size":{"x":0.85,"y":0.2,"z":0.55},"at":{"x":0,"y":0.32,"z":0.4},"role":"leather"}],
+["shape",{"kind":"box","name":"armchair_built.arm_0","size":{"x":0.16,"y":0.8,"z":0.25},"at":{"x":-0.345,"y":0,"z":0.4},"role":"leather"}],
+["shape",{"kind":"box","name":"armchair_built.arm_2","size":{"x":0.16,"y":0.8,"z":0.25},"at":{"x":0.345,"y":0,"z":0.4},"role":"leather"}]
+]

@@ -1,0 +1,108 @@
+"""A render job: everything Blender needs to build and render one shot, as one JSON file.
+The pipeline writes it; `worker.py`, inside Blender, reads it. This module is the whole
+contract between the two, defined once and imported by both."""
+
+import json
+from dataclasses import asdict, dataclass, field
+from pathlib import Path
+from typing import Any, Literal
+
+# still: a few frames for a contact sheet; draft: every frame, quickly; final: full quality.
+Quality = Literal["still", "draft", "final"]
+
+
+@dataclass(frozen=True, slots=True)
+class BlockCall:
+    """A block by name, with its settings as text (read by `blocks.base.read`)."""
+
+    block: str
+    settings: dict[str, str] = field(default_factory=dict)
+
+
+@dataclass(frozen=True, slots=True)
+class ActorCall:
+    """An actor: its name in the shot, the actor block that places it, and its model (a
+    library model or a prop made in code)."""
+
+    actor_id: str
+    block: str
+    model: str
+    settings: dict[str, str] = field(default_factory=dict)
+
+
+@dataclass(frozen=True, slots=True)
+class ModelFile:
+    """A library model the shot uses: where its file is, and its real width, depth and height
+    in metres."""
+
+    model_id: str
+    path: str
+    size: tuple[float, float, float]
+
+
+@dataclass(frozen=True, slots=True)
+class Job:
+    shot_id: str
+    seconds: float
+    layout: BlockCall
+    camera: BlockCall
+    look: BlockCall
+    actors: tuple[ActorCall, ...] = ()
+    actions: tuple[BlockCall, ...] = ()
+    lights: tuple[BlockCall, ...] = ()
+    models: tuple[ModelFile, ...] = ()
+    palette: dict[str, str] = field(default_factory=dict)
+    # A channel's own blocks and looks (`themes/<name>/blender`), beside the engine's.
+    channel_blocks: tuple[str, ...] = ()
+    width: int = 1080
+    height: int = 1920
+    fps: int = 30
+    quality: Quality = "draft"
+    # The frames to render for a still; empty renders every frame.
+    frames: tuple[int, ...] = ()
+    seed: int = 1
+    # Also save the built scene as a .blend, to open and look around in Blender.
+    save_scene: bool = False
+
+    @property
+    def frame_count(self) -> int:
+        return max(1, round(self.seconds * self.fps))
+
+    def dumps(self) -> str:
+        return json.dumps(asdict(self), indent=2, sort_keys=True)
+
+    @classmethod
+    def loads(cls, text: str) -> "Job":
+        data: dict[str, Any] = json.loads(text)
+        data["layout"] = BlockCall(**data["layout"])
+        data["camera"] = BlockCall(**data["camera"])
+        data["look"] = BlockCall(**data["look"])
+        data["actors"] = tuple(ActorCall(**actor) for actor in data.get("actors", ()))
+        data["actions"] = tuple(BlockCall(**action) for action in data.get("actions", ()))
+        data["lights"] = tuple(BlockCall(**light) for light in data.get("lights", ()))
+        data["models"] = tuple(
+            ModelFile(model["model_id"], model["path"], tuple(model["size"]))
+            for model in data.get("models", ())
+        )
+        data["channel_blocks"] = tuple(data.get("channel_blocks", ()))
+        data["frames"] = tuple(data.get("frames", ()))
+        return cls(**data)
+
+    @classmethod
+    def read(cls, path: Path) -> "Job":
+        return cls.loads(path.read_text(encoding="utf-8"))
+
+
+@dataclass(frozen=True, slots=True)
+class Report:
+    """What the worker writes beside the frames."""
+
+    shot_id: str
+    frames: list[str]
+    issues: list[str]
+    seconds_building: float
+    seconds_rendering: float
+    blend: str | None = None
+
+    def dumps(self) -> str:
+        return json.dumps(asdict(self), indent=2)

@@ -1,0 +1,9 @@
+[
+["shape",{"kind":"plane","name":"ground","size":{"x":400.0,"y":400.0,"z":0},"at":{"x":0.0,"y":0.0,"z":0.0},"role":"ground"}],
+["shape",{"kind":"box","name":"road","size":{"x":400,"y":7,"z":0.02},"at":{"x":0,"y":0,"z":0},"role":"road"}],
+["path",{"name":"road","points":[{"x":-60,"y":-1.75,"z":0.02},{"x":60,"y":-1.75,"z":0.02}]}],
+["path",{"name":"approach","points":[{"x":0,"y":120,"z":0.02},{"x":0,"y":8,"z":0.02}]}],
+["path",{"name":"sky","points":[{"x":-150,"y":80,"z":40},{"x":0,"y":40,"z":60},{"x":150,"y":80,"z":40}]}],
+["mark",{"name":"centre","at":{"x":0.0,"y":0.0,"z":0.0}}],
+["mark",{"name":"far","at":{"x":0,"y":60,"z":0}}]
+]

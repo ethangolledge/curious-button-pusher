@@ -1,0 +1,8 @@
+[
+["group",{"name":"street_lamp_built","at":{"x":0.0,"y":0.0,"z":0.0}}],
+["shape",{"kind":"cylinder","name":"street_lamp_built.foot","size":{"x":0.22,"y":0.22,"z":0.4},"at":{"x":0.0,"y":0.0,"z":0.0},"role":"metal"}],
+["shape",{"kind":"cylinder","name":"street_lamp_built.post","size":{"x":0.11,"y":0.11,"z":5.0},"at":{"x":0.0,"y":0.0,"z":0.0},"role":"metal"}],
+["shape",{"kind":"box","name":"street_lamp_built.arm","size":{"x":0.06,"y":0.9,"z":0.06},"at":{"x":0,"y":-0.42,"z":4.94},"role":"metal"}],
+["shape",{"kind":"funnel","name":"street_lamp_built.hood","size":{"x":0.45,"y":0.45,"z":0.22},"at":{"x":0,"y":-0.85,"z":4.7},"role":"metal"}],
+["shape",{"kind":"sphere","name":"street_lamp_built.bulb","size":{"x":0.14,"y":0.14,"z":0.14},"at":{"x":0,"y":-0.85,"z":4.72},"role":"bulb"}]
+]

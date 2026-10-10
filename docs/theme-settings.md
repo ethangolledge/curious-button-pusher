@@ -199,3 +199,13 @@ generated for each video from `music.prompt`.
 | `music.duck_threshold`, `music.duck_ratio` | how hard the music dips under speech | 0.02, 2.0 | music fights the voice | free |
 | `music.duck_attack_ms`, `music.duck_release_ms` | how gently it dips and comes back (slow keeps it from pumping) | 200, 1500 | as above | free |
 | `music.loudness_lufs`, `music.true_peak_db` | the finished video's loudness and peak (platforms expect about −14 LUFS) | −14, −1 | a platform asks for other values | free |
+
+## 3D shots
+
+How scenes built in Blender are drawn ([staging.md](staging.md)). The look is a file; its
+settings are the feel, so the feel is tuned here, in numbers, not in code.
+
+| Setting | What it does | Starter | Change it when | Re-makes |
+|---|---|---|---|---|
+| `staging.look` | the look by name: `plain` (the engine's), or the channel's own file in `blender/looks/` | `starter` (`themes/starter/blender/looks/starter.py`) | you make your own look | 3D renders (free, render time) |
+| `staging.look_settings` | the look's settings, as its file lists them; the starter's: `exposure` (stops), `contrast` (Blender's tone curve name), `saturation` (0 grey to 1 full), `shadow` and `glow` (palette names: the colour of the dark and of lamps and screens) | −0.3, Medium High Contrast, 0.75, night, sun | the 3D pictures do not feel like the channel | 3D renders (free, render time) |

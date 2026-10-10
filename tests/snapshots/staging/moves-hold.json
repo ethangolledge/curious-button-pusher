@@ -1,0 +1,4 @@
+[
+["animate",{"name":"camera","first":{"frame":1,"at":{"x":-0.329,"y":-0.906,"z":0.165},"rotation":{"w":0.753,"x":0.635,"y":-0.112,"z":-0.132}},"last":{"frame":60,"at":{"x":-0.318,"y":-0.893,"z":0.165},"rotation":{"w":0.754,"x":0.634,"y":-0.11,"z":-0.13}},"count":60}],
+["animate_value",{"name":"camera","channel":"lens","first":[1,50.0],"last":[60,50.0]}]
+]

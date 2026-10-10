@@ -219,7 +219,10 @@ def _theme_files(theme_root: Path) -> list[Path]:
     return [
         path
         for path in sorted(theme_root.rglob("*"))
-        if path.is_file() and not path.relative_to(theme_root).as_posix().startswith(THEME_SKIPPED)
+        if path.is_file()
+        and not path.relative_to(theme_root).as_posix().startswith(THEME_SKIPPED)
+        # Python's compiled copies of a channel's own blocks are remade from them.
+        and "__pycache__" not in path.parts
     ]
 
 

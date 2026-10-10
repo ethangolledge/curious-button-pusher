@@ -460,5 +460,15 @@
     "duck_release_ms": 1500,
     "loudness_lufs": -14,
     "true_peak_db": -1
+  },
+  "staging": {
+    "look": "starter",
+    "look_settings": {
+      "exposure": -0.3,
+      "contrast": "Medium High Contrast",
+      "saturation": 0.75,
+      "shadow": "night",
+      "glow": "sun"
+    }
   }
 }

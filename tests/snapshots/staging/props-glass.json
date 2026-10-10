@@ -1,0 +1,5 @@
+[
+["group",{"name":"glass_built","at":{"x":0.0,"y":0.0,"z":0.0}}],
+["shape",{"kind":"cylinder","name":"glass_built.glass","size":{"x":0.075,"y":0.075,"z":0.09},"at":{"x":0.0,"y":0.0,"z":0.0},"role":"glass"}],
+["shape",{"kind":"cylinder","name":"glass_built.drink","size":{"x":0.066,"y":0.066,"z":0.03},"at":{"x":0,"y":0,"z":0.006},"role":"wood"}]
+]

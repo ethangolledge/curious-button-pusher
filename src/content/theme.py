@@ -472,6 +472,15 @@ class WritingSpec(ImmutableModel):
     weights: StoryWeights
 
 
+class StagingSpec(ImmutableModel):
+    """How the channel's 3D shots are drawn: a look by name (the engine's in
+    `content/blender/blocks/looks/`, or the channel's own in `<theme>/blender/looks/`) and
+    the settings it takes, which set the feel."""
+
+    look: str = "plain"
+    look_settings: dict[str, str | float | int | bool] = {}
+
+
 class ThemeSpec(ImmutableModel):
     name: str
     # The formats the channel makes, by name, and the one in use: in theme.json, the
@@ -485,6 +494,7 @@ class ThemeSpec(ImmutableModel):
     voice: VoiceSpec
     subtitles: SubtitleSpec
     music: MusicSpec
+    staging: StagingSpec = StagingSpec()
 
     @model_validator(mode="before")
     @classmethod

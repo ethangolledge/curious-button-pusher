@@ -17,12 +17,15 @@ Packages are layers: each imports only from the ones above it in this list, neve
 (`tests/test_architecture.py` enforces it, and that there are no import cycles).
 
 ```text
+blender/      3D shots: what runs inside Blender (the Stage verbs, blocks, looks); imports nothing else
 schemas/      the data every part passes around (research, plan, script, review, media…)
 errors.py, models.py
-providers/    the paid models and outside services (OpenRouter, Wikimedia), and their stand-ins
+providers/    the paid models and outside services (OpenRouter, Wikimedia, Blender), and their stand-ins
 state.py      the run's state and the record of every call
 judging/      Jev: the question bank, answer → outcome → verdict, the judge
-theme.py, config.py, choices.py
+theme.py, config.py
+staging/      3D shots from the pipeline's side: the catalogue, the model library, the shot check
+choices.py
 story/        the story's maths and checks, in code (ledger, weights, pace, prose, field, notes)
 agents/       the roles that write: one folder each, agent.py + prompt.md (+ <job>_prompt.md)
 production/   from storyboard to finished cut: five stages on one shared studio
@@ -56,6 +59,25 @@ Every file in `src/content`.
 | `spend.py` | the channel's spending ledger (`spend.sqlite`): every paid call, what the person said they have, each provider's own figures, and the calibration between them | Plain SQL; calls no provider ([spending.md](spending.md)) |
 | `storage.py` | the archive (a folder, `LocalStore`, or a bucket, `GcsStore`): runs in progress and finished under their own names (finishing moves a run, never keeping both), and the channel folder by hash, with every version | [storage.md](storage.md) |
 
+### 3D shots (`blender/`, `staging/`)
+
+[staging.md](staging.md) explains them. `blender/` runs inside Blender (its own Python), so it
+imports nothing from the rest of `content`; only the files marked † use Blender's API.
+
+| Module | Owns |
+|---|---|
+| `blender/job.py` | the job: everything one shot needs, as JSON; the whole contract between the two sides |
+| `blender/api.py` | `Stage`: every verb a block may use, and `Box`, `Pose`, `Mark` |
+| `blender/maths.py` | vectors, rotations, easing, curves (line, arc, spline, constant-speed), turn limits, drift |
+| `blender/camera.py`, `motion.py`, `sets.py`, `shapes.py`, `lighting.py` | what blocks share: framing and keeping inside the set; travel and finding things; room shells; legs, slabs and drawers; light sources and flicker |
+| `blender/blocks/` | one block per file, a folder per kind (`base.py`: what a block is, reading settings) |
+| `blender/registry.py`, `direct.py` | finding blocks by folder; building a shot in its one order |
+| `blender/rehearsal.py` | a `Stage` without Blender: checks shots and tests blocks |
+| `blender/stage.py` †, `worker.py` †, `audit.py` †, `ingest.py` † | the foundation; the job runner; the checks before rendering; preparing a downloaded model |
+| `staging/catalogue.py` | the blocks and models, described; the shot check |
+| `staging/library.py` | the model library: search by meaning, no duplicates |
+| `staging/templates.py` | the starting file for a new block of each kind |
+
 ### Providers (`providers/`)
 
 | Module | Owns | Notes |
@@ -63,6 +85,8 @@ Every file in `src/content`.
 | `base.py` | `ModelProvider` (System 2), `DecisionProvider` (System 1), `Usage` | The only interfaces agents see |
 | `openrouter.py` | chat models through the OpenAI SDK, Jev through the Decisions API, `key_credit_remaining` | The only provider-specific text code |
 | `images.py` | `ImageSource`: Wikimedia Commons, and a fake source | Add a source here |
+| `assets.py` | `AssetSource`: 3D models from the Smithsonian (CC0 only), and a fake source | Add a model source here |
+| `blender.py` | running Blender on a job (`LocalBlender`: render, ingest), and `FakeBlender` | Blender is found from `BLENDER` or the path |
 | `http.py` | the shared wait-and-retry for rate-limited outside services | |
 | `fake.py` | deterministic providers that record every call | The rehearsal and tests use them |
 | `cache.py` | `AssetCache.fetch`: request → file, refusals remembered, one `INDEX.csv` line per paid item | Media and text alike; keys are hashes of the full request |
@@ -172,7 +196,8 @@ Each folder: `agent.py` (the code), `prompt.md` (what its model is told, theme-n
 | `storage.py` | `storage`, and keeping the channel after any command that changes it (`keep_theme`) |
 | `spend.py` | `spend`, `spend budget`; recording every run's and tool's calls (`record_spend`), reading OpenRouter and the bucket |
 | `cloud.py` | `cloud setup`: the Google Cloud steps after the sign-ins, checked and done in order, safe to run again (gcloud runs through a replaceable function, so it is tested without Google) |
-| `check.py` | `check`: is this machine ready (Python, ffmpeg, extras, the key and its balance, the channel, the bucket), with the fix for anything missing |
+| `check.py` | `check`: is this machine ready (Python, ffmpeg, extras, the key and its balance, the channel, the bucket, Blender), with the fix for anything missing |
+| `staging.py` | `staging`: the catalogue, models (search, find, add, name), check, preview, new |
 
 ## Tunable Constants
 

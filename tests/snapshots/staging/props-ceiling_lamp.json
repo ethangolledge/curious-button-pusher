@@ -1,0 +1,6 @@
+[
+["group",{"name":"ceiling_lamp_built","at":{"x":0.0,"y":0.0,"z":0.0}}],
+["shape",{"kind":"cylinder","name":"ceiling_lamp_built.cord","size":{"x":0.008,"y":0.008,"z":0.8},"at":{"x":0,"y":0,"z":-0.8},"role":"rubber"}],
+["shape",{"kind":"funnel","name":"ceiling_lamp_built.shade","size":{"x":0.4,"y":0.4,"z":0.2},"at":{"x":0,"y":0,"z":-0.98},"role":"metal"}],
+["shape",{"kind":"sphere","name":"ceiling_lamp_built.bulb","size":{"x":0.08,"y":0.08,"z":0.08},"at":{"x":0,"y":0,"z":-0.96},"role":"bulb"}]
+]

@@ -1,0 +1,12 @@
+[
+["group",{"name":"filing_cabinet_built","at":{"x":0.0,"y":0.0,"z":0.0}}],
+["shape",{"kind":"box","name":"filing_cabinet_built.body","size":{"x":0.47,"y":0.62,"z":1.32},"at":{"x":0.0,"y":0.0,"z":0.0},"role":"metal"}],
+["shape",{"kind":"box","name":"filing_cabinet_built.drawer_0","size":{"x":0.446,"y":0.02,"z":0.315},"at":{"x":0,"y":-0.32,"z":0.012},"role":"metal"}],
+["shape",{"kind":"box","name":"filing_cabinet_built.handle_0","size":{"x":0.12,"y":0.02,"z":0.015},"at":{"x":0,"y":-0.34,"z":0.201},"role":"metal"}],
+["shape",{"kind":"box","name":"filing_cabinet_built.drawer_1","size":{"x":0.446,"y":0.02,"z":0.315},"at":{"x":0,"y":-0.32,"z":0.339},"role":"metal"}],
+["shape",{"kind":"box","name":"filing_cabinet_built.handle_1","size":{"x":0.12,"y":0.02,"z":0.015},"at":{"x":0,"y":-0.34,"z":0.528},"role":"metal"}],
+["shape",{"kind":"box","name":"filing_cabinet_built.drawer_2","size":{"x":0.446,"y":0.02,"z":0.315},"at":{"x":0,"y":-0.32,"z":0.666},"role":"metal"}],
+["shape",{"kind":"box","name":"filing_cabinet_built.handle_2","size":{"x":0.12,"y":0.02,"z":0.015},"at":{"x":0,"y":-0.34,"z":0.855},"role":"metal"}],
+["shape",{"kind":"box","name":"filing_cabinet_built.drawer_3","size":{"x":0.446,"y":0.02,"z":0.315},"at":{"x":0,"y":-0.32,"z":0.993},"role":"metal"}],
+["shape",{"kind":"box","name":"filing_cabinet_built.handle_3","size":{"x":0.12,"y":0.02,"z":0.015},"at":{"x":0,"y":-0.34,"z":1.182},"role":"metal"}]
+]

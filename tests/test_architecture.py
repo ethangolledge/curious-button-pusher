@@ -8,6 +8,7 @@ from pathlib import Path
 SOURCE = Path(__file__).parents[1] / "src"
 # Bottom to top: a part may import only from the parts below it (or from itself).
 LAYERS: list[set[str]] = [
+    {"blender"},  # what runs inside Blender: imports nothing else (it has none of it there)
     {"schemas"},  # the data every part passes around
     {"errors", "models"},
     {"providers"},  # the paid models and the stand-ins for them
@@ -16,6 +17,7 @@ LAYERS: list[set[str]] = [
     {"judging"},  # Jev: the questions, the outcomes, the judge
     {"theme"},
     {"config"},
+    {"staging"},  # 3D shots: the catalogue, the model library, checks
     {"choices"},
     {"story"},  # the story's maths and checks, in code
     {"agents"},  # the roles that write
@@ -86,3 +88,37 @@ def test_dependencies_run_one_way_from_the_data_up_to_the_command_line() -> None
 
     assert not unplaced, f"Give these a layer: {sorted(unplaced)}"
     assert not upward, "\n".join(upward)
+
+
+# Inside `content.blender`, only these use Blender's own API; everything else there is plain
+# Python, so the rest of the project (and the tests) can build shots without Blender.
+USES_BLENDER = ("content.blender.stage", "content.blender.worker", "content.blender.audit",
+                "content.blender.ingest", "content.blender.blocks.looks.")  # fmt: skip
+
+
+def _uses_blender(path: Path) -> bool:
+    tree = ast.parse(path.read_text(encoding="utf-8"))
+    names = [a.name for n in ast.walk(tree) if isinstance(n, ast.Import) for a in n.names]
+    names += [n.module or "" for n in ast.walk(tree) if isinstance(n, ast.ImportFrom)]
+    return any(name.split(".")[0] in ("bpy", "bmesh", "mathutils") for name in names)
+
+
+def test_only_the_foundation_and_looks_touch_blender_and_nothing_outside_imports_them() -> None:
+    graph = _imports()
+    blender = SOURCE / "content" / "blender"
+    touching = sorted(
+        ".".join(path.with_suffix("").relative_to(SOURCE).parts)
+        for path in blender.rglob("*.py")
+        if _uses_blender(path)
+    )
+    reaching_in = [
+        f"{module} imports {target}"
+        for module, targets in graph.items()
+        if not module.startswith("content.blender")
+        for target in targets
+        if target.startswith(USES_BLENDER)
+    ]
+    assert [m for m in touching if not m.startswith(USES_BLENDER)] == [], (
+        "blocks use Stage verbs, never Blender's API (only looks may)"
+    )
+    assert not reaching_in, "\n".join(reaching_in)

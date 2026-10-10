@@ -1,0 +1,7 @@
+[
+["animate",{"name":"car","first":{"frame":1,"at":{"x":-20.0,"y":-2.0,"z":0.0},"rotation":{"w":0.707,"x":0.0,"y":0.0,"z":0.707}},"last":{"frame":60,"at":{"x":20.0,"y":-2.0,"z":0.0},"rotation":{"w":0.707,"x":0.0,"y":0.0,"z":0.707}},"count":60}],
+["spin",{"name":"car.body.wheel_0","axis":{"x":1,"y":0,"z":0},"last":[60,6944.943]}],
+["spin",{"name":"car.body.wheel_1","axis":{"x":1,"y":0,"z":0},"last":[60,6944.943]}],
+["spin",{"name":"car.body.wheel_2","axis":{"x":1,"y":0,"z":0},"last":[60,6944.943]}],
+["spin",{"name":"car.body.wheel_3","axis":{"x":1,"y":0,"z":0},"last":[60,6944.943]}]
+]

@@ -1,0 +1,10 @@
+[
+["group",{"name":"potted_plant_built","at":{"x":0.0,"y":0.0,"z":0.0}}],
+["shape",{"kind":"funnel","name":"potted_plant_built.pot","size":{"x":0.32,"y":0.32,"z":0.34},"at":{"x":0,"y":0,"z":0},"role":"paint"}],
+["shape",{"kind":"sphere","name":"potted_plant_built.leaves_0","size":{"x":0.28,"y":0.28,"z":0.24},"at":{"x":0.084,"y":-0.031,"z":0.585},"role":"foliage"}],
+["shape",{"kind":"sphere","name":"potted_plant_built.leaves_1","size":{"x":0.28,"y":0.28,"z":0.24},"at":{"x":-0.08,"y":0.055,"z":0.412},"role":"foliage"}],
+["shape",{"kind":"sphere","name":"potted_plant_built.leaves_2","size":{"x":0.28,"y":0.28,"z":0.24},"at":{"x":-0.088,"y":0.047,"z":0.542},"role":"foliage"}],
+["shape",{"kind":"sphere","name":"potted_plant_built.leaves_3","size":{"x":0.28,"y":0.28,"z":0.24},"at":{"x":-0.027,"y":-0.075,"z":0.636},"role":"foliage"}],
+["shape",{"kind":"sphere","name":"potted_plant_built.leaves_4","size":{"x":0.28,"y":0.28,"z":0.24},"at":{"x":0.012,"y":0.1,"z":0.531},"role":"foliage"}],
+["shape",{"kind":"sphere","name":"potted_plant_built.leaves_5","size":{"x":0.28,"y":0.28,"z":0.24},"at":{"x":0.105,"y":0.008,"z":0.546},"role":"foliage"}]
+]

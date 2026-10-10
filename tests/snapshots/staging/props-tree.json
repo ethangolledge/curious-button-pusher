@@ -1,0 +1,9 @@
+[
+["group",{"name":"tree_built","at":{"x":0.0,"y":0.0,"z":0.0}}],
+["shape",{"kind":"cylinder","name":"tree_built.trunk","size":{"x":0.4,"y":0.4,"z":3.2},"at":{"x":0.0,"y":0.0,"z":0.0},"role":"dark_wood"}],
+["shape",{"kind":"sphere","name":"tree_built.crown_0","size":{"x":2.403,"y":2.403,"z":2.043},"at":{"x":-0.17,"y":0.019,"z":3.418},"role":"foliage"}],
+["shape",{"kind":"sphere","name":"tree_built.crown_1","size":{"x":2.16,"y":2.16,"z":1.836},"at":{"x":-0.197,"y":-0.002,"z":3.495},"role":"foliage"}],
+["shape",{"kind":"sphere","name":"tree_built.crown_2","size":{"x":2.365,"y":2.365,"z":2.01},"at":{"x":-0.203,"y":-0.038,"z":2.763},"role":"foliage"}],
+["shape",{"kind":"sphere","name":"tree_built.crown_3","size":{"x":2.833,"y":2.833,"z":2.408},"at":{"x":-0.474,"y":-0.102,"z":3.521},"role":"foliage"}],
+["shape",{"kind":"sphere","name":"tree_built.crown_4","size":{"x":2.429,"y":2.429,"z":2.065},"at":{"x":-0.34,"y":-0.21,"z":3.388},"role":"foliage"}]
+]
