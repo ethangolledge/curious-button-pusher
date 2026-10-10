@@ -89,7 +89,7 @@ class Job:
         data: dict[str, Any] = json.loads(text)
         data["layout"] = BlockCall(**data["layout"])
         data["camera"] = BlockCall(**data["camera"])
-        data["look"] = BlockCall(**data["look"])
+        data["look"] = BlockCall(**data.get("look", {"block": "plain"}))
         data["grade"] = Grade(**data.get("grade", {}))
         data["actors"] = tuple(ActorCall(**actor) for actor in data.get("actors", ()))
         data["actions"] = tuple(BlockCall(**action) for action in data.get("actions", ()))

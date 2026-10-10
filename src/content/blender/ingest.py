@@ -2,7 +2,7 @@
 """Runs inside Blender: brings a downloaded model into the library's form.
 
     blender -b --factory-startup --python-exit-code 1 \\
-        -P src/content/blender/ingest.py -- model.glb out.glb facts.json <height> <max_faces>
+        -P src/content/blender/ingest.py -- model.glb out.glb facts.json <height> <faces> <turn>
 
 Every library model is the same shape of thing, so no block has to allow for its quirks: one
 object hierarchy, transforms applied, standing on the origin and centred over it, in metres
@@ -11,13 +11,14 @@ most `max_faces` faces, saved as a binary glTF. Writes its
 size and face count to `facts.json`."""
 
 import json
+import math
 import re
 import sys
 from pathlib import Path
 from typing import Any
 
 import bpy  # type: ignore[import-not-found]
-from mathutils import Vector  # type: ignore[import-not-found]
+from mathutils import Matrix, Vector  # type: ignore[import-not-found]
 
 IMPORTERS = {
     ".glb": lambda path: bpy.ops.import_scene.gltf(filepath=path),
@@ -28,15 +29,35 @@ IMPORTERS = {
 }
 
 
-def main(source: Path, target: Path, facts: Path, height: float, max_faces: int) -> int:
+def main(
+    source: Path, target: Path, facts: Path, height: float, max_faces: int, turn: float = 0.0
+) -> int:
     bpy.ops.wm.read_factory_settings(use_empty=True)
     IMPORTERS[source.suffix.lower()](str(source))
+    # Turned so its front faces −Y, as every model's does.
+    for obj in bpy.context.scene.objects:
+        if obj.parent is None and turn:
+            obj.rotation_mode = "XYZ"
+            obj.rotation_euler.z += math.radians(turn)
+            obj.location = Matrix.Rotation(math.radians(turn), 4, "Z") @ obj.location
+    # Shapes a skeleton draws its bones with are never seen in a render: they go.
+    shapes = {
+        bone.custom_shape
+        for rig in bpy.context.scene.objects
+        if rig.type == "ARMATURE"
+        for bone in rig.pose.bones
+        if bone.custom_shape is not None
+    }
+    for shape in shapes:
+        bpy.data.objects.remove(shape, do_unlink=True)
     meshes = [obj for obj in bpy.context.scene.objects if obj.type == "MESH"]
     if not meshes:
         raise SystemExit(f"{source} has no meshes")
     # Meshes take their rotation and scale into their shape; empties keep theirs, because a
-    # set's marks face the way their empties do.
-    with bpy.context.temp_override(selected_editable_objects=meshes):
+    # set's marks face the way their empties do, and so do skinned meshes, which follow their
+    # skeleton (a character).
+    rigid = [obj for obj in meshes if not _skinned(obj)]
+    with bpy.context.temp_override(selected_editable_objects=rigid):
         bpy.ops.object.transform_apply(location=False, rotation=True, scale=True)
     low, high = _extent(meshes)
     size = high - low
@@ -51,7 +72,12 @@ def main(source: Path, target: Path, facts: Path, height: float, max_faces: int)
         for obj in meshes:
             modifier = obj.modifiers.new("simplify", "DECIMATE")
             modifier.ratio = max_faces / faces
-    bpy.ops.export_scene.gltf(filepath=str(target), export_format="GLB", export_apply=True)
+            # Simplified now, so the skeleton's own modifier is never baked into the shape.
+            with bpy.context.temp_override(object=obj, active_object=obj):
+                bpy.ops.object.modifier_move_to_index(modifier="simplify", index=0)
+                bpy.ops.object.modifier_apply(modifier="simplify")
+    # Animations go with it: a character's motions are played by name.
+    bpy.ops.export_scene.gltf(filepath=str(target), export_format="GLB", export_animations=True)
     bpy.context.view_layer.update()
     low, high = _extent(meshes)
     size = high - low
@@ -63,6 +89,7 @@ def main(source: Path, target: Path, facts: Path, height: float, max_faces: int)
                 "height": round(size.z, 3),
                 "faces": min(faces, max_faces),
                 "parts": _parts(),
+                "motions": sorted(action.name for action in bpy.data.actions),
             }
         )  # fmt: skip
     )
@@ -96,6 +123,10 @@ def _parts() -> list[dict[str, Any]]:
     return found
 
 
+def _skinned(obj: Any) -> bool:
+    return any(modifier.type == "ARMATURE" for modifier in obj.modifiers)
+
+
 def _units(tallest: float) -> float:
     """Many files are in millimetres or centimetres; nothing in a shot is taller than about
     fifty metres, so a taller model is read in the unit that makes it a plausible size."""
@@ -114,5 +145,7 @@ def _extent(meshes: list[object]) -> tuple[Vector, Vector]:
 
 if __name__ == "__main__":
     arguments = sys.argv[sys.argv.index("--") + 1 :]
-    source, target, facts, height, max_faces = arguments
-    sys.exit(main(Path(source), Path(target), Path(facts), float(height), int(max_faces)))
+    source, target, facts, height, max_faces, turn = arguments
+    sys.exit(
+        main(Path(source), Path(target), Path(facts), float(height), int(max_faces), float(turn))
+    )

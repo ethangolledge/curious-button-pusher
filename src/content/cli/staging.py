@@ -19,6 +19,7 @@ from content.providers.blender import LocalBlender
 from content.staging.backlog import most_wanted
 from content.staging.catalogue import Catalogue, check, describe, load_catalogue, with_models
 from content.staging.library import Model
+from content.staging.plan import themed
 from content.staging.templates import TEMPLATES, render
 
 MAX_FACES = 150_000
@@ -53,6 +54,9 @@ def _staging(arguments: list[str]) -> int:
     find.add_argument(
         "--alongside", action="store_true", help="Add it although a similar model exists"
     )
+    find.add_argument(
+        "--turn", type=float, default=0.0, help="Degrees to turn it so its front faces the camera"
+    )
     add = actions.add_parser(
         "add", parents=[common], help="Add a model file you downloaded yourself"
     )
@@ -65,10 +69,16 @@ def _staging(arguments: list[str]) -> int:
     add.add_argument("--page", default="", help="The page it came from")
     add.add_argument("--author", default="")
     add.add_argument(
+        "--can", default="", help="What it can do, comma separated: vehicle, humanoid, seat, light…"
+    )
+    add.add_argument(
         "--height", type=float, help="Its real height in metres, if the file's scale is off"
     )
     add.add_argument(
         "--alongside", action="store_true", help="Add it although a similar model exists"
+    )
+    add.add_argument(
+        "--turn", type=float, default=0.0, help="Degrees to turn it so its front faces the camera"
     )
     name = actions.add_parser("name", parents=[common], help="Another word for a library model")
     name.add_argument("model_id")
@@ -110,15 +120,12 @@ def _staging(arguments: list[str]) -> int:
             parser.error("models are added to a channel: pass --config themes/<name>/config.json")
         return _find(catalogue, args) if args.action == "find" else _add(catalogue, args)
     elif args.action == "check":
-        return _check(Job.read(args.job), catalogue)
+        job = Job.read(args.job)
+        return _check(themed(job, theme) if theme else job, catalogue)
     elif args.action == "preview":
         job = Job.read(args.job)
-        if theme is not None:
-            # A channel's shots are drawn in the channel's look.
-            staging = theme.spec.staging
-            look = BlockCall(staging.look, {k: str(v) for k, v in staging.look_settings.items()})
-            job = replace(job, look=look, palette=dict(theme.spec.palette))
-        return _preview(job, catalogue, args)
+        # A channel's shots are drawn its way: its look, and its camera moves.
+        return _preview(themed(job, theme) if theme else job, catalogue, args)
     elif args.action == "backlog":
         if theme_root is None:
             parser.error("the backlog is a channel's: pass --config themes/<name>/config.json")
@@ -248,7 +255,9 @@ def _ingest(
     assert library.folder is not None
     model_id = re.sub(r"[^a-z0-9_]+", "_", args.model_id.lower()).strip("_")
     target = library.folder / f"{model_id}.glb"
-    facts = LocalBlender().ingest(file, target, height=args.height, max_faces=MAX_FACES)
+    facts = LocalBlender().ingest(
+        file, target, height=args.height, max_faces=MAX_FACES, turn=args.turn
+    )
     model = Model(
         model_id=model_id,
         names=tuple(n.strip() for n in args.names.split(",") if n.strip()),
@@ -260,6 +269,10 @@ def _ingest(
         author=candidate.author,
         file=target.name,
         parts=tuple(facts.get("parts", ())),
+        motions=tuple(facts.get("motions", ())),
+        capabilities=tuple(
+            sorted(c.strip() for c in getattr(args, "can", "").split(",") if c.strip())
+        ),
     )
     try:
         library.add(model, alongside=args.alongside)

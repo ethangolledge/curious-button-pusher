@@ -194,6 +194,11 @@ class Stage(Protocol):
         motion."""
         ...
 
+    def play(self, thing: Thing, motion: str, *, start_frame: int = 1, speed: float = 1.0) -> None:
+        """A character plays one of its motions (by name, as its model lists them) from
+        `start_frame`, repeating to the end of the shot; `speed` 2 plays it twice as fast."""
+        ...
+
     def poses(self, thing: Thing) -> list[Pose]:
         """Every frame's pose of a thing animated so far, or its resting pose on every frame."""
         ...

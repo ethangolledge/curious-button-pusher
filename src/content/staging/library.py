@@ -79,6 +79,8 @@ class Model:
     # A set's named parts (marks, surfaces, paths, actors, interior), each with where it is,
     # which way it faces and its size: what a shot using the set can refer to.
     parts: tuple[dict[str, Any], ...] = ()
+    # A character's motions, by name (what the figure actor can play).
+    motions: tuple[str, ...] = ()
 
     @property
     def words(self) -> list[str]:
@@ -188,6 +190,7 @@ def load_library(folder: Path | None, channel_blocks: Sequence[Path] = ()) -> Li
             data["capabilities"] = tuple(data.get("capabilities", ()))
             data["used_in"] = tuple(data.get("used_in", ()))
             data["parts"] = tuple(data.get("parts", ()))
+            data["motions"] = tuple(data.get("motions", ()))
             model = Model(**data)
             if model.model_id in library.models:
                 raise ValueError(f"{stored}: '{model.model_id}' is already a prop made in code")

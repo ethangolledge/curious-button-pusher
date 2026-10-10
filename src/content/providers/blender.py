@@ -56,13 +56,27 @@ class LocalBlender:
         return _report(out / "report.json")
 
     def ingest(
-        self, source: Path, target: Path, *, height: float | None, max_faces: int
+        self,
+        source: Path,
+        target: Path,
+        *,
+        height: float | None,
+        max_faces: int,
+        turn: float = 0.0,
     ) -> dict[str, Any]:
         """Bring a downloaded model into the library's form (`blender/ingest.py`); returns
         its size, face count and named parts (a set's marks and paths)."""
         target.parent.mkdir(parents=True, exist_ok=True)
         facts = target.with_suffix(".ingest.json")
-        self._run(INGEST, str(source), str(target), str(facts), str(height or 0), str(max_faces))
+        self._run(
+            INGEST,
+            str(source),
+            str(target),
+            str(facts),
+            str(height or 0),
+            str(max_faces),
+            str(turn),
+        )
         result: dict[str, Any] = json.loads(facts.read_text(encoding="utf-8"))
         facts.unlink()
         return result

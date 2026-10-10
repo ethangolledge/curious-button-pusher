@@ -10,7 +10,8 @@ from typing import Any, Protocol
 from content.providers.http import RETRY_WAITS
 
 # Only these may enter a library: anything else needs attribution, or forbids commercial use.
-FREE = frozenset({"CC0", "Public Domain"})
+# "own": made for the channel (drawn, generated or built by hand), so the channel's to use.
+FREE = frozenset({"CC0", "Public Domain", "own"})
 USER_AGENT = "content/0.1 (learning project; 3D models for illustration)"
 
 

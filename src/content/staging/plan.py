@@ -2,6 +2,7 @@
 can be built: the bridge between the Visual Director's plan and the Blender toolkit."""
 
 from collections.abc import Mapping, Sequence
+from dataclasses import replace
 from typing import Any, TypeVar
 
 from content.blender.blocks.base import SettingError, read
@@ -107,6 +108,23 @@ def join_for(
         height=spec.height,
         fps=spec.fps,
         channel_blocks=(str(folder),) if folder.is_dir() else (),
+    )
+
+
+def themed(job: Job, theme: Theme) -> Job:
+    """A shot drawn the channel's way: its look and palette, and its camera named by one of
+    the theme's moves turned into the move block."""
+    staging = theme.spec.staging
+    camera = job.camera
+    preset = staging.moves.get(camera.block)
+    if preset is not None:
+        base = {name: _text(value) for name, value in preset.settings.items()}
+        camera = BlockCall(preset.block, {**base, **camera.settings})
+    return replace(
+        job,
+        camera=camera,
+        look=BlockCall(staging.look, {k: _text(v) for k, v in staging.look_settings.items()}),
+        palette=dict(theme.spec.palette),
     )
 
 

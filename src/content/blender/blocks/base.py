@@ -156,6 +156,9 @@ class Look(Block):
         """Bring an imported model's own materials into the look."""
         raise NotImplementedError
 
+    def dress(self, obj: Any) -> None:
+        """Anything the look adds to every solid it draws (an outline, say); none by default."""
+
     def world(self, scene: Any) -> None:
         raise NotImplementedError
 

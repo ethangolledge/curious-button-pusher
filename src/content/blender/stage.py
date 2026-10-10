@@ -134,6 +134,7 @@ class BlenderStage:
             modifier.width = bevel
             modifier.segments = 3
             modifier.limit_method = "ANGLE"
+        self._look.dress(obj)
         return self._link(obj, at, parent)
 
     def model(self, model_id: str, *, name: str, height: float | None = None) -> BlenderObject:
@@ -150,6 +151,8 @@ class BlenderStage:
                 if obj.parent is None:
                     obj.parent = group
                 self._look.restyle(obj)
+                if obj.type == "MESH":
+                    self._look.dress(obj)
         else:
             raise KeyError(f"no model or prop called '{model_id}'")
         if height:
@@ -316,6 +319,28 @@ class BlenderStage:
             turn = Vector(axis.tuple()) * math.radians(angle)
             thing.rotation_euler = tuple(rest + turn)
             thing.keyframe_insert("rotation_euler", frame=frame)
+
+    def play(
+        self, thing: BlenderObject, motion: str, *, start_frame: int = 1, speed: float = 1.0
+    ) -> None:
+        rigs = [obj for obj in [thing, *thing.children_recursive] if obj.type == "ARMATURE"]
+        if not rigs:
+            raise ValueError(f"{thing.name} has no skeleton to play '{motion}' with")
+        rig = rigs[0]
+        data = rig.animation_data or rig.animation_data_create()
+        # Its own copy of the motion: importing a model twice numbers the second "idle.001".
+        held = [data.action, *(strip.action for track in data.nla_tracks for strip in track.strips)]
+        found = next((a for a in held if a and a.name.split(".")[0] == motion), None)
+        found = found or bpy.data.actions.get(motion)
+        if found is None:
+            raise KeyError(f"{thing.name} has no motion '{motion}'")
+        data.action = None
+        for track in list(data.nla_tracks):
+            data.nla_tracks.remove(track)
+        strip = data.nla_tracks.new().strips.new(motion, start_frame, found)
+        strip.scale = 1 / speed
+        length = (strip.frame_end - strip.frame_start) or 1
+        strip.repeat = max(1.0, (self._frames - start_frame + 1) / length)
 
     def poses(self, thing: BlenderObject) -> list[Pose]:
         if thing.name in self._poses:

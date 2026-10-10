@@ -23,17 +23,9 @@ class Studio(Layout):
     example = Settings()
 
     def build(self, stage: Stage, p: Settings) -> None:
-        stage.shape("plane", Vec(30, 30, 0), Vec(), role=p.backdrop, name="floor")
-        # The curve where the floor meets the wall, so there is no line behind the object.
-        stage.shape(
-            "cylinder",
-            Vec(4, 4, 30),
-            Vec(-15, 6, 2),
-            role=p.backdrop,
-            name="cove",
-            turn=Vec(0, 90, 0),
-        )
-        stage.shape("box", Vec(30, 0.1, 15), Vec(0, 8, 0), role=p.backdrop, name="backdrop")
+        stage.shape("plane", Vec(60, 60, 0), Vec(), role=p.backdrop, name="floor")
+        # Far enough back that its line with the floor sits in the dark behind the object.
+        stage.shape("box", Vec(60, 0.1, 25), Vec(0, 14, 0), role=p.backdrop, name="backdrop")
         stage.mark(Mark("centre", Vec(), FRONT))
         if p.plinth:
             plinth = stage.shape(

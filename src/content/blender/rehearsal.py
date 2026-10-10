@@ -233,6 +233,9 @@ class RehearsalStage:
     def spin(self, thing: Thing, axis: Vec, degrees: Sequence[tuple[int, float]]) -> None:
         self._record("spin", name=thing.name, axis=axis, last=degrees[-1])
 
+    def play(self, thing: Thing, motion: str, *, start_frame: int = 1, speed: float = 1.0) -> None:
+        self._record("play", name=thing.name, motion=motion, start=start_frame, speed=speed)
+
     def poses(self, thing: Thing) -> list[Pose]:
         piece = self._piece(thing)
         if piece.name in self._poses:
