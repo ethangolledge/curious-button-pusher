@@ -58,7 +58,8 @@ Only when no block, with any settings, can do it. A block is general (`drive`, n
    for places, `shapes` for props, `lighting.source`/`flicker` for lights. If two blocks would
    share code, it goes in a helper, not in both. Never import Blender's API (the tests refuse).
 5. Its `example` refers only to what the test stage has: the `centre` mark (a table-top),
-   the `across` and `road` paths, the actors `thing` and `car`, and the set `sample_set`.
+   the `across` and `road` paths, the actors `thing` and `car`, the set `sample_set` and the picture `sample_picture` (an actor
+   names the model its example places in `example_model`).
    A setting that names a model is a `ModelName`, so the model is checked and sent along.
 6. `pytest -k <name>` writes its snapshot; `content staging preview` a shot using it and look.
 7. If it truly needs a new verb, add it to `Stage` (`api.py`), both stages (`stage.py`,

@@ -74,6 +74,9 @@ class Actor(Block):
     """Puts a model into the shot as a named actor."""
 
     kind = "actors"
+    # The model its example places (the test stage offers props, `sample_set` and
+    # `sample_picture`).
+    example_model: ClassVar[str] = "desk"
 
     def build(self, stage: Stage, p: Any, actor_id: str, model: str) -> None:
         raise NotImplementedError

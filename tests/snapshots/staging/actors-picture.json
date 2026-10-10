@@ -1,0 +1,4 @@
+[
+["picture",{"model":"sample_picture","name":"actor","width":0.6,"lying":false}],
+["place",{"name":"actor","at":{"x":0.0,"y":0.0,"z":0.75},"facing":{"x":0.0,"y":-1.0,"z":0.0}}]
+]

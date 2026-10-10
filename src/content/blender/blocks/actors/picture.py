@@ -26,6 +26,7 @@ class Picture(Actor):
     name = "picture"
     settings = Settings
     example = Settings(at=Ref("centre"))
+    example_model = "sample_picture"
 
     def build(self, stage: Stage, p: Settings, actor_id: str, model: str) -> None:
         card = stage.picture(model, name=actor_id, width=p.width, lying=p.flat)

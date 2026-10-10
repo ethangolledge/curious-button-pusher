@@ -76,7 +76,7 @@ def _stage(registry: Any = REGISTRY) -> RehearsalStage:
     stage = RehearsalStage(
         frames=60,
         props=registry.props(),
-        model_sizes={"sample_set": (8.0, 6.0, 3.0)},
+        model_sizes={"sample_set": (8.0, 6.0, 3.0), "sample_picture": (1.0, 0.0, 1.5)},
         model_parts={"sample_set": SAMPLE_SET},
     )
     top = Box(Vec(-0.6, -0.4, 0), Vec(0.6, 0.4, 0.75))
@@ -97,7 +97,7 @@ def _build(block: type[Block], stage: RehearsalStage) -> None:
         assert canvas.shown is not None, f"{block.name} never shows anything"
         stage.calls.extend(("canvas", {"steps": step}) for step in canvas.steps)
     elif issubclass(block, Actor):
-        block().build(stage, example, "actor", "desk")
+        block().build(stage, example, "actor", block.example_model)
     elif issubclass(block, Prop):
         block().build(stage, f"{block.name}_built")
     else:
