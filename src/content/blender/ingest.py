@@ -1,14 +1,15 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Runs inside Blender: brings a downloaded model into the library's form.
 
-    blender -b --factory-startup --python-exit-code 1 \\
-        -P src/content/blender/ingest.py -- model.glb out.glb facts.json <height> <faces> <turn>
+    PYTHONPATH=src blender -b --factory-startup --python-use-system-env \\
+        --python-exit-code 1 -P src/content/blender/ingest.py -- \\
+        model.glb out.glb facts.json <height> <faces> <turn> <up>
 
 Every library model is the same shape of thing, so no block has to allow for its quirks: one
 object hierarchy, transforms applied, standing on the origin and centred over it, in metres
 (scaled to `height` if given, or from millimetres or centimetres when its size says so), at
-most `max_faces` faces, saved as a binary glTF. Writes its
-size and face count to `facts.json`."""
+most `max_faces` faces, saved as a binary glTF. Writes its size and face count to
+`facts.json`."""
 
 import json
 import math
@@ -20,43 +21,33 @@ from typing import Any
 import bpy  # type: ignore[import-not-found]
 from mathutils import Matrix, Vector  # type: ignore[import-not-found]
 
-IMPORTERS = {
-    ".glb": lambda path: bpy.ops.import_scene.gltf(filepath=path),
-    ".gltf": lambda path: bpy.ops.import_scene.gltf(filepath=path),
-    ".obj": lambda path: bpy.ops.wm.obj_import(filepath=path),
-    ".fbx": lambda path: bpy.ops.import_scene.fbx(filepath=path),
-    ".stl": lambda path: bpy.ops.wm.stl_import(filepath=path),
-}
+from content.blender.imports import import_model, skinned
 
 
 def main(
-    source: Path, target: Path, facts: Path, height: float, max_faces: int, turn: float = 0.0
+    source: Path,
+    target: Path,
+    facts: Path,
+    height: float,
+    max_faces: int,
+    turn: float = 0.0,
+    up: str = "Y",
 ) -> int:
     bpy.ops.wm.read_factory_settings(use_empty=True)
-    IMPORTERS[source.suffix.lower()](str(source))
+    import_model(str(source), up)
     # Turned so its front faces −Y, as every model's does.
     for obj in bpy.context.scene.objects:
         if obj.parent is None and turn:
             obj.rotation_mode = "XYZ"
             obj.rotation_euler.z += math.radians(turn)
             obj.location = Matrix.Rotation(math.radians(turn), 4, "Z") @ obj.location
-    # Shapes a skeleton draws its bones with are never seen in a render: they go.
-    shapes = {
-        bone.custom_shape
-        for rig in bpy.context.scene.objects
-        if rig.type == "ARMATURE"
-        for bone in rig.pose.bones
-        if bone.custom_shape is not None
-    }
-    for shape in shapes:
-        bpy.data.objects.remove(shape, do_unlink=True)
     meshes = [obj for obj in bpy.context.scene.objects if obj.type == "MESH"]
     if not meshes:
         raise SystemExit(f"{source} has no meshes")
     # Meshes take their rotation and scale into their shape; empties keep theirs, because a
     # set's marks face the way their empties do, and so do skinned meshes, which follow their
     # skeleton (a character).
-    rigid = [obj for obj in meshes if not _skinned(obj)]
+    rigid = [obj for obj in meshes if not skinned(obj)]
     with bpy.context.temp_override(selected_editable_objects=rigid):
         bpy.ops.object.transform_apply(location=False, rotation=True, scale=True)
     low, high = _extent(meshes)
@@ -123,10 +114,6 @@ def _parts() -> list[dict[str, Any]]:
     return found
 
 
-def _skinned(obj: Any) -> bool:
-    return any(modifier.type == "ARMATURE" for modifier in obj.modifiers)
-
-
 def _units(tallest: float) -> float:
     """Many files are in millimetres or centimetres; nothing in a shot is taller than about
     fifty metres, so a taller model is read in the unit that makes it a plausible size."""
@@ -135,9 +122,9 @@ def _units(tallest: float) -> float:
     return 0.001 if tallest / 1000 >= 0.02 else 0.01
 
 
-def _extent(meshes: list[object]) -> tuple[Vector, Vector]:
+def _extent(meshes: list[Any]) -> tuple[Vector, Vector]:
     bpy.context.view_layer.update()
-    corners = [obj.matrix_world @ Vector(c) for obj in meshes for c in obj.bound_box]  # type: ignore[attr-defined]
+    corners = [obj.matrix_world @ Vector(c) for obj in meshes for c in obj.bound_box]
     low = Vector([min(c[i] for c in corners) for i in range(3)])
     high = Vector([max(c[i] for c in corners) for i in range(3)])
     return low, high
@@ -145,7 +132,15 @@ def _extent(meshes: list[object]) -> tuple[Vector, Vector]:
 
 if __name__ == "__main__":
     arguments = sys.argv[sys.argv.index("--") + 1 :]
-    source, target, facts, height, max_faces, turn = arguments
+    source, target, facts, height, max_faces, turn, up = arguments
     sys.exit(
-        main(Path(source), Path(target), Path(facts), float(height), int(max_faces), float(turn))
+        main(
+            Path(source),
+            Path(target),
+            Path(facts),
+            float(height),
+            int(max_faces),
+            float(turn),
+            up,
+        )  # fmt: skip
     )

@@ -10,8 +10,8 @@ import bmesh  # type: ignore[import-not-found]
 import bpy  # type: ignore[import-not-found]
 
 from content.blender.canvas_api import Edge, Operation, Picture
+from content.blender.materials import linear
 from content.blender.maths import progress
-from content.blender.stage import linear
 
 OPERATIONS: dict[str, str] = {
     "add": "ADD", "subtract": "SUBTRACT", "multiply": "MULTIPLY", "divide": "DIVIDE",

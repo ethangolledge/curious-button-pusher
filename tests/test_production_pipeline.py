@@ -13,13 +13,13 @@ from pydantic import BaseModel
 from content.blender.job import Job, Join
 from content.choices import RunChoices, configure_run
 from content.config import ContentConfig, load_config
-from content.production import ffmpeg
 from content.production.checks import hard_cuts, integrated_loudness
 from content.production.media import FakeMediaProvider, GenerationRefused
 from content.production.music_map import MusicMap, MusicSection, save_map
 from content.production.producer import Producer
 from content.production.score import arrangements
 from content.production.studio import NarrationTask
+from content.providers import ffmpeg
 from content.providers.base import Usage
 from content.providers.blender import FakeBlender
 from content.providers.fake import FakeDecisionProvider, FakeModelProvider
@@ -28,6 +28,7 @@ from content.schemas.plan import EditorialBrief
 from content.schemas.review import ReviewRequest, ReviewResponse
 from content.schemas.visuals import VisualPackage
 from content.staging.backlog import most_wanted
+from content.staging.plan import staged as staged_scene
 from content.state import ContentOutput
 from content.theme import Theme
 from content.workflow.checkpoint import create_checkpointer
@@ -61,6 +62,7 @@ def video_config(project_root: Path, tmp_path: Path) -> ContentConfig:
 def test_a_staged_channel_renders_the_scenes_it_can_stage_and_draws_the_rest(
     video_config: ContentConfig, tmp_path: Path
 ) -> None:
+    """S2, S4 and S6 are staged; S6's shot fails its checks in Blender, so it is drawn."""
     assert video_config.production is not None
     # A copy of the channel: what it could not stage is noted in its folder.
     root = tmp_path / "channel"
@@ -71,7 +73,7 @@ def test_a_staged_channel_renders_the_scenes_it_can_stage_and_draws_the_rest(
         theme=theme,
         production=replace(video_config.production, pictures="staged"),
     )
-    media, blender = FakeMediaProvider(), FakeBlender()
+    media, blender = FakeMediaProvider(), FakeBlender(refuse=frozenset({"S6"}))
 
     result, reviews = _run(config, media, renderer=blender)
 
@@ -93,7 +95,11 @@ def test_a_staged_channel_renders_the_scenes_it_can_stage_and_draws_the_rest(
     info = ffmpeg.probe(Path(package.production.video_path))
     assert info.duration == pytest.approx(package.production.scenes[-1].end, abs=0.2)
     assert [review.stage for review in reviews] == ["storyboard", "final_cut"]
-    assert most_wanted(root) == [("layout: a reading room", 1)]
+    assert staged_scene(package.visual_plan.scenes[5]) is None
+    assert sorted(most_wanted(root)) == [
+        ("its 3d shot was not rendered (frame 1: desk and safe pass into each other)", 1),
+        ("layout: a reading room", 1),
+    ]
 
 
 @pytest.mark.video

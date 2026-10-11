@@ -17,8 +17,8 @@ narrator's own timing is never touched.
 from collections.abc import Sequence
 from pathlib import Path
 
-from content.production import ffmpeg
 from content.production.music_map import MusicMap
+from content.providers import ffmpeg
 from content.schemas.media import Arrangement, ScoreSpan
 from content.schemas.script import ScriptUnit
 

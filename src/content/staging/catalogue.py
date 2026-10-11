@@ -13,7 +13,7 @@ from content.blender.direct import build
 from content.blender.job import BlockCall, Job, ModelFile
 from content.blender.registry import KINDS, Registry, RegistryError, discover
 from content.blender.rehearsal import RehearsalStage
-from content.staging.library import Library, load_library
+from content.staging.library import MADE_IN_CODE, Library, load_library
 from content.theme import BlockPreset
 
 
@@ -105,14 +105,27 @@ def models_named(job: Job, registry: Registry) -> set[str]:
 
 
 def with_models(job: Job, catalogue: Catalogue) -> Job:
-    """The job with its library models' files and sizes, and the channel's own blocks."""
-    wanted = models_named(job, catalogue.registry)
+    """The job with its library models (their files, sizes and paint) and the channel's own
+    blocks. A version of a model goes as the model it is made from, repainted and resized."""
+    library = catalogue.library
     files = []
-    for model_id in sorted(wanted):
-        model = catalogue.library.get(model_id)
-        path = catalogue.library.path(model)
-        if path is not None:
-            files.append(ModelFile(model_id, str(path), model.size))
+    for model_id in sorted(models_named(job, catalogue.registry)):
+        model = library.get(model_id)
+        root, paint = library.root(model)
+        path = library.path(root)
+        made_in_code = root.source == MADE_IN_CODE
+        if path is None and not model.base:
+            continue  # a prop made in code: Blender builds it from its own file
+        files.append(
+            ModelFile(
+                model_id,
+                str(path or ""),
+                model.size,
+                prop=root.model_id if made_in_code else "",
+                paint=paint,
+                height=model.size[2] if model.base else 0.0,
+            )
+        )
     folders = tuple(str(folder) for folder in catalogue.channel_blocks)
     return replace(job, models=tuple(files), channel_blocks=folders)
 
@@ -151,7 +164,7 @@ def check(job: Job, catalogue: Catalogue) -> list[str]:
         aspect=job.width / job.height,
         seed=job.seed,
         props=catalogue.registry.props(),
-        model_sizes={m.model_id: m.size for m in library.models.values() if m.file},
+        model_sizes={m.model_id: m.size for m in library.models.values() if m.file or m.base},
         model_parts={m.model_id: m.parts for m in library.models.values() if m.parts},
     )
     try:

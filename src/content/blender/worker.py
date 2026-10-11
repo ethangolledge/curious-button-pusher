@@ -1,8 +1,8 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Runs inside Blender: reads a job, builds the shot, checks it, renders it.
 
-    blender -b --factory-startup --python-exit-code 1 \
-        -P src/content/blender/worker.py -- job.json out/
+    PYTHONPATH=src blender -b --factory-startup --python-use-system-env \
+        --python-exit-code 1 -P src/content/blender/worker.py -- job.json out/
 
 Writes `out/frames/NNNN.png`, `out/snapshot.json` (where everything is on a few frames, for
 tests), `out/report.json`, and with `save_scene` the built scene as `out/scene.blend`."""
@@ -13,22 +13,18 @@ import time
 from pathlib import Path
 from typing import Any
 
-SOURCE = Path(__file__).resolve().parents[2]
-if str(SOURCE) not in sys.path:
-    sys.path.insert(0, str(SOURCE))
+import bpy  # type: ignore[import-not-found]
+from mathutils import Vector  # type: ignore[import-not-found]
 
-import bpy  # type: ignore[import-not-found]  # noqa: E402
-from mathutils import Vector  # type: ignore[import-not-found]  # noqa: E402
-
-from content.blender.audit import audit  # noqa: E402
-from content.blender.blocks.base import Look, Transition, read  # noqa: E402
-from content.blender.blocks.looks.plain import ENGINE  # noqa: E402
-from content.blender.camera import SUBJECT  # noqa: E402
-from content.blender.canvas import BlenderCanvas  # noqa: E402
-from content.blender.direct import build  # noqa: E402
-from content.blender.job import Grade, Job, Join, Report  # noqa: E402
-from content.blender.registry import KINDS, LOOKS, discover  # noqa: E402
-from content.blender.stage import BlenderStage  # noqa: E402
+from content.blender.audit import audit
+from content.blender.blocks.base import Look, Transition, read
+from content.blender.blocks.looks.plain import ENGINE
+from content.blender.camera import SUBJECT
+from content.blender.canvas import BlenderCanvas
+from content.blender.direct import build
+from content.blender.job import Grade, Job, Join, Report
+from content.blender.registry import KINDS, LOOKS, discover
+from content.blender.stage import BlenderStage
 
 # How far full warmth (or cold) moves the white balance from daylight.
 WARMTH_KELVIN = 2500
@@ -57,7 +53,7 @@ def main(job_path: Path, out: Path, *, force: bool) -> int:
         seed=job.seed,
         look=look,
         props=registry.props(),
-        model_files={m.model_id: (m.path, m.size) for m in job.models},
+        model_files={m.model_id: m for m in job.models},
     )
     build(stage, job, registry)
     issues = audit(job.frame_count, _subject(stage))

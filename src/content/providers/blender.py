@@ -13,8 +13,9 @@ from typing import Any, Protocol
 
 from content.blender.job import Job, Join, Report
 
-WORKER = Path(__file__).parents[1] / "blender" / "worker.py"
-INGEST = Path(__file__).parents[1] / "blender" / "ingest.py"
+SOURCE = Path(__file__).parents[2]
+WORKER = SOURCE / "content" / "blender" / "worker.py"
+INGEST = SOURCE / "content" / "blender" / "ingest.py"
 VERSION = "5.2"
 
 
@@ -63,6 +64,7 @@ class LocalBlender:
         height: float | None,
         max_faces: int,
         turn: float = 0.0,
+        up: str = "Y",
     ) -> dict[str, Any]:
         """Bring a downloaded model into the library's form (`blender/ingest.py`); returns
         its size, face count and named parts (a set's marks and paths)."""
@@ -76,6 +78,7 @@ class LocalBlender:
             str(height or 0),
             str(max_faces),
             str(turn),
+            up,
         )
         result: dict[str, Any] = json.loads(facts.read_text(encoding="utf-8"))
         facts.unlink()
@@ -83,11 +86,16 @@ class LocalBlender:
 
     def _run(self, script: Path, *arguments: str) -> None:
         command = [
-            str(self.program), "-b", "--factory-startup", "--python-exit-code", "1",
-            "-P", str(script), "--", *arguments,
+            str(self.program), "-b", "--factory-startup", "--python-use-system-env",
+            "--python-exit-code", "1", "-P", str(script), "--", *arguments,
         ]  # fmt: skip
+        # Blender's own Python, finding this package (and nothing else of this computer's).
+        environment = {k: v for k, v in os.environ.items() if not k.startswith("PYTHON")}
+        environment["PYTHONPATH"] = str(SOURCE)
         try:
-            done = subprocess.run(command, capture_output=True, text=True, timeout=self.seconds)
+            done = subprocess.run(
+                command, capture_output=True, text=True, timeout=self.seconds, env=environment
+            )
         except subprocess.TimeoutExpired as exc:
             raise BlenderError(f"Blender took longer than {self.seconds:.0f} s") from exc
         if done.returncode not in (0, 2):  # 2: the shot was checked and not rendered
@@ -103,15 +111,29 @@ def _report(path: Path) -> Report:
 class FakeBlender:
     """Offline stand-in: every frame a flat colour at the given brightness and saturation
     (give it the theme's neutral tone, as the fake media provider has), each shot a little
-    different; the report is written as the worker writes it. Records each job."""
+    different; the report is written as the worker writes it. Records each job. Shots named
+    in `refuse` fail their checks, as a shot with two things passing into each other does."""
 
-    def __init__(self, *, brightness: float = 128.0, saturation: float = 0.0) -> None:
+    def __init__(
+        self,
+        *,
+        brightness: float = 128.0,
+        saturation: float = 0.0,
+        refuse: frozenset[str] = frozenset(),
+    ) -> None:
         self.jobs: list[Job | Join] = []
         self.brightness = brightness
         self.saturation = saturation
+        self.refuse = refuse
 
     def render(self, job: Job | Join, out: Path, *, force: bool = False) -> Report:
         self.jobs.append(job)
+        if isinstance(job, Job) and job.shot_id in self.refuse:
+            issue = "frame 1: desk and safe pass into each other"
+            report = Report(job.shot_id, [], [issue], 0.0, 0.0)
+            out.mkdir(parents=True, exist_ok=True)
+            (out / "report.json").write_text(report.dumps(), encoding="utf-8")
+            return report
         wanted = job.frames or tuple(range(1, job.frame_count + 1))
         folder = out / "frames"
         folder.mkdir(parents=True, exist_ok=True)

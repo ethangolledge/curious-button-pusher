@@ -4,7 +4,7 @@ A guide for changing the code: where things live, why they are shaped as they ar
 choice costs, and where to optimise. Rules for contributors are in `AGENTS.md`; the current
 design is in [architecture.md](architecture.md); models are in [models.md](models.md).
 
-Last reviewed: 2026-10-10. About 27,000 lines of Python in `src/content`, about 350 tests (`pytest`, 20 s) and 12 whole-video renders (`pytest -m video`).
+Last reviewed: 2026-10-11. About 28,000 lines of Python in `src/content`, about 380 tests (`pytest`, 20 s) and 12 whole-video renders (`pytest -m video`).
 
 **Code holds no style and no story.** Every look, voice, camera move, local effect, prompt
 template and taste threshold is theme data ([themes.md](themes.md)); every story lives in a run
@@ -68,6 +68,8 @@ imports nothing from the rest of `content`; only the files marked † use Blende
 |---|---|
 | `blender/job.py` | the job: everything one shot needs, as JSON; the whole contract between the two sides |
 | `blender/api.py` | `Stage`: every verb a block may use, and `Box`, `Pose`, `Mark` |
+| `blender/bookkeeping.py` | what every stage keeps alike: the shot's length and shape, seeded randomness, marks, paths and actors by name |
+| `blender/materials.py` | each surface role's everyday colour, and the role an imported surface is nearest to |
 | `blender/maths.py` | vectors, rotations, easing, curves (line, arc, spline, constant-speed), turn limits, drift |
 | `blender/canvas_api.py`, `patterns.py` | `Canvas`: the verbs a transition's per-pixel program uses; the patterns transitions share (polar coordinates, turning, mirrored wedges, the Droste spiral) |
 | `blender/canvas.py` † | `Canvas` built as a GPU shader on a plane filling an orthographic camera; moving pictures as image sequences |
@@ -75,9 +77,10 @@ imports nothing from the rest of `content`; only the files marked † use Blende
 | `blender/blocks/` | one block per file, a folder per kind (`base.py`: what a block is, reading settings) |
 | `blender/registry.py`, `direct.py` | finding blocks by folder; building a shot in its one order |
 | `blender/rehearsal.py` | a `Stage` and a `Canvas` without Blender: checks shots and tests blocks and transitions |
-| `blender/stage.py` †, `worker.py` †, `audit.py` †, `ingest.py` † | the foundation; the runner of shot and join jobs; the checks before rendering; preparing a downloaded model or character |
+| `blender/stage.py` †, `worker.py` †, `audit.py` †, `ingest.py` †, `imports.py` † | the foundation (drawing every surface in its role, versions repainted and resized); the runner of shot and join jobs; the checks before rendering (the camera, the view, things passing into each other); preparing a downloaded model or character; reading a model file the one way both use |
 | `staging/catalogue.py` | the blocks and models, described; the shot check |
-| `staging/library.py` | the model library: search by meaning, no duplicates |
+| `staging/library.py` | the model library: search by meaning, no duplicates, versions of a model, credits |
+| `staging/sourcing.py` | where models come from: every free source searched, the best prepared and drawn side by side, one taken with its rights |
 | `staging/templates.py` | the starting file for a new block of each kind |
 | `staging/plan.py` | a staged scene to a render job (the theme's look, moves and frame); the storyboard's shot check; drawing a scene instead |
 | `staging/backlog.py` | what scenes could not be staged for, kept in the channel's folder |
@@ -89,7 +92,8 @@ imports nothing from the rest of `content`; only the files marked † use Blende
 | `base.py` | `ModelProvider` (System 2), `DecisionProvider` (System 1), `Usage` | The only interfaces agents see |
 | `openrouter.py` | chat models through the OpenAI SDK, Jev through the Decisions API, `key_credit_remaining` | The only provider-specific text code |
 | `images.py` | `ImageSource`: Wikimedia Commons, and a fake source | Add a source here |
-| `assets.py` | `AssetSource`: 3D models from the Smithsonian (CC0 only), and a fake source | Add a model source here |
+| `assets.py` | `AssetSource`: free 3D models from Sketchfab, Poly Pizza, Gazebo Fuel and the Smithsonian; which licences are allowed (CC0, public domain, own; CC BY with credit) | Add a model source here, and to `SOURCES` |
+| `ffmpeg.py` | running ffmpeg and ffprobe | Used by production, the review and the 3D tools |
 | `blender.py` | running Blender on a job (`LocalBlender`: render, ingest), and `FakeBlender` | Blender is found from `BLENDER` or the path |
 | `http.py` | the shared wait-and-retry for rate-limited outside services | |
 | `fake.py` | deterministic providers that record every call | The rehearsal and tests use them |
@@ -146,7 +150,7 @@ Each folder: `agent.py` (the code), `prompt.md` (what its model is told, theme-n
 | `stages/assembly.py` | the final cut | |
 | `media.py` | `MediaProvider`: OpenRouter speech, images, video, vision, transcription, music; the fake one | Retries 429/5xx for about 2 minutes |
 | `assemble.py` | glide, breathing, morph layer, texture, joins, held ending, mix, finish | All ffmpeg; every look value from the theme |
-| `ffmpeg.py`, `timing.py`, `score.py`, `music_map.py`, `subtitles.py`, `checks.py`, `budget.py`, `focus.py` | ffmpeg calls; scene windows; fitting the narration to the music; beats and phrases; subtitles; exact media checks; prices and the cap; focal points | |
+| `timing.py`, `score.py`, `music_map.py`, `subtitles.py`, `checks.py`, `budget.py`, `focus.py` | scene windows; fitting the narration to the music; beats and phrases; subtitles; exact media checks; prices and the cap; focal points | |
 | `story_sheet.py` (+ `story_sheet.css`) | the HTML story sheet at the Pictures sign-off | |
 | `audition.py`, `voice_lock.py`, `narration_analysis.py` | the channel tools: auditions, locking a voice, measuring a narrator | |
 
@@ -201,7 +205,7 @@ Each folder: `agent.py` (the code), `prompt.md` (what its model is told, theme-n
 | `spend.py` | `spend`, `spend budget`; recording every run's and tool's calls (`record_spend`), reading OpenRouter and the bucket |
 | `cloud.py` | `cloud setup`: the Google Cloud steps after the sign-ins, checked and done in order, safe to run again (gcloud runs through a replaceable function, so it is tested without Google) |
 | `check.py` | `check`: is this machine ready (Python, ffmpeg, extras, the key and its balance, the channel, the bucket, Blender), with the fix for anything missing |
-| `staging.py` | `staging`: the catalogue, models (search, find, add, name), check, preview, new |
+| `staging.py` | `staging`: the catalogue, models (search, find, add, vary, name), check, preview, backlog, new |
 
 ## Tunable Constants
 

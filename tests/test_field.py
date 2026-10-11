@@ -9,8 +9,8 @@ from content.config import ContentConfig, load_config
 from content.errors import ConfigurationError
 from content.judging.outcomes import answer_outcome
 from content.judging.questions import QUESTIONS
-from content.production import ffmpeg
 from content.production.checks import colour_issues, measure, temperature_issues
+from content.providers import ffmpeg
 from content.schemas.judgement import Answer, Judgement
 from content.schemas.research import ResearchPack
 from content.schemas.script import ScriptPackage

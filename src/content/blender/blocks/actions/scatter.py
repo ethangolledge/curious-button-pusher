@@ -1,17 +1,21 @@
 """Sheets fall and settle on a surface, rocking like leaves as they go: papers off a desk, a
 shower of banknotes, letters dropped on a floor. Each lands flat, a little apart from the
-rest, at its own moment."""
+rest, at its own moment, on a clear spot: on the surface it falls onto, and never on (or
+through) what already stands there."""
 
 import math
+import random
 from dataclasses import dataclass
 from typing import Annotated
 
-from content.blender.api import Pose, Stage
+from content.blender.api import Box, Pose, Stage
 from content.blender.blocks.base import About, Action, ModelName, Range, Ref
 from content.blender.maths import UP, Vec, axis_angle, progress
 from content.blender.sets import resting_on
 
 SHEET = Vec(0.21, 0.297, 0.0006)  # A4
+# Random spots tried for each, to find one clear of everything else.
+TRIES = 40
 
 
 @dataclass(frozen=True)
@@ -32,7 +36,10 @@ class Scatter(Action):
 
     def build(self, stage: Stage, p: Settings) -> None:
         chance = stage.random(f"scatter:{p.onto.name}")
-        ground = resting_on(stage.find_mark(p.onto.name))
+        mark = stage.find_mark(p.onto.name)
+        ground = resting_on(mark)
+        reach = Vec(p.spread, p.spread, 0)
+        taken = stage.occupied(Box(ground - reach, ground + reach + Vec(0, 0, p.height)))
         group = stage.group(f"scatter_{p.onto.name}")
         window = p.end - p.start
         for index in range(p.count):
@@ -44,9 +51,9 @@ class Scatter(Action):
                 sheet = stage.shape("box", SHEET, Vec(), role="paper", name=name, parent=group)
             begins = p.start + chance.uniform(0, window * 0.45)
             lands = min(p.end, begins + window * chance.uniform(0.45, 0.55))
-            angle, reach = chance.uniform(0, math.tau), p.spread * math.sqrt(chance.random())
-            landing = ground + Vec(
-                math.cos(angle) * reach, math.sin(angle) * reach, 0.0008 * (index + 1)
+            size = stage.bounds(sheet).size
+            landing = _clear_spot(chance, ground, p.spread, mark.surface, taken, size) + Vec(
+                0, 0, 0.0008 * (index + 1)
             )
             origin = ground + Vec(
                 chance.uniform(-0.15, 0.15), chance.uniform(-0.15, 0.15), p.height
@@ -57,6 +64,37 @@ class Scatter(Action):
                     stage, origin, landing, begins, lands, chance.uniform(0, 360), chance.random()
                 ),
             )
+
+
+def _clear_spot(
+    chance: random.Random,
+    ground: Vec,
+    spread: float,
+    surface: Box | None,
+    taken: list[Box],
+    size: Vec,
+) -> Vec:
+    """A random spot within `spread` of the mark, on its surface (if it has one) and clear of
+    everything standing there; if none is clear, the first one tried on the surface."""
+    half = max(size.x, size.y) / 2
+    fallback = None
+    for _ in range(TRIES):
+        angle, reach = chance.uniform(0, math.tau), spread * math.sqrt(chance.random())
+        spot = ground + Vec(math.cos(angle) * reach, math.sin(angle) * reach, 0)
+        on = surface is None or (
+            surface.low.x + half <= spot.x <= surface.high.x - half
+            and surface.low.y + half <= spot.y <= surface.high.y - half
+        )
+        clear = all(
+            spot.x + half <= box.low.x or box.high.x <= spot.x - half
+            or spot.y + half <= box.low.y or box.high.y <= spot.y - half
+            for box in taken
+        )  # fmt: skip
+        if on and clear:
+            return spot
+        if on and fallback is None:
+            fallback = spot
+    return fallback or ground
 
 
 def _fall(

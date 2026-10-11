@@ -6,8 +6,8 @@ from typing import Annotated
 
 from content.blender.api import Stage
 from content.blender.blocks.base import About, Actor, Range, Ref
-from content.blender.maths import UP, Vec, axis_angle
-from content.blender.sets import resting_on
+from content.blender.maths import Vec
+from content.blender.sets import moved, resting_on
 
 
 @dataclass(frozen=True)
@@ -30,8 +30,6 @@ class Picture(Actor):
 
     def build(self, stage: Stage, p: Settings, actor_id: str, model: str) -> None:
         card = stage.picture(model, name=actor_id, width=p.width, lying=p.flat)
-        mark = stage.find_mark(p.at.name)
-        facing = axis_angle(UP, p.turn).rotate(mark.facing)
-        at = resting_on(mark) - facing.normalised() * p.behind + Vec(0, 0, p.raised)
-        stage.place(card, at, facing=facing)
+        mark = moved(stage.find_mark(p.at.name), turn=p.turn, along=p.behind)
+        stage.place(card, resting_on(mark) + Vec(0, 0, p.raised), facing=mark.facing)
         stage.cast(actor_id, card)

@@ -328,3 +328,21 @@ def test_staging_that_cannot_be_built_is_sent_back_then_drawn_instead() -> None:
     assert issues and issues[0].startswith("S1 staging:") and "sofa" in issues[0]
     assert staging_issues(drawn, theme, catalogue) == []
     assert drawn.scenes[0].staging is None and drawn.scenes[0].missing
+
+
+def test_scattered_things_land_on_the_surface_and_clear_of_what_stands_there() -> None:
+    stage = RehearsalStage(frames=60, props=REGISTRY.props())
+    desk = Box(Vec(-0.6, -0.4, 0), Vec(0.6, 0.4, 0.75))
+    stage.mark(Mark("centre", Vec(0, 0, 0), FRONT, desk))
+    lamp = stage.shape("box", Vec(0.3, 0.3, 0.5), Vec(0.2, 0.1, 0.75), role="metal", name="lamp")
+    block = REGISTRY.get("actions", "scatter")
+    assert issubclass(block, Action)
+
+    block().build(stage, read(block, {"onto": "centre", "count": "20", "spread": "0.6"}))
+
+    taken = stage.bounds(lamp)
+    landed = [d["last"].at for verb, d in stage.calls if verb == "animate"]
+    assert len(landed) == 20
+    for at in landed:
+        assert desk.low.x <= at.x <= desk.high.x and desk.low.y <= at.y <= desk.high.y
+        assert not (taken.low.x < at.x < taken.high.x and taken.low.y < at.y < taken.high.y)

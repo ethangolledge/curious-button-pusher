@@ -5,7 +5,6 @@ import numpy as np
 import pytest
 
 from content.config import ContentConfig
-from content.production import ffmpeg
 from content.production.music_map import MusicMap, MusicSection, analyse_track
 from content.production.score import (
     arranged_beats,
@@ -17,6 +16,7 @@ from content.production.score import (
     render,
     turn_unit,
 )
+from content.providers import ffmpeg
 from content.review.render import render_plan
 from content.schemas.plan import EditorialBrief
 from content.schemas.script import ScriptUnit

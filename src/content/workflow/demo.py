@@ -493,7 +493,7 @@ def _visual_response(topic: str) -> dict[str, Any]:
 
 
 def _staged_visual_response(topic: str) -> dict[str, Any]:
-    """The demo storyboard with two scenes staged in 3D, and one the toolkit cannot stage."""
+    """The demo storyboard with three scenes staged in 3D, and one the toolkit cannot stage."""
     response = _visual_response(topic)
     scenes = response["scenes"]
 
@@ -529,4 +529,18 @@ def _staged_visual_response(topic: str) -> dict[str, Any]:
         "camera": choice("orbit", subject="card", degrees="90"),
     }
     scenes[4]["missing"] = "layout: a reading room"
+    scenes[5]["staging"] = {
+        "layout": choice("office"),
+        "actors": [
+            {
+                "actor_id": "safe",
+                "block": "prop",
+                "model": "safe",
+                "settings": [{"name": "at", "value": "desk_front"}],
+            },
+        ],  # fmt: skip
+        "actions": [],
+        "lights": [choice("overhead")],
+        "camera": choice("orbit", subject="safe", degrees="30"),
+    }
     return response

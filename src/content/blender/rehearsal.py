@@ -3,13 +3,23 @@ Used to check a shot before it is rendered (does every name it refers to exist?)
 every block's example in milliseconds. Rotation is ignored in extents: a rehearsal checks
 names and rough places, not pixels."""
 
-import random
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Any
 
-from content.blender.api import Box, Channel, LightKind, Mark, Pose, Role, ShapeKind, Thing
+from content.blender.api import (
+    Box,
+    Channel,
+    LightKind,
+    Mark,
+    Pose,
+    Role,
+    ShapeKind,
+    Thing,
+    standing_in,
+)
 from content.blender.blocks.base import Prop
+from content.blender.bookkeeping import Bookkeeping
 from content.blender.maths import ORIGIN, Quat, Vec, axis_angle, heading_rotation
 
 
@@ -40,7 +50,7 @@ class Piece:
         return box
 
 
-class RehearsalStage:
+class RehearsalStage(Bookkeeping):
     def __init__(
         self,
         *,
@@ -52,39 +62,21 @@ class RehearsalStage:
         model_sizes: Mapping[str, tuple[float, float, float]] | None = None,
         model_parts: Mapping[str, Sequence[Mapping[str, Any]]] | None = None,
     ) -> None:
-        self._frames, self._fps, self._aspect, self._seed = frames, fps, aspect, seed
+        super().__init__(frames=frames, fps=fps, aspect=aspect, seed=seed)
         self._props = dict(props or {})
         self._model_sizes = dict(model_sizes or {})
         self._model_parts = dict(model_parts or {})
-        self._marks: dict[str, Mark] = {}
-        self._paths: dict[str, list[Vec]] = {}
-        self._actors: dict[str, Piece] = {}
         self._poses: dict[str, list[Pose]] = {}
-        self._names: set[str] = set()
+        self._pieces: dict[str, Piece] = {}
         self._camera = Piece("camera", Vec(), Vec())
         self.calls: list[tuple[str, dict[str, Any]]] = []
 
-    @property
-    def fps(self) -> int:
-        return self._fps
-
-    @property
-    def frames(self) -> int:
-        return self._frames
-
-    @property
-    def aspect(self) -> float:
-        return self._aspect
-
-    def random(self, purpose: str) -> random.Random:
-        return random.Random(f"{self._seed}:{purpose}")
-
     def _new(self, name: str, at: Vec, size: Vec, parent: Thing | None) -> Piece:
-        if name in self._names:
+        if name in self._pieces:
             raise ValueError(f"two things are called '{name}'")
-        self._names.add(name)
         owner = self._piece(parent) if parent is not None else None
         piece = Piece(name, at, size, owner)
+        self._pieces[name] = piece
         if owner is not None:
             owner.children.append(piece)
         return piece
@@ -167,6 +159,11 @@ class RehearsalStage:
     def bounds(self, thing: Thing) -> Box:
         return self._piece(thing).extent()
 
+    def occupied(self, space: Box) -> list[Box]:
+        self._record("occupied", space=space)
+        tops = [piece for piece in self._pieces.values() if piece.parent is None]
+        return standing_in(space, [piece.extent() for piece in tops])
+
     def parts(self, thing: Thing, prefix: str) -> list[Thing]:
         found: list[Thing] = []
         stack = list(self._piece(thing).children)
@@ -198,34 +195,14 @@ class RehearsalStage:
 
     def mark(self, mark: Mark) -> None:
         self._record("mark", name=mark.name, at=mark.at)
-        self._marks[mark.name] = mark
-
-    def find_mark(self, name: str) -> Mark:
-        if name not in self._marks:
-            raise KeyError(f"the layout has no mark '{name}' (marks: {', '.join(self._marks)})")
-        return self._marks[name]
-
-    def marks(self) -> list[Mark]:
-        return list(self._marks.values())
+        super().mark(mark)
 
     def path(self, name: str, points: Sequence[Vec]) -> None:
         self._record("path", name=name, points=list(points))
-        self._paths[name] = list(points)
-
-    def find_path(self, name: str) -> list[Vec]:
-        if name not in self._paths:
-            raise KeyError(f"the layout has no path '{name}' (paths: {', '.join(self._paths)})")
-        return self._paths[name]
+        super().path(name, points)
 
     def cast(self, actor_id: str, thing: Thing) -> None:
-        if actor_id in self._actors:
-            raise ValueError(f"two actors are called '{actor_id}'")
-        self._actors[actor_id] = self._piece(thing)
-
-    def actor(self, actor_id: str) -> Thing:
-        if actor_id not in self._actors:
-            raise KeyError(f"no actor '{actor_id}' (actors: {', '.join(self._actors)})")
-        return self._actors[actor_id]
+        super().cast(actor_id, self._piece(thing))
 
     def animate(self, thing: Thing, poses: Sequence[Pose]) -> None:
         piece = self._piece(thing)

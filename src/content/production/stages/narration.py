@@ -7,7 +7,7 @@ from pathlib import Path
 
 from langgraph.types import Send
 
-from content.production import assemble, checks, ffmpeg
+from content.production import assemble, checks
 from content.production.budget import (
     morph_timings,
     project,
@@ -29,6 +29,7 @@ from content.production.studio import (
 )
 from content.production.subtitles import chunk, to_ass
 from content.production.timing import lay_out, passage_starts, scene_timings
+from content.providers import ffmpeg
 from content.providers.base import Usage
 from content.providers.cache import file_digest
 from content.schemas.media import (

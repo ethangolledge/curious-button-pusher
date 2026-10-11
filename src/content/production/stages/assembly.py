@@ -1,16 +1,20 @@
 """The final cut: stills and morphs joined, the texture pass, the mix and the subtitles."""
 
+from collections.abc import Sequence
 from pathlib import Path
 
-from content.production import assemble, checks, ffmpeg
+from content.blender.job import Job
+from content.production import assemble, checks
 from content.production.studio import (
     Studio,
     decision,
     required,
 )
+from content.providers import ffmpeg
 from content.providers.cache import file_digest
 from content.schemas.media import (
     ProductionResult,
+    RenderedAsset,
     Timeline,
 )
 from content.state import ContentState
@@ -50,6 +54,7 @@ class Assembly(Studio):
             contact_sheet_path=state.get("contact_sheet") or "",
             duration=ffmpeg.probe(final).duration,
             scenes=timeline.scenes,
+            credits=self._credits(self.current(state, "keyframes")),
         )
         notes = [*state.get("revision_notes", []), *issues]
         return {
@@ -57,6 +62,15 @@ class Assembly(Studio):
             "production": result,
             "call_log": calls,
         }
+
+    def _credits(self, keyframes: Sequence[RenderedAsset]) -> list[str]:
+        """The credits the 3D shots' models ask for, each once."""
+        staging = self.staging()
+        if staging is None:
+            return []
+        library = staging[1].library
+        used = sorted({m.model_id for a in keyframes if a.shot for m in Job.loads(a.shot).models})
+        return sorted({line for model_id in used if (line := library.credit(model_id))})
 
     def _final_issues(self, final: Path, cut: Path, timeline: Timeline) -> list[str]:
         spec = self.theme.spec

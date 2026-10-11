@@ -1,6 +1,6 @@
 # 3D Shots (Staging)
 
-Last reviewed: 2026-10-10
+Last reviewed: 2026-10-11
 
 Besides keyframes, a scene's pictures can be a 3D shot built and rendered in Blender: a set,
 the things in it, what they do, the light, and a camera move, all chosen by name from a
@@ -18,7 +18,7 @@ as a keyframe scene, with its picture rendered instead of drawn.
 |---|---|---|
 | storyboard | anchor, focus, camera, motion, bridge | the same, plus `staging`: the shot from the catalogue (`agents/visual_director/staging_prompt.md`); or `missing`, saying what the toolkit lacks |
 | storyboard gate | structure | also the shot check (`staging.plan.staging_issues`); a shot that still fails after the Visual Director's revisions is drawn instead |
-| keyframe | drawn by the image model | the shot's first, middle and last frames rendered (`production/stages/keyframes.py`); then the same measures and judging: brightness and colour against the scene's feeling, the vision model's description, Jev. A shot measured too dark or too cool is rendered again with a corrected grade; one that cannot be rendered is drawn instead |
+| keyframe | drawn by the image model | the shot's first, middle and last frames rendered (`production/stages/keyframes.py`); then the same measures and judging: brightness and colour against the scene's feeling, the vision model's description, Jev. A shot measured too dark or too cool is rendered again with a corrected grade. One that cannot be built (it fails the audit) or that Jev finds does not show its scene is drawn instead, at once: rendering the same shot again would not change it. The reason goes in the scene's `missing` and the backlog |
 | the feeling | colour words in the prompt, the ripples' tint | a grade on the render (`job.Grade`: exposure, and warmth by white balance), and the same ripples' tint |
 | Pictures sign-off | the animatic moves the stills | the animatic plays a quick draft of the shot (half size, 12 frames a second) |
 | morphs | from keyframe to keyframe | AI morphs (`production.joins: "ai"`) run from the frame where the morph out begins to the next scene's frame where it holds; rendered joins (`"rendered"`) play over both shots' moving frames, so nothing stops at a join |
@@ -53,13 +53,14 @@ audit, then render       the camera inside something, blocked, or snapping: no r
 |---|---|
 | every block and model, with their settings | `content staging catalogue [--config themes/<name>/config.json]` |
 | the models, or those matching some words | `content staging models "desk lamp"` |
-| a model the library lacks, from free sources | `content staging find "typewriter" --config …`, then `--take N --as typewriter --names "type writer"` |
-| add a model you downloaded (CC0 only) | `content staging add chair.glb --as side_chair --about "…" --licence CC0 --source "Poly Haven" --config …` |
+| a model the library lacks, from every free source | `content staging find "typewriter" --config …`: the best six, prepared and drawn side by side in the channel's look; then `--take N --as typewriter --about "…" --names "type writer"` |
+| a version of a model: repainted, resized | `content staging vary red_ballot_box --from cardboard_box --paint card=brick --height 0.5 --about "…" --config …` |
+| add a model you downloaded | `content staging add chair.glb --as side_chair --about "…" --licence CC0 --source "Poly Haven" --config …` (CC0, public domain, own, or CC-BY with `--author` and `--page`) |
 | another word for a library model | `content staging name side_chair "dining chair" --config …` |
 | check a shot without rendering | `content staging check shot.json` |
 | stills of a shot, and a contact sheet | `content staging preview shot.json [--frames 1,60,120] [--scene] --config …` |
 | start a new block | `content staging new action pour_drink [--channel --config …]` |
-| what scenes could not be staged for, most wanted first | `content staging backlog --config …` |
+| what scenes could not be staged for, most wanted first | `content staging backlog --config …` (`--find`: search the free sources for every model wanted) |
 
 `preview` renders into `.cache/staging/` (gitignored) and prints the contact sheet's path;
 `--scene` also saves the built scene as a `.blend` to open and look around in Blender. With
@@ -196,14 +197,60 @@ The engine's props are listed beside them. Each model has one id and other words
 - **Every model is the same shape of thing** (`blender/ingest.py`): one hierarchy, standing on
   the origin facing −Y, in metres (millimetre and centimetre files are recognised), at most
   150,000 faces, saved as `.glb`. Blocks never allow for a file's quirks.
-- **Only free licences** (CC0, public domain), with the source, page and author kept.
+- **Only models anyone may use, commercially too:** CC0, public domain, the channel's own, or
+  CC BY (credit to the maker). Share-alike, non-commercial and no-derivatives models are never
+  offered. The source, page and maker are kept with every model.
+- **Credits follow the video.** A finished video that used a CC BY model lists who to credit
+  (`ProductionResult.credits`, shown on the final review page, for the video's description).
+  A version of a model credits the original's maker.
 - **Fetched when a shot needs it, never in bulk;** `used_in` records which videos used each.
 
-| Source | What it has | How |
+### When something is missing, in order
+
+1. **Search again with other words**, and look at what is there: a near thing may do as it is.
+2. **A version of what is there** (`content staging vary`): the same shape, repainted part by
+   part and resized, under its own name. No file is copied; it is a line in `library.json`.
+3. **The free sources** (`content staging find`): every source with a key searched at once,
+   the closest titles first; each candidate is downloaded, brought into the library's form and
+   drawn on the studio plinth in the channel's look, and the sheet of them is picked from by
+   eye. Nothing joins the library until one is taken.
+4. **Built in code** (`content staging new prop <name>`): any everyday thing, from the shared
+   shapes, free and exactly as wanted. A prop may be assembled from other props and models.
+5. In a run, a scene with nothing for it is drawn as a keyframe, as before, and the gap goes
+   in the backlog: the run never stops, and never pays for 3D.
+
+| Source | What it has | Key (in `.env`) |
 |---|---|---|
-| props made in code | generic things: furniture, paper, money, vehicles, street | in the engine; add one with `content staging new prop` |
-| Smithsonian Open Access | museum objects in CC0, often period pieces; coverage is narrow | `content staging find` (a free key from api.data.gov in `SMITHSONIAN_API_KEY`; without one, a few searches an hour) |
-| Poly Haven and other CC0 sites | high-quality props | download by hand, then `content staging add` (Poly Haven's API needs a commercial licence; its files are CC0) |
+| props made in code | generic things: furniture, paper, money, vehicles, street, figurines | none |
+| [Sketchfab](https://sketchfab.com) | over a million models, searched by licence (CC0 and CC BY only) | `SKETCHFAB_API_TOKEN`, from a free account: Settings → Password & API |
+| [Poly Pizza](https://poly.pizza) | about ten thousand low-poly models: Kenney's and Quaternius's (CC0), the old Google Poly (CC BY) | `POLY_PIZZA_API_KEY`, free from poly.pizza/settings/api |
+| [Gazebo Fuel](https://app.gazebosim.org) | an open library of everyday objects, with Google's thousand scanned household items (CC BY) | none |
+| Smithsonian Open Access | museum objects in CC0, often period pieces; narrow | `SMITHSONIAN_API_KEY` from api.data.gov (without one, a few searches an hour) |
+| anything else free | downloaded by hand | `content staging add` (Poly Haven's files are CC0; its API needs a commercial licence) |
+
+A source without its key is skipped, and `find` says which. Files whose makers took Z as up
+(Fuel's) are read upright.
+
+### How a model is drawn
+
+The look draws every surface by its role (wood, paper, metal, skin…). A prop made in code
+names its roles. An imported model's surfaces arrive with their own colours, so each takes
+the role it is most like (`blender/materials.py`): glass if light passes through it, metal if
+it is metallic, otherwise the role whose everyday colour is nearest as the eye sees it (a
+textured surface by its picture's average colour). So a white mug becomes paper, a red one
+brick, a dark wooden chest dark wood: every look draws it its own way, and it keeps its light
+and dark parts. A version's `paint` overrides any of it, by part name, material name or role
+(`paper=leather`: whatever was drawn as paper is drawn as leather).
+
+### Fitting models together
+
+A layout offers named marks (`desk_top`, `seat_3`, `kerb`), each with a facing and, often,
+a surface. An actor stands a model on a mark (on its surface), turned and moved a few metres
+by `turn`, `across` and `along`; models are already at their real size, so things from
+different sources sit together at the right scale, and the look draws them all alike.
+Nothing may pass into anything else: the audit checks every pair of separate things on the
+first, middle and last frames (below), and things scattered onto a surface land on a clear
+spot of it.
 
 ## Looks: the channel's style, kept separate
 
@@ -229,7 +276,7 @@ block's name.
 |---|---|---|
 | the shot check (`content staging check`) | before anything else, without Blender | unknown blocks or models, settings out of range, names that are not in the shot, an action given an actor that cannot do it (`drive` given a desk) |
 | inside the set | every camera position, whatever the move | the camera behind a wall or in a building: it stays in the layout's `interior`, and the lens widens (to 20 mm at most) where it cannot step back |
-| the audit, before rendering | sampled frames | the camera inside a solid thing, something blocking the view of the subject (glass does not count), the camera turning faster than 20° a frame. A failing audit stops the render |
+| the audit, before rendering | sampled frames | the camera inside a solid thing, something blocking the view of the subject (glass does not count), the camera turning faster than 20° a frame, and two separate things passing into each other by more than 1 cm (3 cm for a character's moving feet): a figure sunk in a table, a box through a wall. A failing audit stops the render; in a run, the scene is then drawn instead |
 | stills and contact sheet | `preview` | composition, light, scale |
 | block snapshots | every test run, offline | any change that alters what a block builds (below) |
 
@@ -246,8 +293,10 @@ Rules the tests enforce:
 - A setting that names a model is declared so (`ModelName`): the model is checked and its
   file sent with the shot.
 - Blocks use `Stage` verbs and the shared helpers (`maths`, `camera`, `motion`, `sets`,
-  `shapes`, `lighting`), never Blender's API; only `stage.py`, `worker.py`, `audit.py`,
-  `ingest.py` and looks import it, and nothing outside `content/blender/` imports those.
+  `shapes`, `lighting`), never Blender's API; only `stage.py`, `canvas.py`, `worker.py`,
+  `audit.py`, `ingest.py`, `imports.py` and looks import it, and nothing outside
+  `content/blender/` imports those. What the Blender stage and the rehearsal stage keep the
+  same way (marks, paths, actors, seeded randomness) is written once (`bookkeeping.py`).
 - Every block's example is built on a stand-in stage and its calls compared with a stored
   snapshot (`tests/snapshots/staging/`). A change that alters a block fails until the
   snapshot is renewed on purpose: `UPDATE_SNAPSHOTS=1 pytest -k <name>`.
@@ -267,8 +316,8 @@ it).
 ## Licence
 
 Code that uses Blender's API is a derivative of Blender, so those few files (marked
-`GPL-3.0-or-later` in their first line: `stage.py`, `worker.py`, `audit.py`, `ingest.py`,
-and looks) are GPL; everything else stays MIT, because it only writes job files and runs
+`GPL-3.0-or-later` in their first line: `stage.py`, `canvas.py`, `worker.py`, `audit.py`,
+`ingest.py`, `imports.py`, and looks) are GPL; everything else stays MIT, because it only writes job files and runs
 Blender as a program (`LICENSE`). A channel's own look is never distributed, so nothing is owed
 for it. Renders belong to whoever makes them.
 
@@ -291,8 +340,7 @@ Everything else (ffmpeg included) runs on macOS as on Linux; the effects are the
 |---|---|
 | characters during a run | making a character the storyboard asks for, signed off at the Pictures stage (today: by hand, then added to the library) |
 | more motions | a CC0 motion library retargeted onto any character; procedural gestures (reach, point, type) |
-| finding models in a run | today a missing model makes the scene a keyframe (and a backlog line); next, the run searches free sources and Jev judges the candidates, as reference photos are found |
+| finding models in a run | today a missing model makes the scene a keyframe (and a backlog line), and `content staging backlog --find` shortlists candidates between runs; next, the run could search and Jev judge the candidates, as reference photos are found |
 | `travel` joins | one camera move between two framings of a shared set |
 | cloud rendering | finals on a rented GPU, one machine per job that deletes itself; this laptop takes seconds a frame |
-| more sources | Sketchfab's CC0 models (needs the channel's own token) |
-| imported textures | some museum scans render untextured in the plain look; to look into |
+| furnishing a set | filling shelves, desks and corners with background detail by rule, so every set looks lived in |

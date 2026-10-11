@@ -140,10 +140,10 @@ class Transition(Block):
 
 
 class Look(Block):
-    """How everything is drawn: materials for each role, the world, the render settings, and
-    how imported models are restyled. Its settings are the theme's numbers for the feel. A
-    look is the one kind of block that uses Blender's own API, so looks are only loaded
-    inside Blender."""
+    """How everything is drawn: materials for each role, the world and the render settings
+    (an imported model is drawn in the roles its surfaces match, `materials.py`). Its
+    settings are the theme's numbers for the feel. A look is the one kind of block that uses
+    Blender's own API, so looks are only loaded inside Blender."""
 
     kind = "looks"
 
@@ -153,10 +153,6 @@ class Look(Block):
 
     def material(self, role: str) -> Any:
         """The material for a role (a Blender material, made once and reused)."""
-        raise NotImplementedError
-
-    def restyle(self, obj: Any) -> None:
-        """Bring an imported model's own materials into the look."""
         raise NotImplementedError
 
     def picture(self, path: str) -> Any:

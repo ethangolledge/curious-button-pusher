@@ -31,10 +31,11 @@ class Corridor(Layout):
             y = -half + (index + 1) * p.length / (p.doors + 1)
             for side in (-1, 1):
                 name = f"door_{side + 1}_{index}"
+                # Set against the wall, standing proud of it.
                 stage.shape(
                     "box",
                     Vec(0.06, 0.95, 2.1),
-                    Vec(side * WIDTH / 2, y, 0),
+                    Vec(side * (WIDTH / 2 - 0.03), y, 0),
                     role="dark_wood",
                     name=name,
                 )

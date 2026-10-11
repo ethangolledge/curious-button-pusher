@@ -10,36 +10,37 @@ from typing import Annotated, Any, ClassVar
 import bpy  # type: ignore[import-not-found]
 
 from content.blender.blocks.base import About, Look, Range
-from content.blender.stage import linear
+from content.blender.materials import REFERENCE, linear
 
-# Each role: its colour, how rough it is, how metallic, and how brightly it glows.
-ROLES: dict[str, tuple[str, float, float, float]] = {
-    "wall": ("#b9b2a6", 0.9, 0.0, 0.0),
-    "floor": ("#6b5a48", 0.7, 0.0, 0.0),
-    "ceiling": ("#d6d1c8", 0.95, 0.0, 0.0),
-    "ground": ("#5d6150", 0.95, 0.0, 0.0),
-    "road": ("#3b3c3e", 0.9, 0.0, 0.0),
-    "wood": ("#8a6440", 0.55, 0.0, 0.0),
-    "dark_wood": ("#4a3121", 0.5, 0.0, 0.0),
-    "metal": ("#9a9c9f", 0.35, 1.0, 0.0),
-    "glass": ("#c9d7dc", 0.05, 0.0, 0.0),
-    "paper": ("#e8e2d3", 0.85, 0.0, 0.0),
-    "card": ("#c7b796", 0.8, 0.0, 0.0),
-    "fabric": ("#5b5f6b", 0.95, 0.0, 0.0),
-    "leather": ("#5a3624", 0.45, 0.0, 0.0),
-    "plastic": ("#2f3134", 0.4, 0.0, 0.0),
-    "stone": ("#8d8a83", 0.85, 0.0, 0.0),
-    "brick": ("#7d4a3a", 0.9, 0.0, 0.0),
-    "concrete": ("#8f8d88", 0.9, 0.0, 0.0),
-    "money": ("#a9b49a", 0.8, 0.0, 0.0),
-    "foliage": ("#3f5a35", 0.8, 0.0, 0.0),
-    "rubber": ("#1c1c1d", 0.8, 0.0, 0.0),
-    "screen": ("#9fc4d9", 0.2, 0.0, 1.5),
-    "lamp_shade": ("#d9c7a0", 0.8, 0.0, 0.0),
-    "bulb": ("#fff2d6", 0.3, 0.0, 12.0),
-    "paint": ("#7a7f86", 0.6, 0.0, 0.0),
-    "skin": ("#c79a7e", 0.6, 0.0, 0.0),
-    "hair": ("#2b2018", 0.7, 0.0, 0.0),
+# Each role: how rough it is, how metallic, and how brightly it glows; its colour is its
+# everyday one (`materials.REFERENCE`).
+ROLES: dict[str, tuple[float, float, float]] = {
+    "wall": (0.9, 0.0, 0.0),
+    "floor": (0.7, 0.0, 0.0),
+    "ceiling": (0.95, 0.0, 0.0),
+    "ground": (0.95, 0.0, 0.0),
+    "road": (0.9, 0.0, 0.0),
+    "wood": (0.55, 0.0, 0.0),
+    "dark_wood": (0.5, 0.0, 0.0),
+    "metal": (0.35, 1.0, 0.0),
+    "glass": (0.05, 0.0, 0.0),
+    "paper": (0.85, 0.0, 0.0),
+    "card": (0.8, 0.0, 0.0),
+    "fabric": (0.95, 0.0, 0.0),
+    "leather": (0.45, 0.0, 0.0),
+    "plastic": (0.4, 0.0, 0.0),
+    "stone": (0.85, 0.0, 0.0),
+    "brick": (0.9, 0.0, 0.0),
+    "concrete": (0.9, 0.0, 0.0),
+    "money": (0.8, 0.0, 0.0),
+    "foliage": (0.8, 0.0, 0.0),
+    "rubber": (0.8, 0.0, 0.0),
+    "screen": (0.2, 0.0, 1.5),
+    "lamp_shade": (0.8, 0.0, 0.0),
+    "bulb": (0.3, 0.0, 12.0),
+    "paint": (0.6, 0.0, 0.0),
+    "skin": (0.6, 0.0, 0.0),
+    "hair": (0.7, 0.0, 0.0),
 }
 ENGINE = "BLENDER_EEVEE"
 
@@ -66,7 +67,7 @@ class Plain(Look):
 
     def colour(self, role: str) -> tuple[float, float, float]:
         """A role's colour, in linear light."""
-        return linear(ROLES[role][0])
+        return linear(REFERENCE[role])
 
     def sky(self) -> tuple[tuple[float, float, float], float]:
         """The world's colour, and how strongly it lights the scene."""
@@ -78,7 +79,7 @@ class Plain(Look):
 
     def material(self, role: str) -> Any:
         if role not in self._made:
-            _, roughness, metallic, glow = ROLES[role]
+            roughness, metallic, glow = ROLES[role]
             material = bpy.data.materials.new(role)  # named after its role: checks read it
             shader = material.node_tree.nodes["Principled BSDF"]
             shader.inputs["Base Color"].default_value = (*self.colour(role), 1.0)
@@ -103,10 +104,6 @@ class Plain(Look):
             shader.inputs["Roughness"].default_value = 0.8
             self._made[path] = material
         return self._made[path]
-
-    def restyle(self, obj: Any) -> None:
-        if obj.type == "MESH" and not obj.data.materials:
-            obj.data.materials.append(self.material("paint"))
 
     def world(self, scene: Any) -> None:
         colour, strength = self.sky()

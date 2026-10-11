@@ -6,7 +6,6 @@ from typing import Any, cast
 import pytest
 
 from content.config import load_config
-from content.production import ffmpeg
 from content.production.assemble import (
     Framing,
     dissolve_join,
@@ -45,6 +44,7 @@ from content.production.producer import Producer
 from content.production.subtitles import align, chunk, to_ass
 from content.production.timing import lay_out, passage_starts, scene_timings
 from content.production.voice_lock import lock_voice
+from content.providers import ffmpeg
 from content.providers.base import Usage
 from content.providers.cache import AssetCache
 from content.providers.images import WikimediaCommons

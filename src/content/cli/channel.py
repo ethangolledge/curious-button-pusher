@@ -13,7 +13,6 @@ from content.config import (
     write_channel_config,
 )
 from content.errors import ConfigurationError
-from content.production import ffmpeg
 from content.production.assemble import mix_audio
 from content.production.audition import audition, design_voices, music_audition
 from content.production.checks import loudness_range
@@ -21,6 +20,7 @@ from content.production.music_map import analyse_track, save_map
 from content.production.narration_analysis import analyse, apply_to_theme
 from content.production.score import arrangements, choose, render
 from content.production.voice_lock import lock_voice
+from content.providers import ffmpeg
 from content.spend import now
 from content.theme import ThemeError, new_theme
 from content.workflow.providers import (

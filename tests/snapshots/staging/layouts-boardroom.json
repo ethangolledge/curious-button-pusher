@@ -51,7 +51,7 @@
 ["shape",{"kind":"box","name":"table.body.pedestal_0","size":{"x":0.5,"y":0.715,"z":0.7},"at":{"x":-1.44,"y":0,"z":0},"role":"dark_wood"}],
 ["shape",{"kind":"box","name":"table.body.pedestal_2","size":{"x":0.5,"y":0.715,"z":0.7},"at":{"x":1.44,"y":0,"z":0},"role":"dark_wood"}],
 ["place",{"name":"table.body","at":{"x":0.0,"y":0.0,"z":0.0},"facing":null}],
-["place",{"name":"table","at":{"x":0,"y":0.3,"z":0},"facing":{"x":1,"y":0,"z":0}}],
+["place",{"name":"table","at":{"x":0,"y":0.3,"z":0},"facing":null}],
 ["mark",{"name":"table_top","at":{"x":0.0,"y":0.3,"z":0.75}}],
 ["model",{"model":"chair","name":"chair_0","height":null}],
 ["group",{"name":"chair_0.body","at":{"x":0.0,"y":0.0,"z":0.0}}],

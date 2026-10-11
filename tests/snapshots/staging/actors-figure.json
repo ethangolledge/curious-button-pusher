@@ -18,5 +18,5 @@
 ["shape",{"kind":"box","name":"actor.body.side_2.handle_2","size":{"x":0.12,"y":0.02,"z":0.015},"at":{"x":0.52,"y":0.375,"z":0.604},"role":"metal"}],
 ["shape",{"kind":"box","name":"actor.body.panel","size":{"x":0.66,"y":0.02,"z":0.4},"at":{"x":0,"y":-0.315,"z":0.31},"role":"wood"}],
 ["place",{"name":"actor.body","at":{"x":0.0,"y":0.0,"z":0.0},"facing":null}],
-["place",{"name":"actor","at":{"x":0,"y":0,"z":0.75},"facing":{"x":0.0,"y":-1.0,"z":0.0}}]
+["place",{"name":"actor","at":{"x":0.0,"y":0.0,"z":0.75},"facing":{"x":0.0,"y":-1.0,"z":0.0}}]
 ]

@@ -306,6 +306,11 @@ def render_production(result: ProductionResult) -> list[str]:
             ]
         ),
         "",
+        *(
+            ["### Credits (for the video's description)", "", *_bullet_lines(result.credits), ""]
+            if result.credits
+            else []
+        ),
     ]
 
 

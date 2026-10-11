@@ -8,8 +8,8 @@ from dataclasses import dataclass
 from typing import Annotated, Literal
 
 from content.blender.blocks.base import About, Range
-from content.blender.blocks.looks.plain import ROLES, Plain
-from content.blender.stage import linear
+from content.blender.blocks.looks.plain import Plain
+from content.blender.materials import REFERENCE, linear
 
 GLOWING = ("bulb", "screen")
 Contrast = Literal[
@@ -34,7 +34,7 @@ class Starter(Plain):
 
     def colour(self, role: str) -> tuple[float, float, float]:
         if role in GLOWING:
-            return linear(self.palette.get(self.values.glow, ROLES[role][0]))
+            return linear(self.palette.get(self.values.glow, REFERENCE[role]))
         r, g, b = super().colour(role)
         grey = 0.2126 * r + 0.7152 * g + 0.0722 * b
         mixed = [grey + (c - grey) * self.values.saturation for c in (r, g, b)]

@@ -14,8 +14,8 @@ from content.learning.examples import Harvest, LearningStore, NarrationSample, h
 from content.learning.model import FastEmbedder
 from content.learning.provider import ModelRegistry
 from content.learning.train import TrainingReport, train
-from content.production import ffmpeg
 from content.production.assemble import spoken_clip
+from content.providers import ffmpeg
 
 
 @dataclass

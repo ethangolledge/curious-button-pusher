@@ -15,6 +15,7 @@ from typing import Literal
 
 from content.config import ContentConfig, load_config
 from content.errors import ConfigurationError
+from content.providers.assets import SOURCES
 from content.providers.blender import VERSION, blender_path
 from content.workflow.providers import MIN_RUN_USD
 
@@ -46,8 +47,22 @@ def checks(config_path: Path | None) -> list[Check]:
         _extra("music", "beat_this", "cutting stories to a locked music bed's beats"),
         _extra("vision", "transformers", "aiming the camera at each picture's focal point"),
         _blender(),
+        _model_sources(),
     ]
     return found
+
+
+def _model_sources() -> Check:
+    ready = [source.name for source in SOURCES if source.ready()]
+    waiting = [f"{source.name} ({source.key})" for source in SOURCES if not source.ready()]
+    if not waiting:
+        return Check("Free 3D models", "ready", ", ".join(ready))
+    return Check(
+        "Free 3D models",
+        "optional",
+        f"searching {', '.join(ready)}",
+        f"To search more, put a free key in .env: {', '.join(waiting)} (docs/staging.md).",
+    )
 
 
 def _blender() -> Check:

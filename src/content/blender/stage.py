@@ -7,7 +7,6 @@ for its role, every animation is keyed per frame and linear between, names are u
 simulated bodies are recorded as ordinary animation."""
 
 import math
-import random
 from collections.abc import Mapping, Sequence
 from typing import Any
 
@@ -15,23 +14,26 @@ import bmesh  # type: ignore[import-not-found]
 import bpy  # type: ignore[import-not-found]
 from mathutils import Matrix, Vector  # type: ignore[import-not-found]
 
-from content.blender.api import Box, Channel, LightKind, Mark, Pose, Role, ShapeKind
+from content.blender.api import (
+    Box,
+    Channel,
+    LightKind,
+    Pose,
+    Role,
+    ShapeKind,
+    standing_in,
+)
 from content.blender.blocks.base import Look, Prop
+from content.blender.bookkeeping import Bookkeeping
+from content.blender.imports import import_model, surface
+from content.blender.job import ModelFile
+from content.blender.materials import ROLES, linear, nearest_role
 from content.blender.maths import ORIGIN, Quat, Vec, heading_rotation, look_rotation
 
 BlenderObject = Any
 
 
-def linear(colour: str) -> tuple[float, float, float]:
-    """A hex colour (sRGB, as a person picks it) in Blender's linear light."""
-    value = colour.lstrip("#")
-    channels = [int(value[i : i + 2], 16) / 255 for i in (0, 2, 4)]
-    return tuple(  # type: ignore[return-value]
-        c / 12.92 if c <= 0.04045 else ((c + 0.055) / 1.055) ** 2.4 for c in channels
-    )
-
-
-class BlenderStage:
+class BlenderStage(Bookkeeping):
     def __init__(
         self,
         *,
@@ -41,33 +43,15 @@ class BlenderStage:
         seed: int,
         look: Look,
         props: Mapping[str, type[Prop]],
-        model_files: Mapping[str, tuple[str, tuple[float, float, float]]],
+        model_files: Mapping[str, ModelFile],
     ) -> None:
-        self._frames, self._fps, self._aspect, self._seed = frames, fps, aspect, seed
+        super().__init__(frames=frames, fps=fps, aspect=aspect, seed=seed)
         self._look = look
         self._props = props
         self._model_files = model_files
         self._scene = bpy.context.scene
-        self._marks: dict[str, Mark] = {}
-        self._paths: dict[str, list[Vec]] = {}
-        self._actors: dict[str, BlenderObject] = {}
         self._poses: dict[str, list[Pose]] = {}
         self._camera = self._make_camera()
-
-    @property
-    def fps(self) -> int:
-        return self._fps
-
-    @property
-    def frames(self) -> int:
-        return self._frames
-
-    @property
-    def aspect(self) -> float:
-        return self._aspect
-
-    def random(self, purpose: str) -> random.Random:
-        return random.Random(f"{self._seed}:{purpose}")
 
     # --- Building ------------------------------------------------------------------------
 
@@ -139,34 +123,64 @@ class BlenderStage:
 
     def model(self, model_id: str, *, name: str, height: float | None = None) -> BlenderObject:
         group = self.group(name)
-        if model_id in self._props:
-            body: BlenderObject = self._props[model_id]().build(self, f"{name}.body")
+        spec = self._model_files.get(model_id)
+        made = spec.prop if spec and spec.prop else model_id
+        if made in self._props:
+            body: BlenderObject = self._props[made]().build(self, f"{name}.body")
             body.parent = group
-        elif model_id in self._model_files:
-            path, _ = self._model_files[model_id]
-            before = set(bpy.data.objects)
-            bpy.ops.import_scene.gltf(filepath=path)
-            imported = [obj for obj in bpy.data.objects if obj not in before]
-            for obj in imported:
+        elif spec is not None and spec.path:
+            for obj in import_model(spec.path):
                 if obj.parent is None:
                     obj.parent = group
-                self._look.restyle(obj)
-                if obj.type == "MESH":
-                    self._look.dress(obj)
         else:
             raise KeyError(f"no model or prop called '{model_id}'")
+        self._paint(group, spec.paint if spec else {}, imported=made not in self._props)
+        height = height or (spec.height if spec else None)
         if height:
             box = self.bounds(group)
             if box.size.z > 0:
                 group.scale = (height / box.size.z,) * 3
         return group
 
+    def _paint(self, group: BlenderObject, paint: Mapping[str, str], *, imported: bool) -> None:
+        """Every surface in the look's material for its role: its own role (a prop's), or the
+        one its colour is nearest (an imported model's), unless `paint` names another for its
+        part, its material or that role. An imported model is then dressed as every solid is."""
+        for obj in group.children_recursive:
+            if obj.type != "MESH":
+                continue
+            part = obj.name.split(".")[-1].lower()
+            if imported and not obj.material_slots:
+                obj.data.materials.append(None)
+            for slot in obj.material_slots:
+                current = slot.material.name.split(".")[0] if slot.material else ""
+                if imported:
+                    colour, metallic, transmission = surface(slot.material)
+                    role = nearest_role(colour, metallic=metallic, transmission=transmission)
+                elif current in ROLES:
+                    role = current
+                else:
+                    continue  # what the look added (an outline)
+                chosen = next(
+                    (
+                        new
+                        for key, new in paint.items()
+                        if part.startswith(key.lower()) or key in (current, role)
+                    ),
+                    role,
+                )
+                if imported or chosen != role:
+                    slot.material = self._look.material(chosen)
+            if imported:
+                self._look.dress(obj)
+
     def picture(
         self, model_id: str, *, name: str, width: float, lying: bool = False
     ) -> BlenderObject:
         if model_id not in self._model_files:
             raise KeyError(f"no picture called '{model_id}'")
-        path, (w, _, h) = self._model_files[model_id]
+        spec = self._model_files[model_id]
+        path, (w, _, h) = spec.path, spec.size
         tall = width * h / w
         size = Vec(width, tall, 0.002) if lying else Vec(width, 0.002, tall)
         card = self.shape("box", size, Vec(), role="paper", name=name)
@@ -219,6 +233,10 @@ class BlenderStage:
         high = Vec(*(max(c[i] for c in corners) for i in range(3)))
         return Box(low, high)
 
+    def occupied(self, space: Box) -> list[Box]:
+        tops = [obj for obj in self._scene.objects if obj.parent is None and obj.type != "CAMERA"]
+        return standing_in(space, [self.bounds(obj) for obj in tops])
+
     def parts(self, thing: BlenderObject, prefix: str) -> list[BlenderObject]:
         return [
             obj
@@ -270,37 +288,6 @@ class BlenderStage:
 
     def camera(self) -> BlenderObject:
         return self._camera
-
-    # --- The layout's vocabulary -----------------------------------------------------------
-
-    def mark(self, mark: Mark) -> None:
-        self._marks[mark.name] = mark
-
-    def find_mark(self, name: str) -> Mark:
-        if name not in self._marks:
-            raise KeyError(f"the layout has no mark '{name}' (marks: {', '.join(self._marks)})")
-        return self._marks[name]
-
-    def marks(self) -> list[Mark]:
-        return list(self._marks.values())
-
-    def path(self, name: str, points: Sequence[Vec]) -> None:
-        self._paths[name] = list(points)
-
-    def find_path(self, name: str) -> list[Vec]:
-        if name not in self._paths:
-            raise KeyError(f"the layout has no path '{name}' (paths: {', '.join(self._paths)})")
-        return self._paths[name]
-
-    def cast(self, actor_id: str, thing: BlenderObject) -> None:
-        if actor_id in self._actors:
-            raise ValueError(f"two actors are called '{actor_id}'")
-        self._actors[actor_id] = thing
-
-    def actor(self, actor_id: str) -> BlenderObject:
-        if actor_id not in self._actors:
-            raise KeyError(f"no actor '{actor_id}' (actors: {', '.join(self._actors)})")
-        return self._actors[actor_id]
 
     # --- Time ----------------------------------------------------------------------------
 

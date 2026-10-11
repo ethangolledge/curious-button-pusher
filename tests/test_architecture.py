@@ -94,7 +94,8 @@ def test_dependencies_run_one_way_from_the_data_up_to_the_command_line() -> None
 # Python, so the rest of the project (and the tests) can build shots without Blender.
 USES_BLENDER = (
     "content.blender.stage", "content.blender.canvas", "content.blender.worker",
-    "content.blender.audit", "content.blender.ingest", "content.blender.blocks.looks.",
+    "content.blender.audit", "content.blender.ingest", "content.blender.imports",
+    "content.blender.blocks.looks.",
 )  # fmt: skip
 
 

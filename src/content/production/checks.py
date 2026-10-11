@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from difflib import SequenceMatcher
 from pathlib import Path
 
-from content.production import ffmpeg
+from content.providers import ffmpeg
 from content.schemas.media import Word
 
 SCENE_SCORE = re.compile(r"lavfi\.scd\.score:\s*([\d.]+),\s*lavfi\.scd\.time:\s*([\d.]+)")

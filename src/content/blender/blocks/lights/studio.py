@@ -17,7 +17,9 @@ class Settings:
     key_side: Annotated[float, Range(-120, 120, "degrees round from the front for the key")] = -45.0
     contrast: Annotated[float, Range(1, 16, "key over fill: 2 gentle, 8 dramatic")] = 3.0
     colour: Annotated[str, About("hex")] = "#fff3e2"
-    power: Annotated[float, Range(10, 5000, "watts of the key")] = 250.0
+    power: Annotated[
+        float, Range(10, 5000, "watts of the key for a small thing; larger ones get more")
+    ] = 250.0
 
 
 class Studio(Light):
@@ -29,10 +31,12 @@ class Studio(Light):
         box = where(stage, p.subject.name)
         reach = max(box.radius * 4, 1.5)
         facing = front(stage, p.subject.name)
+        # Lights further away to frame a larger thing are brighter, so it is lit as brightly.
+        key = p.power * (reach / 1.5) ** 2
         for role, angle, power, height, size in (
-            ("key", p.key_side, p.power, 0.6, 1.0),
-            ("fill", -p.key_side * 0.8, p.power / p.contrast, 0.2, 2.0),
-            ("rim", 170.0, p.power * 0.8, 0.9, 0.6),
+            ("key", p.key_side, key, 0.6, 1.0),
+            ("fill", -p.key_side * 0.8, key / p.contrast, 0.2, 2.0),
+            ("rim", 170.0, key * 0.8, 0.9, 0.6),
         ):
             turn = math.radians(facing + angle)
             at = box.centre + Vec(math.sin(turn) * reach, -math.cos(turn) * reach, reach * height)

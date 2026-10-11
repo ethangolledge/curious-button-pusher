@@ -9,7 +9,7 @@ library never holds the same thing twice under different names."""
 
 import json
 import re
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
@@ -17,10 +17,13 @@ from typing import Any
 import numpy as np
 
 from content.blender.blocks.base import Prop, summary
+from content.blender.materials import ROLES
 from content.blender.registry import discover
 from content.blender.rehearsal import RehearsalStage
+from content.providers.assets import CREDITED
 
 LIBRARY = "library.json"
+MADE_IN_CODE = "made in code"
 # Words that say nothing about what a thing is.
 FILLER = frozenset(
     [
@@ -69,7 +72,7 @@ class Model:
     size: tuple[float, float, float]
     capabilities: tuple[str, ...] = ()
     # Where it came from: "made in code" for the engine's props.
-    source: str = "made in code"
+    source: str = MADE_IN_CODE
     licence: str = ""
     page: str = ""
     author: str = ""
@@ -81,6 +84,10 @@ class Model:
     parts: tuple[dict[str, Any], ...] = ()
     # A character's motions, by name (what the figure actor can play).
     motions: tuple[str, ...] = ()
+    # A version of another model (`base`): its parts, materials or roles drawn as other roles
+    # (`paint`), and its own size. It has no file of its own.
+    base: str = ""
+    paint: dict[str, str] = field(default_factory=dict)
 
     @property
     def words(self) -> list[str]:
@@ -148,15 +155,73 @@ class Library:
     def name(self, model_id: str, words: str) -> None:
         """Another word for a model, so searches find it."""
         model = self.get(model_id)
-        if model.source == "made in code":
+        if model.source == MADE_IN_CODE:
             raise ValueError(f"'{model_id}' is made in code: add the words to its file's `names`")
         if words not in model.names:
             self.models[model_id] = _replace(model, names=(*model.names, words))
             self.save()
 
+    def vary(
+        self,
+        model_id: str,
+        base_id: str,
+        *,
+        describe: str,
+        names: Sequence[str] = (),
+        paint: Mapping[str, str] | None = None,
+        height: float | None = None,
+    ) -> Model:
+        """A version of a model: the same shape, repainted and resized, under its own name
+        (a red ballot box from a cardboard box, a gold statue from a stone one). It keeps the
+        original's rights: whoever must be credited for it is credited for this."""
+        base = self.get(base_id)
+        unknown = sorted(set((paint or {}).values()) - set(ROLES))
+        if unknown:
+            raise ValueError(f"no role {', '.join(unknown)} (roles: {', '.join(ROLES)})")
+        scale = height / base.size[2] if height and base.size[2] else 1.0
+        variant = Model(
+            model_id=model_id,
+            names=tuple(names),
+            describe=describe,
+            size=(
+                round(base.size[0] * scale, 3),
+                round(base.size[1] * scale, 3),
+                round(base.size[2] * scale, 3),
+            ),
+            capabilities=base.capabilities,
+            source=f"a version of {base_id}",
+            licence=base.licence,
+            page=base.page,
+            author=base.author,
+            parts=base.parts,
+            motions=base.motions,
+            base=base_id,
+            paint=dict(paint or {}),
+        )
+        self.add(variant, alongside=True)
+        return variant
+
+    def root(self, model: Model) -> tuple[Model, dict[str, str]]:
+        """The model a version is ultimately made from, and the paint its versions add up to
+        (a later version's choice wins)."""
+        paint = dict(model.paint)
+        while model.base:
+            model = self.get(model.base)
+            paint = {**model.paint, **paint}
+        return model, paint
+
+    def credit(self, model_id: str) -> str:
+        """The line a video using this model must carry where it is published, naming the
+        original it is (a version of), or "" when its licence asks for none."""
+        model, _ = self.root(self.get(model_id))
+        if model.licence not in CREDITED:
+            return ""
+        maker = f" by {model.author}" if model.author else ""
+        return f"{model.describe}{maker} ({model.source}, {model.licence}): {model.page}"
+
     def used(self, model_id: str, video: str) -> None:
         model = self.get(model_id)
-        if model.source != "made in code" and video not in model.used_in:
+        if model.source != MADE_IN_CODE and video not in model.used_in:
             self.models[model_id] = _replace(model, used_in=(*model.used_in, video))
             self.save()
 
@@ -165,7 +230,7 @@ class Library:
 
     def save(self) -> None:
         assert self.folder is not None
-        kept = [asdict(m) for m in self.models.values() if m.source != "made in code"]
+        kept = [asdict(m) for m in self.models.values() if m.source != MADE_IN_CODE]
         self.folder.mkdir(parents=True, exist_ok=True)
         text = json.dumps({"models": sorted(kept, key=lambda m: m["model_id"])}, indent=2)
         (self.folder / LIBRARY).write_text(text + "\n", encoding="utf-8")
@@ -191,6 +256,7 @@ def load_library(folder: Path | None, channel_blocks: Sequence[Path] = ()) -> Li
             data["used_in"] = tuple(data.get("used_in", ()))
             data["parts"] = tuple(data.get("parts", ()))
             data["motions"] = tuple(data.get("motions", ()))
+            data["paint"] = dict(data.get("paint", {}))
             model = Model(**data)
             if model.model_id in library.models:
                 raise ValueError(f"{stored}: '{model.model_id}' is already a prop made in code")
@@ -207,6 +273,11 @@ def _measured(prop: type[Prop]) -> tuple[float, float, float]:
 
 def _replace(model: Model, **changes: object) -> Model:
     return Model(**{**asdict(model), **changes})
+
+
+def match(words: str, name: str) -> float:
+    """How well a name matches some words, from 0 to 1 (as a library search scores them)."""
+    return _lexical(_terms(words), _terms(name))
 
 
 def _terms(text: str) -> tuple[str, ...]:

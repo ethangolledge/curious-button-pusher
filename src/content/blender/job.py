@@ -32,12 +32,17 @@ class ActorCall:
 
 @dataclass(frozen=True, slots=True)
 class ModelFile:
-    """A library model the shot uses: where its file is, and its real width, depth and height
-    in metres."""
+    """A library model the shot uses: its file (or, for a version of a prop made in code, that
+    prop), its real width, depth and height in metres, and how its surfaces are painted:
+    each part, material or role named (`seat`, `Body_Mat`, `wood`) drawn as another role. A
+    version made at another size is scaled to `height`."""
 
     model_id: str
     path: str
     size: tuple[float, float, float]
+    prop: str = ""
+    paint: dict[str, str] = field(default_factory=dict)
+    height: float = 0.0
 
 
 @dataclass(frozen=True, slots=True)
@@ -95,8 +100,7 @@ class Job:
         data["actions"] = tuple(BlockCall(**action) for action in data.get("actions", ()))
         data["lights"] = tuple(BlockCall(**light) for light in data.get("lights", ()))
         data["models"] = tuple(
-            ModelFile(model["model_id"], model["path"], tuple(model["size"]))
-            for model in data.get("models", ())
+            ModelFile(**{**model, "size": tuple(model["size"])}) for model in data.get("models", ())
         )
         data["channel_blocks"] = tuple(data.get("channel_blocks", ()))
         data["frames"] = tuple(data.get("frames", ()))

@@ -7,7 +7,7 @@ camera usually stands towards −Y, and the floor is at z = 0."""
 from dataclasses import dataclass
 
 from content.blender.api import Box, Mark, Role, Stage, Thing
-from content.blender.maths import FRONT, Vec
+from content.blender.maths import FRONT, UP, Vec, axis_angle
 
 WALL = 0.12  # wall thickness
 
@@ -195,6 +195,14 @@ def resting_on(mark: Mark) -> Vec:
 def stand(stage: Stage, thing: Thing, mark: Mark, *, facing: Vec | None = None) -> None:
     """Put a thing on a mark, facing the mark's way unless told otherwise."""
     stage.place(thing, resting_on(mark), facing=facing or mark.facing)
+
+
+def moved(mark: Mark, *, turn: float = 0.0, across: float = 0.0, along: float = 0.0) -> Mark:
+    """A mark turned `turn` degrees and moved `across` metres to its right and `along` metres
+    behind it (as it faces): where an actor stands when it is told to stand beside a mark."""
+    facing = axis_angle(UP, turn).rotate(mark.facing).normalised()
+    right = Vec(facing.y, -facing.x, 0)
+    return Mark(mark.name, mark.at + right * across - facing * along, facing, mark.surface)
 
 
 def surface_mark(name: str, box: Box, facing: Vec = FRONT) -> Mark:

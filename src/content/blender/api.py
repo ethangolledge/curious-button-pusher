@@ -56,12 +56,34 @@ class Box:
         """Half the box's diagonal: a sphere that holds it."""
         return self.size.length() / 2
 
+    def overlaps(self, other: "Box") -> bool:
+        return all(
+            getattr(self.low, axis) < getattr(other.high, axis)
+            and getattr(other.low, axis) < getattr(self.high, axis)
+            for axis in "xyz"
+        )
+
+    def encloses(self, other: "Box") -> bool:
+        return all(
+            getattr(self.low, axis) <= getattr(other.low, axis)
+            and getattr(other.high, axis) <= getattr(self.high, axis)
+            for axis in "xyz"
+        )
+
     def union(self, other: "Box") -> "Box":
         low, high = self.low, self.high
         return Box(
             Vec(min(low.x, other.low.x), min(low.y, other.low.y), min(low.z, other.low.z)),
             Vec(max(high.x, other.high.x), max(high.y, other.high.y), max(high.z, other.high.z)),
         )
+
+
+def standing_in(space: Box, extents: Sequence[Box]) -> list[Box]:
+    """Of the extents of the separate things on a stage, those standing in a space: solids
+    reaching into it, not the room around it, nor lights and empty places."""
+    return [
+        box for box in extents if box.radius > 0 and box.overlaps(space) and not box.encloses(space)
+    ]
 
 
 @dataclass(frozen=True, slots=True)
@@ -143,6 +165,12 @@ class Stage(Protocol):
 
     def parts(self, thing: Thing, prefix: str) -> list[Thing]:
         """A model's named parts, by the start of their name ("wheel")."""
+        ...
+
+    def occupied(self, space: Box) -> list[Box]:
+        """The extents of the separate things standing in a space (a lamp on a desk-top),
+        not counting what only encloses it (the room around it): where something placed
+        there would pass into something else."""
         ...
 
     def light(

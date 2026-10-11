@@ -19,20 +19,34 @@ technical work and show them stills before anything is final.
 4. **Preview it:** `content staging preview shot.json --config <channel>` renders stills in the
    channel's look and prints a contact sheet. Look at it yourself first (composition, light,
    scale, is the subject in frame and doing something), then show the person. A failing audit
-   (camera in a wall, the view blocked, a snap) means fix the shot, not force the render.
+   (camera in a wall, the view blocked, a snap, two things passing into each other) means fix
+   the shot (another mark, `across`/`along`), not force the render.
 5. Say what is a guess: a size, a time of day, a framing.
 
 ## When a model is missing
 
-1. Search again with other words; `content staging find "<words>" --config <channel>` lists
-   free (CC0) candidates. Pick with the person, then `--take N --as <id> --names "…"`.
-2. Downloaded by hand (Poly Haven and other CC0 sites): `content staging add <file> --as <id>
-   --about "…" --licence CC0 --source "…" --page <url> --config <channel>`.
-3. If it is refused as a duplicate, add the words to the existing model instead
-   (`content staging name <id> "<words>"`). One thing, one model.
-4. Look at the four-view sheet it prints. Wrong scale: add again with `--height`.
-5. Generic things a channel will use again and again can be props made in code instead
-   (`content staging new prop <name>`): simple shapes with bevels read better than noisy scans.
+Never stop at "we don't have it": something always fits, in this order (`docs/staging.md`,
+"When something is missing").
+
+1. Search again with other words (`content staging models "<words>"`): a near thing may do.
+2. A version of what is there: `content staging vary <id> --from <model> --paint part=role
+   --height <m> --about "…" --config <channel>` (same shape, repainted part by part or role by
+   role, resized; no file copied).
+3. The free sources: `content staging find "<words>" --config <channel>` searches every source
+   with a key, prepares the best six and draws them in the channel's look. Look at the sheet
+   yourself (is it the thing, upright, at a sane size, not a mess of a scan?), then show the
+   person, then `--take N --as <id> --about "…" --names "…"`. Only CC0, public domain, own
+   and CC BY are ever offered; CC BY makers are credited with the video automatically.
+4. Built in code: `content staging new prop <name>`, from the shared shapes. Generic things a
+   channel will use again and again are better as props: simple shapes with bevels read
+   better than noisy scans.
+5. Downloaded by hand: `content staging add <file> --as <id> --about "…" --licence <CC0|CC-BY…>
+   --source "…" --page <url> --author "…" --config <channel>`.
+
+If it is refused as a duplicate, add the words to the existing model instead
+(`content staging name <id> "<words>"`). One thing, one model. Look at the four-view sheet
+every add prints; wrong scale or facing: add again with `--height` or `--turn`. Keys for the
+sources go in `.env` (never ask anyone to paste one into the chat).
 
 ## A place the layouts do not cover: a set
 
@@ -63,7 +77,9 @@ Only when no block, with any settings, can do it. A block is general (`drive`, n
    A setting that names a model is a `ModelName`, so the model is checked and sent along.
 6. `pytest -k <name>` writes its snapshot; `content staging preview` a shot using it and look.
 7. If it truly needs a new verb, add it to `Stage` (`api.py`), both stages (`stage.py`,
-   `rehearsal.py`) and a test, and say so: it is a change to the foundation.
+   `rehearsal.py`; what they keep alike goes in `bookkeeping.py`) and a test, and say so: it
+   is a change to the foundation. Ask first whether an existing verb can do it: `occupied`
+   (what stands in a space) and `bounds` answer most "is there room?" questions.
 8. A change to an existing block that alters what it builds fails its snapshot; renew it on
    purpose (`UPDATE_SNAPSHOTS=1 pytest -k <name>`) and say what changed.
 

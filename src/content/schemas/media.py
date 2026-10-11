@@ -154,6 +154,8 @@ class ProductionResult(ImmutableModel):
     contact_sheet_path: str
     duration: float
     scenes: list[SceneTiming]
+    # Whoever must be credited where the video is published (the makers of CC BY models).
+    credits: list[str] = []
 
 
 class Arrangement(ImmutableModel):

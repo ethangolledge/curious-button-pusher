@@ -8,7 +8,8 @@ from collections.abc import Sequence
 from pathlib import Path
 from typing import NamedTuple
 
-from content.production import checks, ffmpeg
+from content.production import checks
+from content.providers import ffmpeg
 from content.schemas.media import NarrationClip
 from content.theme import (
     BreathSpec,

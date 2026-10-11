@@ -1,9 +1,10 @@
 [
+["occupied",{"space":{"low":{"x":-0.5,"y":-0.5,"z":0.75},"high":{"x":0.5,"y":0.5,"z":1.95}}}],
 ["group",{"name":"scatter_centre","at":{"x":0.0,"y":0.0,"z":0.0}}],
 ["shape",{"kind":"box","name":"scatter_centre.sheet_0","size":{"x":0.21,"y":0.297,"z":0.001},"at":{"x":0.0,"y":0.0,"z":0.0},"role":"paper"}],
-["animate",{"name":"scatter_centre.sheet_0","first":{"frame":1,"at":{"x":-0.053,"y":-0.079,"z":1.95},"rotation":{"w":0.896,"x":0.047,"y":-0.169,"z":0.409}},"last":{"frame":60,"at":{"x":-0.281,"y":0.409,"z":0.751},"rotation":{"w":0.354,"x":0.0,"y":0.0,"z":0.935}},"count":60}],
+["animate",{"name":"scatter_centre.sheet_0","first":{"frame":1,"at":{"x":0.097,"y":-0.156,"z":1.95},"rotation":{"w":-0.034,"x":0.149,"y":0.136,"z":0.979}},"last":{"frame":60,"at":{"x":0.275,"y":-0.08,"z":0.751},"rotation":{"w":-0.745,"x":0.0,"y":0.0,"z":0.667}},"count":60}],
 ["shape",{"kind":"box","name":"scatter_centre.sheet_1","size":{"x":0.21,"y":0.297,"z":0.001},"at":{"x":0.0,"y":0.0,"z":0.0},"role":"paper"}],
-["animate",{"name":"scatter_centre.sheet_1","first":{"frame":1,"at":{"x":0.204,"y":0.121,"z":1.95},"rotation":{"w":-0.872,"x":-0.281,"y":0.076,"z":0.394}},"last":{"frame":60,"at":{"x":0.275,"y":-0.08,"z":0.752},"rotation":{"w":-0.941,"x":0.0,"y":0.0,"z":-0.338}},"count":60}],
+["animate",{"name":"scatter_centre.sheet_1","first":{"frame":1,"at":{"x":0.068,"y":0.039,"z":1.95},"rotation":{"w":0.95,"x":0.042,"y":-0.168,"z":0.26}},"last":{"frame":60,"at":{"x":-0.31,"y":-0.169,"z":0.752},"rotation":{"w":0.496,"x":0.0,"y":0.0,"z":0.868}},"count":60}],
 ["shape",{"kind":"box","name":"scatter_centre.sheet_2","size":{"x":0.21,"y":0.297,"z":0.001},"at":{"x":0.0,"y":0.0,"z":0.0},"role":"paper"}],
-["animate",{"name":"scatter_centre.sheet_2","first":{"frame":1,"at":{"x":0.007,"y":0.042,"z":1.95},"rotation":{"w":-0.959,"x":-0.067,"y":0.179,"z":0.208}},"last":{"frame":60,"at":{"x":0.42,"y":0.094,"z":0.752},"rotation":{"w":-0.831,"x":0.0,"y":0.0,"z":-0.556}},"count":60}]
+["animate",{"name":"scatter_centre.sheet_2","first":{"frame":1,"at":{"x":-0.221,"y":0.063,"z":1.95},"rotation":{"w":0.867,"x":-0.135,"y":-0.2,"z":0.436}},"last":{"frame":60,"at":{"x":-0.179,"y":-0.136,"z":0.752},"rotation":{"w":0.34,"x":0.0,"y":0.0,"z":0.94}},"count":60}]
 ]

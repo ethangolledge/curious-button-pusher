@@ -11,7 +11,7 @@ import re
 import statistics
 from pathlib import Path
 
-from content.production import ffmpeg
+from content.providers import ffmpeg
 from content.schemas.base import ImmutableModel
 from content.schemas.media import SectionLabel
 

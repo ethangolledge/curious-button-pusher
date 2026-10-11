@@ -10,10 +10,13 @@ from content.blender.blocks.base import Layout, Range
 from content.blender.maths import Vec
 from content.blender.sets import room, surface_mark
 
+# Facing the table from the near side, and from the far side.
+FRONT_ON, BACK_ON = Vec(0, 1, 0), Vec(0, -1, 0)
+
 
 @dataclass(frozen=True)
 class Settings:
-    chairs: Annotated[int, Range(0, 12, "chairs along each side")] = 4
+    chairs: Annotated[int, Range(0, 8, "chairs along each side")] = 4
     blinds: bool = True
 
 
@@ -25,14 +28,20 @@ class Boardroom(Layout):
     def build(self, stage: Stage, p: Settings) -> None:
         room(stage, 8.0, 6.5, 3.0, window=True, blinds=p.blinds, door=True)
         table = stage.model("long_table", name="table")
-        stage.place(table, Vec(0, 0.3, 0), facing=Vec(1, 0, 0))
+        stage.place(table, Vec(0, 0.3, 0))
         stage.cast("table", table)
-        stage.mark(surface_mark("table_top", stage.bounds(table)))
+        top = stage.bounds(table)
+        stage.mark(surface_mark("table_top", top))
+        # Chairs a metre apart, closer if that many would not fit along the table.
+        spacing = min(1.0, (top.size.x - 0.4) / max(p.chairs, 1))
         seats: list[tuple[Vec, Vec]] = []
         for index in range(p.chairs):
-            x = (index - (p.chairs - 1) / 2) * 1.0
-            seats += [(Vec(x, -0.65, 0), Vec(0, 1, 0)), (Vec(x, 1.25, 0), Vec(0, -1, 0))]
-        seats.append((Vec(-3.0, 0.3, 0), Vec(1, 0, 0)))
+            x = (index - (p.chairs - 1) / 2) * spacing
+            seats += [
+                (Vec(x, top.low.y - 0.3, 0), FRONT_ON),
+                (Vec(x, top.high.y + 0.3, 0), BACK_ON),
+            ]
+        seats.append((Vec(top.low.x - 0.6, top.centre.y, 0), Vec(1, 0, 0)))
         for index, (at, facing) in enumerate(seats):
             chair = stage.model("chair", name=f"chair_{index}")
             # Whoever sits faces the table, so the chair does too.

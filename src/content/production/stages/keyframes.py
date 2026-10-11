@@ -37,7 +37,7 @@ from content.schemas.staging import StagedScene
 from content.schemas.story import Feeling
 from content.schemas.visuals import Scene
 from content.staging.backlog import record_gap
-from content.staging.plan import job_for, staged
+from content.staging.plan import job_for, staged, unstage
 from content.state import CallRecord, ContentState
 from content.story.field import (
     circumplex,
@@ -150,15 +150,12 @@ class Keyframes(Studio):
         previous: RenderedAsset | None,
     ) -> RenderTask | Literal["kept"] | None:
         """A staged scene's keyframe task: its 3D shot's first, middle and last frames,
-        graded by its feeling. None when the scene is drawn instead: it is not staged, or its
-        shot could not be rendered last time."""
+        graded by its feeling. None when the scene is drawn instead."""
         staging = self.staging()
         shot = staged(scene) if staging else None
         if staging is None or shot is None:
             if staging is not None and isinstance(scene, StagedScene) and scene.missing:
                 record_gap(self.theme.root, state["topic"], scene.scene_id, scene.missing)
-            return None
-        if previous is not None and previous.shot and not previous.rendered:
             return None
         timeline = required(state.get("timeline"), "a timeline")
         spec = self.theme.spec.visual.field
@@ -323,8 +320,19 @@ class Keyframes(Studio):
         }
 
     def keyframe_verdict(self, state: ContentState) -> ContentState:
-        """Retry failed keyframes within their allowance; then always show a person."""
+        """Retry failed keyframes within their allowance; then always show a person. A 3D
+        shot that could not be built, or does not show its scene, is drawn instead: rendering
+        the same shot again would not change it."""
         assets = self.current(state, "keyframes")
+        abandoned = {asset.scene_id: reason for asset in assets if (reason := _abandoned(asset))}
+        if abandoned:
+            visuals = required(state.get("visual_package"), "a storyboard")
+            for scene_id, reason in abandoned.items():
+                visuals = unstage(visuals, {scene_id}, reason)
+            return {
+                **decision("keyframes", "retry", [], structural=False),
+                "visual_package": visuals,
+            }
         if self.retry_possible(assets, self.config.keyframe_attempts):
             return decision("keyframes", "retry", [], structural=False)
         drawn = [asset for asset in assets if asset.rendered]
@@ -400,6 +408,21 @@ class Keyframes(Studio):
                 preset="veryfast",
             )
         return animatic, calls
+
+
+# What a staged shot is judged on that a better grade cannot fix.
+SHOWS_THE_SCENE = frozenset({"keyframe_matches_anchor", "keyframe_shows_story"})
+
+
+def _abandoned(asset: RenderedAsset) -> str:
+    """Why a scene's 3D shot gives way to a drawn keyframe, or nothing if it stands."""
+    if not asset.shot:
+        return ""
+    if not asset.rendered:
+        return asset.issues[0].removeprefix(f"{asset.scene_id}: ")
+    if any(j.question_id in SHOWS_THE_SCENE and j.outcome == "fail" for j in asset.judgements):
+        return "its 3D shot did not show the scene"
+    return ""
 
 
 def _judged_unclean(asset: RenderedAsset) -> bool:

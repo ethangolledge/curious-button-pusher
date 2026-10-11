@@ -20,7 +20,7 @@ from pathlib import Path
 from typing import Any, Protocol
 
 from content.errors import ConfigurationError
-from content.production import ffmpeg
+from content.providers import ffmpeg
 from content.providers.base import Usage
 from content.providers.http import RETRY_WAITS, retry_after
 from content.schemas.media import Word

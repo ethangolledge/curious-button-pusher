@@ -5,10 +5,9 @@ the desk, a car in the street. Several props can share a mark, moved apart by `a
 from dataclasses import dataclass
 from typing import Annotated
 
-from content.blender.api import Mark, Stage
+from content.blender.api import Stage
 from content.blender.blocks.base import About, Actor, Range, Ref
-from content.blender.maths import Vec, axis_angle
-from content.blender.sets import stand
+from content.blender.sets import moved, stand
 
 
 @dataclass(frozen=True)
@@ -27,9 +26,6 @@ class Prop(Actor):
 
     def build(self, stage: Stage, p: Settings, actor_id: str, model: str) -> None:
         thing = stage.model(model, name=actor_id, height=p.height or None)
-        mark = stage.find_mark(p.at.name)
-        facing = axis_angle(Vec(0, 0, 1), p.turn).rotate(mark.facing)
-        right = Vec(-facing.y, facing.x, 0) * -1
-        moved = mark.at + right * p.across - facing * p.along
-        stand(stage, thing, Mark(mark.name, moved, facing, mark.surface), facing=facing)
+        mark = moved(stage.find_mark(p.at.name), turn=p.turn, across=p.across, along=p.along)
+        stand(stage, thing, mark)
         stage.cast(actor_id, thing)

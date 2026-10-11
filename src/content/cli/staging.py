@@ -3,31 +3,24 @@ models, check a shot and preview it, and start a new block from its template."""
 
 import argparse
 import hashlib
-import io
 import re
-import shutil
-import tempfile
-import zipfile
 from dataclasses import replace
 from pathlib import Path
-from typing import Any
 
-from content.blender.job import ActorCall, BlockCall, Job
+from content.blender.job import Job
+from content.blender.materials import ROLES
 from content.blender.registry import ENGINE
 from content.config import load_config
-from content.production import ffmpeg
-from content.providers.assets import FREE, AssetSource, Candidate, Smithsonian
+from content.production.assemble import contact_sheet
+from content.providers import ffmpeg
+from content.providers.assets import ALLOWED, SOURCES, AssetSource, Candidate, ready_sources
 from content.providers.blender import LocalBlender
+from content.staging import sourcing
 from content.staging.backlog import most_wanted
 from content.staging.catalogue import Catalogue, check, describe, load_catalogue, with_models
-from content.staging.library import Model
 from content.staging.plan import themed
 from content.staging.templates import TEMPLATES, render
-
-MAX_FACES = 150_000
-# Pictures (maps, paintings, views) join the library as they are, for the picture actor.
-PICTURES = (".png", ".jpg", ".jpeg", ".webp")
-SOURCES: dict[str, type[AssetSource]] = {"smithsonian": Smithsonian}
+from content.theme import Theme
 
 
 def _staging(arguments: list[str]) -> int:
@@ -45,45 +38,42 @@ def _staging(arguments: list[str]) -> int:
     )
     models.add_argument("words", nargs="*")
     find = actions.add_parser(
-        "find", parents=[common], help="Search free sources for a model the library lacks"
+        "find",
+        parents=[common],
+        help="Search every free source for a model the library lacks, and draw the best",
     )
     find.add_argument("words")
-    find.add_argument("--source", choices=sorted(SOURCES), default="smithsonian")
-    find.add_argument("--take", type=int, help="Download, prepare and add result number N")
+    find.add_argument("--source", choices=[s.name for s in SOURCES], help="Only this source")
+    find.add_argument("--take", type=int, help="Add shortlisted model number N")
     find.add_argument("--as", dest="model_id", help="Its id in the library (with --take)")
-    find.add_argument("--names", default="", help="Other words for it, comma separated")
-    find.add_argument(
-        "--height", type=float, help="Its real height in metres, if the file's scale is off"
-    )
-    find.add_argument(
-        "--alongside", action="store_true", help="Add it although a similar model exists"
-    )
-    find.add_argument(
-        "--turn", type=float, default=0.0, help="Degrees to turn it so its front faces the camera"
-    )
+    find.add_argument("--about", default="", help="What it is, in a sentence (with --take)")
+    _model_options(find)
     add = actions.add_parser(
-        "add", parents=[common], help="Add a model file you downloaded yourself"
+        "add", parents=[common], help="Add a model file or picture you downloaded yourself"
     )
     add.add_argument("file", type=Path)
     add.add_argument("--as", dest="model_id", required=True)
-    add.add_argument("--names", default="", help="Other words for it, comma separated")
     add.add_argument("--about", required=True, help="What it is, in a sentence")
-    add.add_argument("--licence", required=True, help=f"One of: {', '.join(sorted(FREE))}")
+    add.add_argument("--licence", required=True, help=f"One of: {', '.join(sorted(ALLOWED))}")
     add.add_argument("--source", required=True, help="Where it came from, e.g. Poly Haven")
     add.add_argument("--page", default="", help="The page it came from")
-    add.add_argument("--author", default="")
-    add.add_argument(
-        "--can", default="", help="What it can do, comma separated: vehicle, humanoid, seat, light…"
+    add.add_argument("--author", default="", help="Its maker (credited if its licence asks)")
+    _model_options(add)
+    vary = actions.add_parser(
+        "vary",
+        parents=[common],
+        help="A version of a model, repainted or resized, under its own name (no new file)",
     )
-    add.add_argument(
-        "--height", type=float, help="Its real height in metres (a picture: its width)"
+    vary.add_argument("model_id", help="The new version's id")
+    vary.add_argument("--from", dest="base", required=True, help="The model it is a version of")
+    vary.add_argument("--about", required=True, help="What it is, in a sentence")
+    vary.add_argument(
+        "--paint",
+        default="",
+        help=f"part=role, comma separated (part, material or role; roles: {', '.join(ROLES)})",
     )
-    add.add_argument(
-        "--alongside", action="store_true", help="Add it although a similar model exists"
-    )
-    add.add_argument(
-        "--turn", type=float, default=0.0, help="Degrees to turn it so its front faces the camera"
-    )
+    vary.add_argument("--names", default="", help="Other words for it, comma separated")
+    vary.add_argument("--height", type=float, help="Its height in metres")
     name = actions.add_parser("name", parents=[common], help="Another word for a library model")
     name.add_argument("model_id")
     name.add_argument("words")
@@ -101,8 +91,11 @@ def _staging(arguments: list[str]) -> int:
             shot.add_argument(
                 "--scene", action="store_true", help="Also save the scene to open in Blender"
             )
-    actions.add_parser(
+    backlog = actions.add_parser(
         "backlog", parents=[common], help="What scenes could not be staged for, most wanted first"
+    )
+    backlog.add_argument(
+        "--find", action="store_true", help="Search the free sources for every model wanted"
     )
     new = actions.add_parser("new", parents=[common], help="Start a new block from its template")
     new.add_argument("kind", choices=sorted(TEMPLATES))
@@ -110,8 +103,7 @@ def _staging(arguments: list[str]) -> int:
     new.add_argument("--channel", action="store_true", help="In the channel's own folder (private)")
     args = parser.parse_args(arguments)
     theme = load_config(args.config).theme if args.config else None
-    theme_root = theme.root if theme else None
-    catalogue = load_catalogue(theme_root)
+    catalogue = load_catalogue(theme.root if theme else None)
     if args.action == "catalogue":
         print(describe(catalogue))
     elif args.action == "models":
@@ -119,10 +111,18 @@ def _staging(arguments: list[str]) -> int:
     elif args.action == "name":
         catalogue.library.name(args.model_id, args.words)
         print(f"{args.model_id} is also found as '{args.words}'.")
-    elif args.action in ("find", "add"):
-        if theme_root is None:
+    elif args.action in ("find", "add", "vary"):
+        if theme is None:
             parser.error("models are added to a channel: pass --config themes/<name>/config.json")
-        return _find(catalogue, args) if args.action == "find" else _add(catalogue, args)
+        try:
+            if args.action == "find":
+                return _find(catalogue, theme, args)
+            if args.action == "add":
+                return _add(catalogue, theme, args)
+            return _vary(catalogue, args)
+        except ValueError as exc:
+            print(exc)
+            return 1
     elif args.action == "check":
         job = Job.read(args.job)
         return _check(themed(job, theme) if theme else job, catalogue)
@@ -131,16 +131,43 @@ def _staging(arguments: list[str]) -> int:
         # A channel's shots are drawn its way: its look, and its camera moves.
         return _preview(themed(job, theme) if theme else job, catalogue, args)
     elif args.action == "backlog":
-        if theme_root is None:
+        if theme is None:
             parser.error("the backlog is a channel's: pass --config themes/<name>/config.json")
-        wanted = most_wanted(theme_root)
+        wanted = most_wanted(theme.root)
         if not wanted:
             print("Nothing yet: every scene the Visual Director wanted to stage could be.")
         for missing, times in wanted:
             print(f"{times:3}× {missing}")
+        if args.find:
+            for missing, _ in wanted:
+                if missing.startswith("model:"):
+                    print(f"\n— {missing}")
+                    _shortlist(catalogue, theme, missing.removeprefix("model:").strip(), None)
     elif args.action == "new":
-        return _new(args.kind, args.name, theme_root if args.channel else None, parser)
+        return _new(args.kind, args.name, theme.root if theme and args.channel else None, parser)
     return 0
+
+
+def _model_options(command: argparse.ArgumentParser) -> None:
+    """What every way of adding a model asks: other words for it, what it can do, and how to
+    correct a file whose size or facing is off."""
+    command.add_argument("--names", default="", help="Other words for it, comma separated")
+    command.add_argument(
+        "--can", default="", help="What it can do, comma separated: vehicle, humanoid, seat, light…"
+    )
+    command.add_argument(
+        "--height", type=float, help="Its real height in metres (a picture: its width)"
+    )
+    command.add_argument(
+        "--turn", type=float, default=0.0, help="Degrees to turn it so its front faces the camera"
+    )
+    command.add_argument(
+        "--alongside", action="store_true", help="Add it although a similar model exists"
+    )
+
+
+def _listed(text: str) -> list[str]:
+    return [item.strip() for item in text.split(",") if item.strip()]
 
 
 def _models(catalogue: Catalogue, words: str) -> None:
@@ -153,7 +180,7 @@ def _models(catalogue: Catalogue, words: str) -> None:
     if not found:
         print(
             f"Nothing in the library for '{words}'. "
-            f'Search free sources: content staging find "{words}"'
+            f'Search the free sources: content staging find "{words}"'
         )
     for model in found:
         w, d, h = model.size
@@ -188,7 +215,7 @@ def _preview(job: Job, catalogue: Catalogue, args: argparse.Namespace) -> int:
         print("Not rendered: fix the problems above (or render anyway from Blender).")
         return 1
     sheet = out / "sheet.png"
-    _contact_sheet([Path(f) for f in report.frames], sheet)
+    _strip([Path(f) for f in report.frames], sheet)
     print(f"✓ {len(report.frames)} frames in {report.seconds_rendering:.0f} s: {sheet}")
     if report.blend:
         print(f"  The scene, to open in Blender: {report.blend}")
@@ -199,149 +226,112 @@ def _four(frames: int) -> tuple[int, ...]:
     return tuple(sorted({1, max(1, frames // 3), max(1, 2 * frames // 3), frames}))
 
 
-def _contact_sheet(frames: list[Path], sheet: Path) -> None:
+def _strip(frames: list[Path], sheet: Path) -> None:
+    """Frames side by side, in order."""
     inputs = [arg for frame in frames for arg in ("-i", frame)]
     stack = f"hstack=inputs={len(frames)}" if len(frames) > 1 else "null"
     ffmpeg.run(*inputs, "-filter_complex", f"{stack},scale=1600:-2", sheet)
 
 
-def _find(catalogue: Catalogue, args: argparse.Namespace) -> int:
-    known = catalogue.library.search(args.words)
-    if known and args.take is None:
-        print("Already in the library:")
-        _models(catalogue, args.words)
-        print()
-    source = SOURCES[args.source]()
-    found = source.search(args.words, 8)
+def _find(catalogue: Catalogue, theme: Theme, args: argparse.Namespace) -> int:
+    folder = sourcing.folder_for(args.words)
     if args.take is None:
-        if not found:
-            print(f"{source.name} has no free model for '{args.words}'.")
-        for index, candidate in enumerate(found, 1):
-            print(
-                f"{index}. {candidate.title} ({candidate.licence}, {candidate.file_type})\n"
-                f"   {candidate.page}"
-            )
-        if found:
-            print('\nTake one: add --take N --as <id> (and --names "other, words").')
-        return 0
-    if not args.model_id or not 1 <= args.take <= len(found):
-        print("--take needs a result number from the list, and --as an id.")
+        known = catalogue.library.search(args.words)
+        if known:
+            print("Already in the library (a version of one may do: content staging vary):")
+            _models(catalogue, args.words)
+            print()
+        sources = [s for s in ready_sources() if not args.source or s.name == args.source]
+        return _shortlist(catalogue, theme, args.words, sources)
+    entries = sourcing.shortlisted(folder)
+    if not 1 <= args.take <= len(entries) or not args.model_id:
+        print(f'--take needs a number from the shortlist (content staging find "{args.words}") '
+              "and --as an id.")  # fmt: skip
         return 1
-    candidate = found[args.take - 1]
-    with tempfile.TemporaryDirectory() as folder:
-        downloaded = _unpack(source.download(candidate.file_url), Path(folder), candidate)
-        return _ingest(catalogue, args, downloaded, candidate.title, candidate)
-
-
-def _add(catalogue: Catalogue, args: argparse.Namespace) -> int:
-    if args.licence not in FREE:
-        print(
-            f"Only free licences enter the library ({', '.join(sorted(FREE))}): "
-            f"'{args.licence}' needs credit or forbids commercial use."
-        )
+    entry = entries[args.take - 1]
+    if not entry.download:
+        print(f"Number {args.take} could not be prepared: {entry.problem}")
         return 1
-    candidate = Candidate(
-        args.source,
-        args.about,
-        args.page,
-        str(args.file),
-        args.file.suffix.lstrip("."),
-        args.licence,
-        args.author,
-    )
-    return _ingest(catalogue, args, args.file, args.about, candidate)
+    model = sourcing.add_file(
+        catalogue, Path(entry.download), entry.candidate, model_id=args.model_id,
+        describe=args.about or entry.candidate.title, names=_listed(args.names),
+        height=args.height, turn=args.turn, capabilities=_listed(args.can),
+        alongside=args.alongside,
+    )  # fmt: skip
+    return _added(catalogue, theme, model.model_id)
 
 
-def _ingest(
-    catalogue: Catalogue, args: argparse.Namespace, file: Path, about: str, candidate: Candidate
+def _shortlist(
+    catalogue: Catalogue, theme: Theme, words: str, sources: list[AssetSource] | None
 ) -> int:
-    library = catalogue.library
-    assert library.folder is not None
-    model_id = re.sub(r"[^a-z0-9_]+", "_", args.model_id.lower()).strip("_")
-    if file.suffix.lower() in PICTURES:
-        target = library.folder / f"{model_id}{file.suffix.lower()}"
-        facts = _picture_facts(file, target, width=args.height or 1.0)
-    else:
-        target = library.folder / f"{model_id}.glb"
-        facts = LocalBlender().ingest(
-            file, target, height=args.height, max_faces=MAX_FACES, turn=args.turn
-        )
-    model = Model(
-        model_id=model_id,
-        names=tuple(n.strip() for n in args.names.split(",") if n.strip()),
-        describe=about,
-        size=(facts["width"], facts["depth"], facts["height"]),
-        source=candidate.source,
-        licence=candidate.licence,
-        page=candidate.page,
-        author=candidate.author,
-        file=target.name,
-        parts=tuple(facts.get("parts", ())),
-        motions=tuple(facts.get("motions", ())),
-        capabilities=tuple(
-            sorted(c.strip() for c in getattr(args, "can", "").split(",") if c.strip())
-        ),
+    entries, failed = sourcing.shortlist(
+        words,
+        ready_sources() if sources is None else sources,
+        sourcing.folder_for(words),
+        catalogue,
+        theme,
     )
-    try:
-        library.add(model, alongside=args.alongside)
-    except ValueError as exc:
-        target.unlink(missing_ok=True)
-        print(exc)
-        return 1
-    print(
-        f"✓ {model_id} added ({facts['width']:.2f}×{facts['depth']:.2f}×"
-        f"{facts['height']:.2f} m, {int(facts['faces'])} faces)."
-    )
-    if target.suffix != ".glb":
-        print("  A picture: stand it in a shot with the picture actor.")
+    for problem in failed:
+        print(f"  (skipped {problem})")
+    missing = [s.name for s in SOURCES if not s.ready()]
+    if missing:
+        print(f"  (not searched, no key in .env: {', '.join(missing)}; docs/staging.md)")
+    if not entries:
+        print(f"No free model for '{words}': build it in code (content staging new props …).")
         return 0
-    print(f"  Four views of it in the studio: {_turntable(catalogue, model_id)}")
+    for index, entry in enumerate(entries, 1):
+        c = entry.candidate
+        made = f", {entry.size[2]:.2f} m tall as made" if entry.model else ""
+        state = f"  ✗ {entry.problem}" if entry.problem else ""
+        print(
+            f"{index}. {c.title} — {c.author} ({c.source}, {c.licence}{made}){state}\n   {c.page}"
+        )
+    stills = [Path(entry.still) for entry in entries if entry.still]
+    if stills:
+        sheet = sourcing.folder_for(words) / "sheet.png"
+        contact_sheet(stills, sheet, columns=3)
+        print(f"\nThe candidates in the channel's look, in order: {sheet}")
+    print(f'Take one: content staging find "{words}" --take N --as <id> --about "…"')
     return 0
 
 
-def _picture_facts(source: Path, target: Path, *, width: float) -> dict[str, Any]:
-    """A picture is kept as it is; its real size is its width and its own shape."""
-    info = ffmpeg.probe(source)
-    if not info.width or not info.height:
-        raise ValueError(f"{source} is not a picture ffmpeg can read")
-    target.parent.mkdir(parents=True, exist_ok=True)
-    shutil.copyfile(source, target)
-    height = round(width * info.height / info.width, 3)
-    return {"width": width, "depth": 0.0, "height": height, "faces": 0}
-
-
-def _turntable(catalogue: Catalogue, model_id: str) -> Path:
-    """Four views of a model in the studio, to judge it by."""
-    job = Job(
-        shot_id=f"model-{model_id}", seconds=4, width=540, height=540, quality="still",
-        layout=BlockCall("studio"), look=BlockCall("plain"),
-        actors=(ActorCall("model", "prop", model_id, {"at": "plinth_top"}),),
-        lights=(BlockCall("studio", {"subject": "model"}),),
-        camera=BlockCall("orbit", {
-            "subject": "model", "degrees": "270", "start": "0", "framing": "close",
-            "elevation": "20",
-        }),
-        frames=(1, 40, 80, 120),
+def _add(catalogue: Catalogue, theme: Theme, args: argparse.Namespace) -> int:
+    candidate = Candidate(
+        args.source, args.about, args.page, str(args.file), args.file.suffix.lstrip("."),
+        args.licence, args.author,
     )  # fmt: skip
-    out = Path(".cache/staging") / job.shot_id
-    report = LocalBlender().render(with_models(job, catalogue), out)
-    sheet = out / "sheet.png"
-    _contact_sheet([Path(f) for f in report.frames], sheet)
-    return sheet
+    model = sourcing.add_file(
+        catalogue, args.file, candidate, model_id=args.model_id, describe=args.about,
+        names=_listed(args.names), height=args.height, turn=args.turn,
+        capabilities=_listed(args.can), alongside=args.alongside,
+    )  # fmt: skip
+    return _added(catalogue, theme, model.model_id)
 
 
-def _unpack(data: bytes, folder: Path, candidate: Candidate) -> Path:
-    """The model file in a download: the file itself, or the model inside a zip."""
-    if data[:2] == b"PK":
-        zipfile.ZipFile(io.BytesIO(data)).extractall(folder)
-        for suffix in (".glb", ".gltf", ".obj", ".fbx"):
-            found = sorted(folder.rglob(f"*{suffix}"))
-            if found:
-                return found[0]
-        raise ValueError(f"no model file inside the download from {candidate.page}")
-    path = folder / f"model.{candidate.file_type or 'glb'}"
-    path.write_bytes(data)
-    return path
+def _vary(catalogue: Catalogue, args: argparse.Namespace) -> int:
+    paint = dict(pair.split("=", 1) for pair in _listed(args.paint))
+    model = catalogue.library.vary(
+        args.model_id, args.base, describe=args.about, names=_listed(args.names),
+        paint={k.strip(): v.strip() for k, v in paint.items()}, height=args.height,
+    )  # fmt: skip
+    w, d, h = model.size
+    print(f"✓ {model.model_id}: a version of {args.base} ({w:.2f}×{d:.2f}×{h:.2f} m).")
+    return 0
+
+
+def _added(catalogue: Catalogue, theme: Theme, model_id: str) -> int:
+    model = catalogue.library.get(model_id)
+    w, d, h = model.size
+    print(f"✓ {model_id} added ({w:.2f}×{d:.2f}×{h:.2f} m, {model.licence}).")
+    if not model.file.endswith(".glb"):
+        print("  A picture: stand it in a shot with the picture actor.")
+        return 0
+    out = Path(".cache/staging") / f"model-{model_id}"
+    frames = sourcing.turntable(catalogue, model_id, theme, out)
+    if frames:
+        _strip(frames, out / "sheet.png")
+        print(f"  Four views of it in the channel's look: {out / 'sheet.png'}")
+    return 0
 
 
 def _new(kind: str, name: str, channel: Path | None, parser: argparse.ArgumentParser) -> int:
