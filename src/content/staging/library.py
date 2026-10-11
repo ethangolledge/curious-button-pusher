@@ -25,6 +25,8 @@ from content.providers.assets import CREDITED
 from content.staging.store import Store
 
 MADE_IN_CODE = "made in code"
+# A picture in the library (a map, a painting) is kept as it is and drawn on a card.
+PICTURES = (".png", ".jpg", ".jpeg", ".webp")
 # Words that say nothing about what a thing is.
 FILLER = frozenset(
     [

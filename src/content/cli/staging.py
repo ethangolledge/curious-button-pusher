@@ -14,8 +14,12 @@ from content.blender.registry import ENGINE
 from content.config import load_config
 from content.production.assemble import contact_sheet
 from content.providers import ffmpeg
-from content.providers.assets import ALLOWED, SOURCES, AssetSource, Candidate, ready_sources
+from content.providers.assets import ALLOWED, AssetSource, Candidate
 from content.providers.blender import LocalBlender, install_people, people_ready
+from content.providers.infinigen import Infinigen
+from content.providers.infinigen import install as install_infinigen
+from content.providers.objaverse import build_index
+from content.providers.sources import SOURCES, ready_sources
 from content.schemas.staging import StagePlan
 from content.staging import sourcing
 from content.staging.backlog import most_wanted
@@ -111,6 +115,16 @@ def _staging(arguments: list[str]) -> int:
                 "--scene", action="store_true", help="Also save the scene to open in Blender"
             )
     actions.add_parser(
+        "objaverse",
+        parents=[common],
+        help="Index Objaverse's 800,000 free models on this computer (~800 MB, once)",
+    )
+    actions.add_parser(
+        "infinigen",
+        parents=[common],
+        help="Install Infinigen, which makes everyday objects on this computer (a few GB)",
+    )
+    actions.add_parser(
         "people",
         parents=[common],
         help="Install what making people needs (MPFB for Blender, CC0 clothes and hair)",
@@ -135,6 +149,15 @@ def _staging(arguments: list[str]) -> int:
     elif args.action == "name":
         catalogue.library.name(args.model_id, args.words)
         print(f"{args.model_id} is also found as '{args.words}'.")
+    elif args.action == "objaverse":
+        build_index(print)
+        print("✓ Objaverse is indexed: its models are searched for what scenes lack.")
+    elif args.action == "infinigen":
+        if Infinigen.ready():
+            print("✓ Infinigen is ready.")
+            return 0
+        install_infinigen()
+        print("✓ Infinigen is ready: what scenes lack is made here first.")
     elif args.action == "people":
         if people_ready():
             print("✓ People can be made already.")

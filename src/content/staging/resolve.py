@@ -18,7 +18,7 @@ from content.blender.materials import BY_COLOUR, linear, nearest_role
 from content.blender.maths import Vec
 from content.schemas.staging import Thing
 from content.staging.compose import Resolve, Resolved
-from content.staging.library import Library, Model
+from content.staging.library import PICTURES, Library, Model
 from content.staging.people import made_person
 
 # Finding a model online for some words: taken into the library, or None.
@@ -122,6 +122,11 @@ def fitted(library: Library, model: Model, thing: Thing) -> Resolved:
             ("height", thing.height),
         )
     )
+    if model.file.endswith(PICTURES):
+        # A picture is its width, as wide as asked; lying flat, as deep as it is tall.
+        w, _, h = model.size
+        wide = thing.width or w
+        return Resolved(model.model_id, Vec(wide, wide * h / w, 0.002), None, picture=True)
     if not look.paint and not params and not any(fit):
         w, d, h = model.size
         return Resolved(model.model_id, Vec(w, d, h), library.model_file(model.model_id),

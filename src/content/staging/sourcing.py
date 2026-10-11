@@ -24,7 +24,7 @@ from content.providers import ffmpeg
 from content.providers.assets import ALLOWED, AssetSource, Candidate
 from content.providers.blender import LocalBlender
 from content.staging.catalogue import Catalogue, with_models
-from content.staging.library import Model, match
+from content.staging.library import PICTURES, Model, match
 from content.staging.plan import themed
 from content.staging.scoring import ACCEPT, Scorer
 from content.staging.store import Store
@@ -35,8 +35,6 @@ MAX_FACES = 150_000
 # Candidates with more than this are passed over: slow to download, and simplified to mush.
 TOO_DETAILED = 1_000_000
 SHORTLIST = 6
-# Pictures (maps, paintings, views) join the library as they are, for the picture actor.
-PICTURES = (".png", ".jpg", ".jpeg", ".webp")
 MODEL_FILES = (".glb", ".gltf", ".obj", ".fbx", ".stl")
 CANDIDATES = "candidates.json"
 
@@ -144,7 +142,12 @@ def add_file(
         else:
             prepared = Path(work) / "model.glb"
             facts = LocalBlender().ingest(
-                file, prepared, height=height, max_faces=MAX_FACES, turn=turn, up=candidate.up
+                file,
+                prepared,
+                height=height,
+                max_faces=MAX_FACES,
+                turn=turn or candidate.turn,
+                up=candidate.up,
             )
         kept = store.keep_file(prepared)
     model = Model(
@@ -231,7 +234,12 @@ def _prepare(
         download = _unpack(source.download(candidate), folder / "download", candidate.file_type)
         prepared = folder / "model.glb"
         facts = LocalBlender().ingest(
-            download, prepared, height=None, max_faces=MAX_FACES, up=candidate.up
+            download,
+            prepared,
+            height=None,
+            max_faces=MAX_FACES,
+            up=candidate.up,
+            turn=candidate.turn,
         )
         size = (facts["width"], facts["depth"], facts["height"])
         job = replace(

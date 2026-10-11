@@ -165,3 +165,10 @@ def _boxes(shot: Composition) -> dict[str, Box]:
 
 def _shrunk(box: Box) -> Box:
     return Box(box.low + Vec(0.01, 0.01, 0.01), box.high - Vec(0.01, 0.01, 0.01))
+
+
+def test_a_thing_too_big_for_where_it_was_asked_is_said_not_squeezed_in() -> None:
+    shot = _compose("office", [_thing("crate", "box", "on", "desk", width=2.5, depth=1.2)])
+
+    assert shot.missing == ["room: no space for box on desk"]
+    assert shot.actors == []

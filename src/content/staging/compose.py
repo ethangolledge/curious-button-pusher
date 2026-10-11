@@ -49,6 +49,8 @@ class Resolved:
     seat: float = 0.0
     # The motion it plays all through the shot (a figure with a skeleton), if any.
     motion: str = ""
+    # A picture (a map, a painting): drawn on a card, lying flat on what it is on.
+    picture: bool = False
 
 
 Resolve = Callable[[Thing], Resolved | None]
@@ -70,14 +72,14 @@ class Placed:
 @dataclass
 class Composition:
     """The shot as composed: the actors, the groups of copies, the models to send, and
-    what could not be done (each a line a person or the Visual Director can act on)."""
+    what could not be done: a thing nobody has, or no room for it where it was asked (each a
+    line the Visual Director can act on)."""
 
     actors: list[ActorCall] = field(default_factory=list)
     groups: dict[str, tuple[str, ...]] = field(default_factory=dict)
     models: list[ModelFile] = field(default_factory=list)
     actions: list[BlockCall] = field(default_factory=list)
     missing: list[str] = field(default_factory=list)
-    crowded: list[str] = field(default_factory=list)
 
 
 # Background detail a room is given, by layout: what, where, and how many. `some` adds the
@@ -191,14 +193,16 @@ class Composer:
                 spot = self._spot(relation, target, anchor, group, resolved, index, thing.count)
                 if spot is None:
                     if required:
-                        self._out.crowded.append(f"no room for every {thing.what}")
+                        where = f"{relation.replace('_', ' ')} {target}"
+                        self._out.missing.append(f"room: no space for {thing.what} {where}")
                     break
                 at, heading, support = spot
                 box = _box(at, resolved.size, heading)
                 placed = Placed(actor_id, thing.thing_id, box, heading, support)
                 self._placed.append(placed)
                 copies.append(placed)
-                self._out.actors.append(_put(actor_id, resolved, at, heading))
+                lying = relation in SMALL
+                self._out.actors.append(_put(actor_id, resolved, at, heading, lying=lying))
         self._copies[thing.thing_id] = copies
         if len(copies) > 1:
             self._out.groups[thing.thing_id] = tuple(p.actor_id for p in copies)
@@ -441,13 +445,18 @@ def _settings(given: Sequence[Setting]) -> dict[str, str]:
     return {setting.name: setting.value for setting in given}
 
 
-def _put(actor_id: str, resolved: Resolved, at: Vec, heading: float) -> ActorCall:
+def _put(
+    actor_id: str, resolved: Resolved, at: Vec, heading: float, *, lying: bool = False
+) -> ActorCall:
     """A placed thing, drawn at the size it was resolved to."""
     values = {"x": _n(at.x), "y": _n(at.y), "z": _n(at.z), "heading": _n(heading)}
     if resolved.file is None:
         values["height"] = _n(resolved.size.z)
     if resolved.motion:
         values["motion"] = resolved.motion
+    if resolved.picture:
+        values = {**values, "picture": _n(resolved.size.x), "lying": "yes" if lying else "no"}
+        values.pop("height", None)
     return ActorCall(actor_id, "put", resolved.model, values)
 
 

@@ -41,6 +41,7 @@ class Candidate:
     author: str = ""
     faces: int = 0  # 0 when the source does not say
     up: str = "Y"  # the axis its files take as up (glTF's is always Y)
+    turn: float = 0.0  # degrees to turn it so its front faces the camera, if its maker's do not
 
 
 class AssetSource(Protocol):
@@ -246,17 +247,6 @@ class Smithsonian(_Http):
     def download(self, candidate: Candidate) -> bytes:
         content: bytes = self._get(candidate.file_url).content
         return content
-
-
-# Searched in this order: the broadest first.
-SOURCES: tuple[type[Sketchfab | PolyPizza | Fuel | Smithsonian], ...] = (
-    Sketchfab, PolyPizza, Fuel, Smithsonian,
-)  # fmt: skip
-
-
-def ready_sources() -> list[AssetSource]:
-    """Every source that can be used now (those that need a key have one)."""
-    return [source() for source in SOURCES if source.ready()]
 
 
 def _file_type(resource: dict[str, Any]) -> str:

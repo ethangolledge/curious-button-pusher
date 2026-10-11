@@ -69,7 +69,9 @@ class Assembly(Studio):
         if staging is None:
             return []
         library = staging[1].library
-        used = sorted({m.model_id for a in keyframes if a.shot for m in Job.loads(a.shot).models})
+        used = sorted(
+            {m.base or m.model_id for a in keyframes if a.shot for m in Job.loads(a.shot).models}
+        )
         return sorted({line for model_id in used if (line := library.credit(model_id))})
 
     def _final_issues(self, final: Path, cut: Path, timeline: Timeline) -> list[str]:

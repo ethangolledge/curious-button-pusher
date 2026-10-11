@@ -21,6 +21,9 @@ class Settings:
     motion: Annotated[str, About("one of the model's motions; empty keeps it still")] = ""
     start: Annotated[float, Range(0, 1, "when the motion starts, as a fraction of the shot")] = 0.0
     speed: Annotated[float, Range(0.1, 4, "how fast the motion plays")] = 1.0
+    # A picture (a map, a painting) on a card this wide, lying flat or upright.
+    picture: Annotated[float, Range(0, 200, "metres wide, when the model is a picture")] = 0.0
+    lying: bool = False
 
 
 class Put(Actor):
@@ -29,7 +32,11 @@ class Put(Actor):
     example = Settings(x=0.2, z=0.75, heading=30)
 
     def build(self, stage: Stage, p: Settings, actor_id: str, model: str) -> None:
-        thing = stage.model(model, name=actor_id, height=p.height or None)
+        thing = (
+            stage.picture(model, name=actor_id, width=p.picture, lying=p.lying)
+            if p.picture
+            else stage.model(model, name=actor_id, height=p.height or None)
+        )
         stage.place(thing, Vec(p.x, p.y, p.z), facing=axis_angle(UP, p.heading).rotate(FRONT))
         if p.motion:
             begins = round(p.start * stage.frames) + 1

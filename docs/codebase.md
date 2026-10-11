@@ -77,12 +77,18 @@ imports nothing from the rest of `content`; only the files marked † use Blende
 | `blender/blocks/` | one block per file, a folder per kind (`base.py`: what a block is, reading settings) |
 | `blender/registry.py`, `direct.py` | finding blocks by folder; building a shot in its one order |
 | `blender/rehearsal.py` | a `Stage` and a `Canvas` without Blender: checks shots and tests blocks and transitions |
-| `blender/stage.py` †, `worker.py` †, `audit.py` †, `ingest.py` †, `imports.py` † | the foundation (drawing every surface in its role, versions repainted and resized); the runner of shot and join jobs; the checks before rendering (the camera, the view, things passing into each other); preparing a downloaded model or character; reading a model file the one way both use |
+| `blender/stage.py` †, `worker.py` †, `audit.py` †, `ingest.py` †, `imports.py` † | the foundation (every surface drawn in its role; families made with settings; models stretched to fit); the runner of shot and join jobs; the checks before rendering (the camera, the view, things passing into each other); preparing a downloaded model or character; reading a model file the one way both use |
+| `blender/person.py` †, `generate.py` † | scripts Blender (or Infinigen's Python) runs: a person made from one parametric body, posed and moving by code; one object from an Infinigen generator |
 | `staging/catalogue.py` | the blocks and models, described; the shot check |
-| `staging/library.py` | the model library: search by meaning, no duplicates, versions of a model, credits |
-| `staging/sourcing.py` | where models come from: every free source searched, the best prepared and drawn side by side, one taken with its rights |
+| `staging/library.py` | the model library: search by meaning, no duplicates, versions of a model, a model as Blender needs it, credits, keep and veto |
+| `staging/store.py` | where the library is kept: SQLite (models, lineage, usage) and files by their hash |
+| `staging/compose.py` | a scene's description to a shot: the room built, every copy placed by its relation clear of everything, background detail, actions for every copy |
+| `staging/resolve.py` | what each thing is drawn with: the library, families from its words, people made, then found online; its looks as paint, its size as a fit |
+| `staging/people.py` | people made to a description, once, and kept |
+| `staging/sourcing.py` | where models come from: every source searched, the best prepared and drawn, scored, one taken with its rights and lineage |
+| `staging/scoring.py` | how sure a candidate is the thing, by eye: CLIP against everyday others |
 | `staging/templates.py` | the starting file for a new block of each kind |
-| `staging/plan.py` | a staged scene to a render job (the theme's look, moves and frame); the storyboard's shot check; drawing a scene instead |
+| `staging/plan.py` | a staged scene to a render job (composed, in the theme's look, moves and frame); the storyboard's shot check; drawing a scene instead |
 | `staging/backlog.py` | what scenes could not be staged for, kept in the channel's folder |
 
 ### Providers (`providers/`)
@@ -92,9 +98,11 @@ imports nothing from the rest of `content`; only the files marked † use Blende
 | `base.py` | `ModelProvider` (System 2), `DecisionProvider` (System 1), `Usage` | The only interfaces agents see |
 | `openrouter.py` | chat models through the OpenAI SDK, Jev through the Decisions API, `key_credit_remaining` | The only provider-specific text code |
 | `images.py` | `ImageSource`: Wikimedia Commons, and a fake source | Add a source here |
-| `assets.py` | `AssetSource`: free 3D models from Sketchfab, Poly Pizza, Gazebo Fuel and the Smithsonian; which licences are allowed (CC0, public domain, own; CC BY with credit) | Add a model source here, and to `SOURCES` |
+| `assets.py` | `AssetSource`: free 3D models from Sketchfab, Poly Pizza, Gazebo Fuel and the Smithsonian; which licences are allowed (CC0, public domain, own; CC BY with credit) | |
+| `infinigen.py`, `objaverse.py` | objects made by Infinigen (in its own environment); Objaverse searched in a local index of its metadata and quality scores | |
+| `sources.py` | every model source, in the order a missing thing is looked for | Add a model source here |
 | `ffmpeg.py` | running ffmpeg and ffprobe | Used by production, the review and the 3D tools |
-| `blender.py` | running Blender on a job (`LocalBlender`: render, ingest), and `FakeBlender` | Blender is found from `BLENDER` or the path |
+| `blender.py` | running Blender on a job (`LocalBlender`: render, ingest, make a person), installing what people need, and `FakeBlender` | Blender is found from `BLENDER` or the path |
 | `http.py` | the shared wait-and-retry for rate-limited outside services | |
 | `fake.py` | deterministic providers that record every call | The rehearsal and tests use them |
 | `cache.py` | `AssetCache.fetch`: request → file, refusals remembered, one `INDEX.csv` line per paid item | Media and text alike; keys are hashes of the full request |

@@ -10,43 +10,48 @@ technical work and show them stills before anything is final.
 
 ## Composing a shot
 
-1. **Start from what exists.** `content staging catalogue --config <channel>` lists every
-   block with its settings; `content staging models "<words>"` searches the models. Reuse
-   before you build: most shots are a layout, one or two actors, an action, a light and a move.
-2. **Write the shot** as a job file (JSON, the shape in `docs/staging.md`) in the scratchpad or
-   the run's folder, never in the repository: a shot belongs to a video.
-3. **Check it:** `content staging check shot.json`. Fix every line it reports.
-4. **Preview it:** `content staging preview shot.json --config <channel>` renders stills in the
-   channel's look and prints a contact sheet. Look at it yourself first (composition, light,
-   scale, is the subject in frame and doing something), then show the person. A failing audit
-   (camera in a wall, the view blocked, a snap, two things passing into each other) means fix
-   the shot (another mark, `across`/`along`), not force the render.
+Describe it; do not assemble it. A shot is a scene's description (the shape in
+`docs/staging.md`, "The scene"): the room, the things in it (plain words, how many, their
+real height, their looks, where each goes in relation to something), people, actions and
+the camera. The composer finds or makes every thing and places it.
+
+1. **Start from the room.** `content staging catalogue --config <channel>` lists the layouts
+   with their marks and furniture, the actions, lights and moves.
+2. **Write the description** (JSON) in the scratchpad or the run's folder, never in the
+   repository: a shot belongs to a video. Name things as a prop master would; give every
+   thing its real height; use `each` for one per copy (a glass before each man); people get a
+   `person` (pose, dress, motion).
+3. **Check it:** `content staging check scene.json --config <channel>`. Fix every line.
+4. **Preview it:** `content staging preview scene.json --config <channel>` makes any people,
+   resolves every thing, renders stills in the channel's look and prints a contact sheet. Look
+   at it yourself first (composition, light, scale, is the subject in frame and doing
+   something), then show the person. A failing audit (camera in a wall, the view blocked, a
+   snap, two things passing into each other) means change the description (another
+   relation, target or count), not force the render.
 5. Say what is a guess: a size, a time of day, a framing.
 
 ## When a model is missing
 
-Never stop at "we don't have it": something always fits, in this order (`docs/staging.md`,
-"When something is missing").
+Never stop at "we don't have it": something always fits (`docs/staging.md`, "Resolving a
+thing"). In a run this is automatic; by hand:
 
-1. Search again with other words (`content staging models "<words>"`): a near thing may do.
+1. Search with other words (`content staging models "<words>"`): a near thing, or a family
+   whose settings make it ("espresso cup", "conference table").
 2. A version of what is there: `content staging vary <id> --from <model> --paint part=role
-   --height <m> --about "…" --config <channel>` (same shape, repainted part by part or role by
-   role, resized; no file copied).
-3. The free sources: `content staging find "<words>" --config <channel>` searches every source
-   with a key, prepares the best six and draws them in the channel's look. Look at the sheet
-   yourself (is it the thing, upright, at a sane size, not a mess of a scan?), then show the
-   person, then `--take N --as <id> --about "…" --names "…"`. Only CC0, public domain, own
-   and CC BY are ever offered; CC BY makers are credited with the video automatically.
-4. Built in code: `content staging new prop <name>`, from the shared shapes. Generic things a
-   channel will use again and again are better as props: simple shapes with bevels read
-   better than noisy scans.
-5. Downloaded by hand: `content staging add <file> --as <id> --about "…" --licence <CC0|CC-BY…>
-   --source "…" --page <url> --author "…" --config <channel>`.
+   --height <m> --about "…" --config <channel>`.
+3. `content staging find "<words>" --config <channel>`: Infinigen makes it, or the free
+   collections have it; the best six are prepared and drawn. Look at the sheet yourself (is
+   it the thing, upright, sane, not a mess of a scan?), show the person, then `--take N --as
+   <id> --about "…"`. Only CC0, public domain, own and CC BY are ever offered.
+4. A model taken automatically in a run is named in its warnings: look at it in the run's
+   stills, then `content staging keep <id>`, or `veto <id> --why "…"` (never used again).
+   `content staging history <id>` shows where it came from and how it was chosen.
+5. Built in code: `content staging new prop <name>`, from the shared shapes; a family (a prop
+   with settings, read as `self.p`) when the kind of thing comes in many forms.
 
-If it is refused as a duplicate, add the words to the existing model instead
-(`content staging name <id> "<words>"`). One thing, one model. Look at the four-view sheet
-every add prints; wrong scale or facing: add again with `--height` or `--turn`. Keys for the
-sources go in `.env` (never ask anyone to paste one into the chat).
+If an add is refused as a duplicate, add the words to the existing model instead
+(`content staging name <id> "<words>"`). One thing, one model. Keys for sources go in `.env`
+(never ask anyone to paste one into the chat); `content check` says what is ready.
 
 ## A place the layouts do not cover: a set
 
@@ -92,10 +97,12 @@ on two real keyframes (a join job: `docs/staging.md`) at small size before anyth
 
 ## A character
 
-Only with the director's sign-off, and only once per person (`docs/staging.md`, "Characters"):
-a figurine model sheet (front approved first), a multiview image-to-3D model with a rig, then
-`content staging add … --can humanoid --turn … --height …`. Check its four-view sheet faces the
-front and stands on the plinth. Anonymous people are the free `person` and `seated_person`.
+Anyone a scene describes is made free, to fit (`docs/staging.md`, "People"): describe them
+(`person`: sex, age, build, dress, pose, motion) and they are made once and kept; run
+`content staging people` once first. A particular person (`who`) is made only with the
+director's sign-off, once: a figurine model sheet (front approved first), a multiview
+image-to-3D model with a rig, then `content staging add … --can humanoid --turn … --height …`.
+Check its four-view sheet faces the front and stands on the plinth.
 
 ## A channel's look
 

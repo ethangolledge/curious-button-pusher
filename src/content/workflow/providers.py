@@ -8,10 +8,10 @@ from dataclasses import replace
 from content.config import ContentConfig
 from content.errors import InputError
 from content.production.media import FakeMediaProvider, MediaProvider
-from content.providers.assets import ready_sources
 from content.providers.base import DecisionProvider, ModelProvider
 from content.providers.blender import FakeBlender, LocalBlender, Renderer, blender_path
 from content.providers.images import FakeImageSource, ImageSource, WikimediaCommons
+from content.providers.sources import ready_sources
 from content.staging.catalogue import Catalogue
 from content.staging.library import Model
 from content.staging.resolve import FindModel

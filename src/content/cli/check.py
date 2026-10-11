@@ -15,8 +15,8 @@ from typing import Literal
 
 from content.config import ContentConfig, load_config
 from content.errors import ConfigurationError
-from content.providers.assets import SOURCES
 from content.providers.blender import VERSION, blender_path, people_ready
+from content.providers.sources import SOURCES
 from content.workflow.providers import MIN_RUN_USD
 
 Status = Literal["ready", "missing", "optional"]
@@ -66,14 +66,18 @@ def _people() -> Check:
 
 def _model_sources() -> Check:
     ready = [source.name for source in SOURCES if source.ready()]
-    waiting = [f"{source.name} ({source.key})" for source in SOURCES if not source.ready()]
+    waiting = [
+        f"{source.name} ({source.key} in .env)" if source.key else
+        f"{source.name} (content staging {source.name})"
+        for source in SOURCES if not source.ready()
+    ]  # fmt: skip
     if not waiting:
         return Check("Free 3D models", "ready", ", ".join(ready))
     return Check(
         "Free 3D models",
         "optional",
         f"searching {', '.join(ready)}",
-        f"To search more, put a free key in .env: {', '.join(waiting)} (docs/staging.md).",
+        f"To search more: {', '.join(waiting)} (docs/staging.md).",
     )
 
 
