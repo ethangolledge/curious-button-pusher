@@ -11,10 +11,12 @@ class PottedPlant(Prop):
 
     def build(self, stage: Stage, name: str) -> Thing:
         plant = stage.group(name)
+        # A funnel turned over: wide at the top. Turned about its base, so its base is raised
+        # by its height to stand on the floor.
         stage.shape(
             "funnel",
             Vec(0.32, 0.32, 0.34),
-            Vec(0, 0, 0),
+            Vec(0, 0, 0.34),
             role="paint",
             name=f"{name}.pot",
             parent=plant,

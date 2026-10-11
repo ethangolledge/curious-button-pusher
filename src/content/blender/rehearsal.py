@@ -159,6 +159,15 @@ class RehearsalStage(Bookkeeping):
     def bounds(self, thing: Thing) -> Box:
         return self._piece(thing).extent()
 
+    def solids(self) -> list[Box]:
+        """The extent of every solid piece on the stage (each leg, slat and sill), for
+        placing things among them without Blender."""
+        return [
+            piece.extent()
+            for piece in self._pieces.values()
+            if not piece.children and piece.size.x * piece.size.y * piece.size.z > 0
+        ]
+
     def occupied(self, space: Box) -> list[Box]:
         self._record("occupied", space=space)
         tops = [piece for piece in self._pieces.values() if piece.parent is None]

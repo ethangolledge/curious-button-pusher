@@ -27,7 +27,7 @@ from content.providers.base import DecisionProvider, ModelProvider
 from content.providers.blender import Renderer
 from content.providers.cache import AssetCache
 from content.providers.images import ImageSource
-from content.staging.catalogue import describe, load_catalogue
+from content.staging.catalogue import DIRECTED, describe, load_catalogue
 from content.state import ContentInput, ContentOutput, ContentState
 from content.story.faithfulness import OnnxInference
 from content.theme import theme_guidance
@@ -120,7 +120,10 @@ def build_graph(
     visual_director = (
         StagedVisualDirector(
             catalogue=describe(
-                catalogue, presets=theme.spec.staging.moves, joins=theme.spec.staging.joins
+                catalogue,
+                DIRECTED,
+                presets=theme.spec.staging.moves,
+                joins=theme.spec.staging.joins,
             ),
             name="visual_director",
             config=config.agents["visual_director"],

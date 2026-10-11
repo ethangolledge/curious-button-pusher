@@ -41,10 +41,10 @@ from content.blender.rehearsal import RecordingCanvas, RehearsalStage
 from content.schemas.staging import (
     BlockChoice,
     Setting,
-    StagedActor,
     StagedScene,
     StagedVisualPackage,
     StagePlan,
+    Thing,
 )
 from content.schemas.visuals import VisualPackage
 from content.staging.catalogue import check, load_catalogue
@@ -288,8 +288,8 @@ def test_a_hand_built_set_offers_its_named_parts_as_the_layout() -> None:
 def _storyboard(camera: str, **settings: str) -> StagedVisualPackage:
     plan = StagePlan(
         layout=BlockChoice(block="office"),
-        actors=[StagedActor(actor_id="phone", block="prop", model="telephone",
-                            settings=[Setting(name="at", value="desk_top")])],
+        things=[Thing.model_validate({"thing_id": "phone", "what": "telephone",
+                                      "place": {"relation": "on", "target": "desk"}})],
         camera=BlockChoice(
             block=camera, settings=[Setting(name=k, value=v) for k, v in settings.items()]
         ),
@@ -309,7 +309,10 @@ def test_a_theme_move_becomes_its_move_block_refined_by_the_plan() -> None:
     theme = load_theme(PROJECT_ROOT / "themes/starter")
     scene = _storyboard("push_in", subject="phone", framing="close").scenes[0]
 
-    job = job_for(scene, theme, load_catalogue(None), seconds=4, quality="still")
+    assert scene.staging is not None
+    job = job_for(
+        scene.scene_id, scene.staging, theme, load_catalogue(None), seconds=4, quality="still"
+    )
 
     assert job.camera == BlockCall(
         "dolly", {"direction": "in", "subject": "phone", "framing": "close"}
@@ -346,3 +349,17 @@ def test_scattered_things_land_on_the_surface_and_clear_of_what_stands_there() -
     for at in landed:
         assert desk.low.x <= at.x <= desk.high.x and desk.low.y <= at.y <= desk.high.y
         assert not (taken.low.x < at.x < taken.high.x and taken.low.y < at.y < taken.high.y)
+
+
+@pytest.mark.parametrize("name", sorted(REGISTRY.props()))
+def test_every_prop_stands_on_its_base_or_hangs_from_its_top(name: str) -> None:
+    """What every placement relies on: a prop's lowest point is on the floor (a thing put on
+    a table sits on it, not in it or above it), or, if it hangs, its highest at its mark."""
+    prop = REGISTRY.props()[name]
+    stage = RehearsalStage(frames=1, props=REGISTRY.props())
+    box = stage.bounds(prop().build(stage, name))
+
+    if "hanging" in prop.capabilities:
+        assert box.high.z == pytest.approx(0, abs=0.005)
+    else:
+        assert box.low.z == pytest.approx(0, abs=0.005)

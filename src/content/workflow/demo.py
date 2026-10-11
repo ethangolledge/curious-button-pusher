@@ -500,46 +500,27 @@ def _staged_visual_response(topic: str) -> dict[str, Any]:
     def choice(block: str, **settings: str) -> dict[str, Any]:
         return {"block": block, "settings": [{"name": k, "value": v} for k, v in settings.items()]}
 
+    def thing(thing_id: str, what: str, relation: str, target: str) -> dict[str, Any]:
+        place = {"relation": relation, "target": target}
+        return {"thing_id": thing_id, "what": what, "place": place}
+
     scenes[1]["staging"] = {
         "layout": choice("office"),
-        "actors": [
-            {
-                "actor_id": "ledger",
-                "block": "prop",
-                "model": "book",
-                "settings": [{"name": "at", "value": "desk_top"}],
-            },
-        ],  # fmt: skip
-        "actions": [],
+        "things": [thing("ledger", "ledger book", "on", "desk")],
+        "furnish": "bare",
         "lights": [choice("lamp", at="desk_lamp"), choice("window", time="night")],
         "camera": choice("push_in", subject="ledger", framing="close"),
     }
     scenes[3]["staging"] = {
         "layout": choice("studio"),
-        "actors": [
-            {
-                "actor_id": "card",
-                "block": "prop",
-                "model": "folder",
-                "settings": [{"name": "at", "value": "plinth_top"}],
-            },
-        ],  # fmt: skip
-        "actions": [],
+        "things": [thing("card", "folder", "at", "plinth_top")],
         "lights": [choice("studio", subject="card")],
         "camera": choice("orbit", subject="card", degrees="90"),
     }
     scenes[4]["missing"] = "layout: a reading room"
     scenes[5]["staging"] = {
         "layout": choice("office"),
-        "actors": [
-            {
-                "actor_id": "safe",
-                "block": "prop",
-                "model": "safe",
-                "settings": [{"name": "at", "value": "desk_front"}],
-            },
-        ],  # fmt: skip
-        "actions": [],
+        "things": [thing("safe", "safe", "at", "desk_front")],
         "lights": [choice("overhead")],
         "camera": choice("orbit", subject="safe", degrees="30"),
     }

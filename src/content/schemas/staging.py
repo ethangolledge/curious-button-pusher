@@ -1,11 +1,32 @@
-"""A staged scene: the 3D shot the Visual Director plans for a scene, named from the
-catalogue of blocks and models (`docs/staging.md`). Settings are text, read by each block
-(`content/blender/blocks/base.read`), so one plan shape serves every block."""
+"""A staged scene: what the Visual Director wants in a 3D shot, described, not assembled. It
+names the room, the things in it (what each is, how many, how it looks, where it goes in
+relation to something else), what they do and how the camera moves; the toolkit finds or
+makes every thing and places it (`staging/compose.py`, `docs/staging.md`). Settings are
+text, read by each block (`content/blender/blocks/base.read`), so one shape serves every
+block."""
+
+from typing import Literal
 
 from pydantic import Field
 
 from content.schemas.base import ImmutableModel
 from content.schemas.visuals import Scene, VisualPackage
+
+# Where a thing goes, in relation to its `target` (another thing, or something the room
+# offers: a mark, a surface, a piece of furniture, or `floor`).
+Relation = Literal[
+    "on",  # standing on its top: a phone on the desk
+    "scattered_on",  # lying here and there on it, turned every way: papers on the floor
+    "stacked_on",  # one on another, on its top: files on the cabinet
+    "in_row_on",  # side by side along it: bottles on the shelf
+    "beside",  # next to it, on what it stands on: a bin beside the desk
+    "in_front_of",  # before it, as it faces: a glass in front of each man
+    "behind",
+    "around",  # in a ring round it, facing it: guards around the car
+    "seated_at",  # on chairs round it, facing it (chairs are added where none are free)
+    "against_wall",  # back to a wall, facing into the room
+    "at",  # standing on one of the room's marks: a man at the window
+]
 
 
 class Setting(ImmutableModel):
@@ -20,21 +41,59 @@ class BlockChoice(ImmutableModel):
     settings: list[Setting] = Field(default_factory=list)
 
 
-class StagedActor(ImmutableModel):
-    """Something placed in the shot: its name in the shot, the actor block that places it,
-    and the model it is (a library model or a prop made in code, by id)."""
+class Placement(ImmutableModel):
+    relation: Relation
+    target: str
+    # One for each of the target's copies (a glass in front of each of eight men).
+    each: bool = False
 
-    actor_id: str
+
+class Person(ImmutableModel):
+    """Who a person is, for a figure built to fit: a particular person from the library
+    (`who`), or anyone of this description."""
+
+    who: str = ""
+    sex: Literal["man", "woman"] = "man"
+    age: Literal["young", "middle", "old"] = "middle"
+    build: Literal["slim", "average", "heavy"] = "average"
+    dress: Literal["suit", "casual", "uniform", "work"] = "suit"
+    pose: Literal["standing", "seated", "walking"] = "standing"
+
+
+class Thing(ImmutableModel):
+    """Something in the shot. `what` is plain words for it ("water glass", "oil tanker");
+    the toolkit finds a model for it, makes one, or fetches one."""
+
+    thing_id: str
+    what: str
+    count: int = Field(default=1, ge=1, le=40)
+    # Its real height in metres, when it matters (a tall vase, a short man); 0 leaves it.
+    height: float = Field(default=0.0, ge=0.0, le=200.0)
+    # How it looks: colour, material, style, era ("colour: red", "material: brass").
+    looks: list[Setting] = Field(default_factory=list)
+    place: Placement
+    person: Person | None = None
+
+
+class Action(ImmutableModel):
+    """Something that happens: an action block, done by every copy of `who` (each in turn,
+    `stagger` of the shot apart)."""
+
     block: str
-    model: str
+    who: str
     settings: list[Setting] = Field(default_factory=list)
+    stagger: float = Field(default=0.0, ge=0.0, le=0.5)
 
 
 class StagePlan(ImmutableModel):
+    # The room or place: a layout block, with its settings.
     layout: BlockChoice
-    actors: list[StagedActor] = Field(default_factory=list)
-    actions: list[BlockChoice] = Field(default_factory=list)
+    things: list[Thing] = Field(default_factory=list)
+    # How much background detail the room is given beyond the things named.
+    furnish: Literal["bare", "some", "lived_in"] = "some"
+    actions: list[Action] = Field(default_factory=list)
     lights: list[BlockChoice] = Field(default_factory=list)
+    # The camera's move; its `subject` may name a thing (every copy is framed).
     camera: BlockChoice
 
 

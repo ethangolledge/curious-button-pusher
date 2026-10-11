@@ -17,6 +17,7 @@ from typing import Any
 import numpy as np
 
 from content.blender.blocks.base import Prop, summary
+from content.blender.job import ModelFile
 from content.blender.materials import ROLES
 from content.blender.registry import discover
 from content.blender.rehearsal import RehearsalStage
@@ -209,6 +210,36 @@ class Library:
             model = self.get(model.base)
             paint = {**model.paint, **paint}
         return model, paint
+
+    def model_file(
+        self,
+        model_id: str,
+        *,
+        key: str = "",
+        paint: Mapping[str, str] | None = None,
+        height: float = 0.0,
+    ) -> ModelFile | None:
+        """What Blender needs to draw a model: the file (or prop) it is made from, its size,
+        its paint and height, under `key` in the job (its id unless it is made to fit a
+        scene). None for a prop made in code drawn as it is: Blender has its file."""
+        model = self.get(model_id)
+        root, painted = self.root(model)
+        painted = {**painted, **(paint or {})}
+        path = self.path(root)
+        fitted = height or (model.size[2] if model.base else 0.0)
+        if path is None and not model.base and not painted and not fitted:
+            return None
+        made_in_code = root.source == MADE_IN_CODE
+        scale = fitted / model.size[2] if fitted and model.size[2] else 1.0
+        return ModelFile(
+            key or model_id,
+            str(path or ""),
+            (model.size[0] * scale, model.size[1] * scale, model.size[2] * scale),
+            prop=root.model_id if made_in_code else "",
+            paint=painted,
+            height=fitted,
+            base=model_id,
+        )
 
     def credit(self, model_id: str) -> str:
         """The line a video using this model must carry where it is published, naming the

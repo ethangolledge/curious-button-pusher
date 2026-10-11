@@ -143,9 +143,10 @@ class BlenderStage(Bookkeeping):
         return group
 
     def _paint(self, group: BlenderObject, paint: Mapping[str, str], *, imported: bool) -> None:
-        """Every surface in the look's material for its role: its own role (a prop's), or the
-        one its colour is nearest (an imported model's), unless `paint` names another for its
-        part, its material or that role. An imported model is then dressed as every solid is."""
+        """Every surface in the look's material for its role: its own role (a prop's, or a
+        material named for one), or the one its colour is nearest (an imported model's),
+        unless `paint` names another for its part, its material or that role (`*`: every
+        surface). An imported model is then dressed as every solid is."""
         for obj in group.children_recursive:
             if obj.type != "MESH":
                 continue
@@ -154,18 +155,18 @@ class BlenderStage(Bookkeeping):
                 obj.data.materials.append(None)
             for slot in obj.material_slots:
                 current = slot.material.name.split(".")[0] if slot.material else ""
-                if imported:
+                if current in ROLES:
+                    role = current  # named for its role (a figure made to fit, a prop)
+                elif imported:
                     colour, metallic, transmission = surface(slot.material)
                     role = nearest_role(colour, metallic=metallic, transmission=transmission)
-                elif current in ROLES:
-                    role = current
                 else:
                     continue  # what the look added (an outline)
                 chosen = next(
                     (
                         new
                         for key, new in paint.items()
-                        if part.startswith(key.lower()) or key in (current, role)
+                        if key == "*" or part.startswith(key.lower()) or key in (current, role)
                     ),
                     role,
                 )

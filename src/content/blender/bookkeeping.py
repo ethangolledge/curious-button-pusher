@@ -56,6 +56,10 @@ class Bookkeeping:
             raise ValueError(f"two actors are called '{actor_id}'")
         self._actors[actor_id] = thing
 
+    def cast_names(self) -> list[str]:
+        """Every actor's name, in the order they were cast."""
+        return list(self._actors)
+
     def actor(self, actor_id: str) -> Any:
         if actor_id not in self._actors:
             raise KeyError(f"no actor '{actor_id}' (actors: {', '.join(self._actors)})")

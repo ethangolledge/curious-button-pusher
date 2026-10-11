@@ -10,10 +10,10 @@ from typing import Any
 
 from content.blender.blocks.base import SettingError, read, refs, settings, summary
 from content.blender.direct import build
-from content.blender.job import BlockCall, Job, ModelFile
+from content.blender.job import BlockCall, Job
 from content.blender.registry import KINDS, Registry, RegistryError, discover
 from content.blender.rehearsal import RehearsalStage
-from content.staging.library import MADE_IN_CODE, Library, load_library
+from content.staging.library import Library, load_library
 from content.theme import BlockPreset
 
 
@@ -30,6 +30,10 @@ def load_catalogue(theme_root: Path | None) -> Catalogue:
     blocks = tuple(p for p in [theme_root / "blender"] if p.is_dir()) if theme_root else ()
     library = load_library(theme_root / "assets" if theme_root else None, blocks)
     return Catalogue(discover(blocks), library, blocks)
+
+
+# What the Visual Director chooses from: it describes things, and the composer places them.
+DIRECTED = ("layouts", "actions", "moves", "lights", "transitions")
 
 
 def describe(
@@ -69,7 +73,7 @@ def describe(
             usual = "; ".join(f"{speed} changes: {preset.block}" for speed, preset in joins.items())
             lines.append(f"- the theme's usual joins, when a scene names none: {usual}")
         lines.append("")
-    lines.append("## models")
+    lines.append("## things on hand (anything else is found or made when the shot is built)")
     for model in sorted(catalogue.library.models.values(), key=lambda m: m.model_id):
         able = f" [{', '.join(model.capabilities)}]" if model.capabilities else ""
         offers = (
@@ -105,27 +109,14 @@ def models_named(job: Job, registry: Registry) -> set[str]:
 
 
 def with_models(job: Job, catalogue: Catalogue) -> Job:
-    """The job with its library models (their files, sizes and paint) and the channel's own
-    blocks. A version of a model goes as the model it is made from, repainted and resized."""
-    library = catalogue.library
-    files = []
-    for model_id in sorted(models_named(job, catalogue.registry)):
-        model = library.get(model_id)
-        root, paint = library.root(model)
-        path = library.path(root)
-        made_in_code = root.source == MADE_IN_CODE
-        if path is None and not model.base:
-            continue  # a prop made in code: Blender builds it from its own file
-        files.append(
-            ModelFile(
-                model_id,
-                str(path or ""),
-                model.size,
-                prop=root.model_id if made_in_code else "",
-                paint=paint,
-                height=model.size[2] if model.base else 0.0,
-            )
-        )
+    """The job with the library models it names (their files, sizes and paint), beside any
+    it already carries (things made to fit a scene), and the channel's own blocks."""
+    given = {m.model_id for m in job.models}
+    files = list(job.models)
+    for model_id in sorted(models_named(job, catalogue.registry) - given):
+        file = catalogue.library.model_file(model_id)
+        if file is not None:
+            files.append(file)
     folders = tuple(str(folder) for folder in catalogue.channel_blocks)
     return replace(job, models=tuple(files), channel_blocks=folders)
 
@@ -134,10 +125,15 @@ def check(job: Job, catalogue: Catalogue) -> list[str]:
     """Every problem with a shot that can be found without rendering it."""
     issues: list[str] = []
     library = catalogue.library
-    for model_id in sorted(models_named(job, catalogue.registry)):
+    given = {m.model_id: m for m in job.models}
+    for model_id in sorted(models_named(job, catalogue.registry) - set(given)):
         if model_id not in library.models:
             issues.append(f"no model '{model_id}' (content staging models)")
-    models = {actor.actor_id: actor.model for actor in job.actors}
+    # A thing made to fit a scene can do what the model it is made from can.
+    models = {
+        actor.actor_id: given[actor.model].base if actor.model in given else actor.model
+        for actor in job.actors
+    }
     for kind, call in _calls(job):
         try:
             block = catalogue.registry.get(kind, call.block)
@@ -164,7 +160,10 @@ def check(job: Job, catalogue: Catalogue) -> list[str]:
         aspect=job.width / job.height,
         seed=job.seed,
         props=catalogue.registry.props(),
-        model_sizes={m.model_id: m.size for m in library.models.values() if m.file or m.base},
+        model_sizes={
+            **{m.model_id: m.size for m in library.models.values() if m.file or m.base},
+            **{m.model_id: m.size for m in job.models},
+        },
         model_parts={m.model_id: m.parts for m in library.models.values() if m.parts},
     )
     try:

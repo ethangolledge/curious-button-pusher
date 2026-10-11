@@ -37,7 +37,7 @@ from content.schemas.staging import StagedScene
 from content.schemas.story import Feeling
 from content.schemas.visuals import Scene
 from content.staging.backlog import record_gap
-from content.staging.plan import job_for, staged, unstage
+from content.staging.plan import StagingError, job_for, staged, unstage
 from content.state import CallRecord, ContentState
 from content.story.field import (
     circumplex,
@@ -169,10 +169,17 @@ class Keyframes(Studio):
             window.frame(window.held_from + window.held / 2, fps),
             window.frame(window.out_from, fps),
         ]
-        base = job_for(
-            shot, self.theme, staging[1], seconds=window.seconds, quality="final",
-            frames=sorted(set(frames)), grade=grade, seed=self.config.seed,
-        )  # fmt: skip
+        try:
+            assert shot.staging is not None
+            base = job_for(
+                shot.scene_id, shot.staging, self.theme, staging[1], seconds=window.seconds,
+                quality="final", frames=sorted(set(frames)), grade=grade, seed=self.config.seed,
+            )  # fmt: skip
+        except StagingError as exc:
+            # Something it needs could not be found or made: drawn, and the gap noted.
+            for missing in exc.missing:
+                record_gap(self.theme.root, state["topic"], scene.scene_id, missing)
+            return None
         signature = render_signature("blender", STAGING_LOOK, base.dumps())
         attempt = next_attempt(previous, signature, self.config.keyframe_attempts)
         if attempt is None:
@@ -461,8 +468,8 @@ def _is_tone_issue(issue: str) -> bool:
 def _summary(plan: StagedScene) -> str:
     staging = plan.staging
     assert staging is not None
-    things = ", ".join(f"{a.model} as {a.actor_id}" for a in staging.actors) or "nothing added"
-    actions = ", ".join(choice.block for choice in staging.actions) or "no action"
+    things = ", ".join(f"{t.count} × {t.what}" for t in staging.things) or "nothing added"
+    actions = ", ".join(action.block for action in staging.actions) or "no action"
     return f"{staging.layout.block} with {things}; {actions}; camera {staging.camera.block}"
 
 

@@ -6,11 +6,19 @@ from dataclasses import replace
 from typing import Any, TypeVar
 
 from content.blender.blocks.base import SettingError, read
-from content.blender.job import NEUTRAL, ActorCall, BlockCall, Grade, Job, Join, Quality
+from content.blender.job import NEUTRAL, BlockCall, Grade, Job, Join, Quality
 from content.blender.registry import RegistryError
-from content.schemas.staging import BlockChoice, Setting, StagedScene, StagedVisualPackage
+from content.schemas.staging import (
+    BlockChoice,
+    Setting,
+    StagedScene,
+    StagedVisualPackage,
+    StagePlan,
+)
 from content.schemas.visuals import Scene, VisualPackage
 from content.staging.catalogue import Catalogue, check, with_models
+from content.staging.compose import Resolve, compose
+from content.staging.resolve import from_library
 from content.theme import BlockPreset, Theme
 
 Package = TypeVar("Package", bound=VisualPackage)
@@ -39,8 +47,17 @@ def _text(value: object) -> str:
     return str(value)
 
 
+class StagingError(ValueError):
+    """A staged scene that cannot be composed: what is missing, in a few words each."""
+
+    def __init__(self, missing: Sequence[str]) -> None:
+        super().__init__("; ".join(missing))
+        self.missing = list(missing)
+
+
 def job_for(
-    scene: StagedScene,
+    shot_id: str,
+    plan: StagePlan,
     theme: Theme,
     catalogue: Catalogue,
     *,
@@ -51,24 +68,31 @@ def job_for(
     scale: float = 1.0,
     grade: Grade = NEUTRAL,
     seed: int = 1,
+    resolve: Resolve | None = None,
 ) -> Job:
-    """The render job for a staged scene, in the channel's look and frame. `scale` shrinks
+    """The render job for a staged scene's plan, in the channel's look and frame: its things
+    resolved (from the library unless `resolve` says otherwise) and placed. `scale` shrinks
     the frame (drafts); `fps` slows it (drafts are stretched back to the cut's rate)."""
-    plan = scene.staging
-    if plan is None:
-        raise ValueError(f"{scene.scene_id} is not staged")
+    shot = compose(
+        plan,
+        catalogue.registry,
+        resolve or from_library(catalogue.library),
+        seed=f"{seed}:{shot_id}",
+    )
+    if shot.missing:
+        raise StagingError(shot.missing)
     spec = theme.spec
     staging = spec.staging
     job = Job(
-        shot_id=scene.scene_id,
+        shot_id=shot_id,
         seconds=seconds,
         layout=_call(plan.layout),
         camera=_call(plan.camera, staging.moves),
         look=BlockCall(staging.look, {k: _text(v) for k, v in staging.look_settings.items()}),
-        actors=tuple(
-            ActorCall(a.actor_id, a.block, a.model, _settings(a.settings)) for a in plan.actors
-        ),
-        actions=tuple(_call(choice) for choice in plan.actions),
+        actors=tuple(shot.actors),
+        groups=dict(shot.groups),
+        models=tuple(shot.models),
+        actions=tuple(shot.actions),
         lights=tuple(_call(choice) for choice in plan.lights),
         palette=dict(spec.palette),
         grade=grade,
@@ -143,12 +167,15 @@ def staging_issues(visuals: VisualPackage, theme: Theme, catalogue: Catalogue) -
         return []
     issues = []
     for scene in visuals.scenes:
-        if (shot := staged(scene)) is None:
+        if (shot := staged(scene)) is None or shot.staging is None:
             continue
         try:
-            job = job_for(shot, theme, catalogue, seconds=CHECK_SECONDS, quality="still")
-        except KeyError as exc:
-            issues.append(f"{scene.scene_id} staging: {str(exc).strip(chr(39))}")
+            job = job_for(
+                scene.scene_id, shot.staging, theme, catalogue, seconds=CHECK_SECONDS,
+                quality="still",
+            )  # fmt: skip
+        except StagingError as exc:
+            issues += [f"{scene.scene_id} staging: {missing}" for missing in exc.missing]
             continue
         issues += [f"{scene.scene_id} staging: {issue}" for issue in check(job, catalogue)]
     for scene in visuals.scenes:

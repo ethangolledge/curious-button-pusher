@@ -43,6 +43,8 @@ class ModelFile:
     prop: str = ""
     paint: dict[str, str] = field(default_factory=dict)
     height: float = 0.0
+    # The library model it is made from, when it is made to fit a scene (what it can do).
+    base: str = ""
 
 
 @dataclass(frozen=True, slots=True)
@@ -67,6 +69,9 @@ class Job:
     actors: tuple[ActorCall, ...] = ()
     actions: tuple[BlockCall, ...] = ()
     lights: tuple[BlockCall, ...] = ()
+    # Names for sets of actors (every copy of a thing), so a move or an action can take
+    # them together: an orbit round "the men" frames all of them.
+    groups: dict[str, tuple[str, ...]] = field(default_factory=dict)
     models: tuple[ModelFile, ...] = ()
     palette: dict[str, str] = field(default_factory=dict)
     grade: Grade = field(default_factory=Grade)
@@ -99,6 +104,7 @@ class Job:
         data["actors"] = tuple(ActorCall(**actor) for actor in data.get("actors", ()))
         data["actions"] = tuple(BlockCall(**action) for action in data.get("actions", ()))
         data["lights"] = tuple(BlockCall(**light) for light in data.get("lights", ()))
+        data["groups"] = {name: tuple(ids) for name, ids in data.get("groups", {}).items()}
         data["models"] = tuple(
             ModelFile(**{**model, "size": tuple(model["size"])}) for model in data.get("models", ())
         )

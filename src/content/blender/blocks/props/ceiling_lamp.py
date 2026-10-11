@@ -11,7 +11,7 @@ DROP = 0.8
 class CeilingLamp(Prop):
     name = "ceiling_lamp"
     names = ("pendant lamp", "hanging lamp", "light fitting", "bare bulb")
-    capabilities = frozenset({"light"})
+    capabilities = frozenset({"light", "hanging"})
 
     def build(self, stage: Stage, name: str) -> Thing:
         lamp = stage.group(name)

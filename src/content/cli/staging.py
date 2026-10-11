@@ -3,6 +3,7 @@ models, check a shot and preview it, and start a new block from its template."""
 
 import argparse
 import hashlib
+import json
 import re
 from dataclasses import replace
 from pathlib import Path
@@ -15,12 +16,17 @@ from content.production.assemble import contact_sheet
 from content.providers import ffmpeg
 from content.providers.assets import ALLOWED, SOURCES, AssetSource, Candidate, ready_sources
 from content.providers.blender import LocalBlender
+from content.schemas.staging import StagePlan
 from content.staging import sourcing
 from content.staging.backlog import most_wanted
 from content.staging.catalogue import Catalogue, check, describe, load_catalogue, with_models
-from content.staging.plan import themed
+from content.staging.plan import StagingError, job_for, themed
 from content.staging.templates import TEMPLATES, render
-from content.theme import Theme
+from content.theme import Theme, load_theme
+
+# The starter kit's theme draws a shot when no channel is named; a plan's shot runs this long.
+STARTER = Path(__file__).parents[3] / "themes" / "starter"
+PREVIEW_SECONDS = 5.0
 
 
 def _staging(arguments: list[str]) -> int:
@@ -82,7 +88,9 @@ def _staging(arguments: list[str]) -> int:
         ("preview", "Render a shot's stills"),
     ):
         shot = actions.add_parser(verb, parents=[common], help=about)
-        shot.add_argument("job", type=Path, help="A shot as a job file (JSON)")
+        shot.add_argument(
+            "job", type=Path, help="A shot: a job file, or a staged scene's plan (JSON)"
+        )
         if verb == "preview":
             shot.add_argument(
                 "--frames", default="", help="Frames to render, e.g. 1,60,120 (default: four)"
@@ -123,13 +131,13 @@ def _staging(arguments: list[str]) -> int:
         except ValueError as exc:
             print(exc)
             return 1
-    elif args.action == "check":
-        job = Job.read(args.job)
-        return _check(themed(job, theme) if theme else job, catalogue)
-    elif args.action == "preview":
-        job = Job.read(args.job)
-        # A channel's shots are drawn its way: its look, and its camera moves.
-        return _preview(themed(job, theme) if theme else job, catalogue, args)
+    elif args.action in ("check", "preview"):
+        try:
+            job = _shot(args.job, theme, catalogue)
+        except StagingError as exc:
+            print("\n".join(f"✗ {missing}" for missing in exc.missing))
+            return 1
+        return _check(job, catalogue) if args.action == "check" else _preview(job, catalogue, args)
     elif args.action == "backlog":
         if theme is None:
             parser.error("the backlog is a channel's: pass --config themes/<name>/config.json")
@@ -186,6 +194,17 @@ def _models(catalogue: Catalogue, words: str) -> None:
         w, d, h = model.size
         origin = model.source + (f", {model.licence}" if model.licence else "")
         print(f"{model.model_id:20} {w:.2f}×{d:.2f}×{h:.2f} m  ({origin})  {model.describe}")
+
+
+def _shot(path: Path, theme: Theme | None, catalogue: Catalogue) -> Job:
+    """A shot from its file: a job, or a staged scene's plan (as the Visual Director writes
+    it), composed. A channel's shots are drawn its way: its look, and its camera moves."""
+    data = json.loads(path.read_text(encoding="utf-8"))
+    theme = theme or load_theme(STARTER)
+    if "shot_id" in data:
+        return themed(Job.loads(json.dumps(data)), theme)
+    plan = StagePlan.model_validate(data)
+    return job_for(path.stem, plan, theme, catalogue, seconds=PREVIEW_SECONDS, quality="still")
 
 
 def _check(job: Job, catalogue: Catalogue) -> int:
