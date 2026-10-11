@@ -147,7 +147,7 @@ def _staging(arguments: list[str]) -> int:
             return 1
     elif args.action in ("check", "preview"):
         try:
-            job = _shot(args.job, theme, catalogue)
+            job, catalogue = _shot(args.job, theme, catalogue)
         except StagingError as exc:
             print("\n".join(f"✗ {missing}" for missing in exc.missing))
             return 1
@@ -230,15 +230,18 @@ def _models(catalogue: Catalogue, words: str) -> None:
         print(f"{model.model_id:20} {w:.2f}×{d:.2f}×{h:.2f} m  ({origin})  {model.describe}")
 
 
-def _shot(path: Path, theme: Theme | None, catalogue: Catalogue) -> Job:
+def _shot(path: Path, theme: Theme | None, catalogue: Catalogue) -> tuple[Job, Catalogue]:
     """A shot from its file: a job, or a staged scene's plan (as the Visual Director writes
     it), composed. A channel's shots are drawn its way: its look, and its camera moves."""
     data = json.loads(path.read_text(encoding="utf-8"))
-    theme = theme or load_theme(STARTER)
     if "shot_id" in data:
-        return themed(Job.loads(json.dumps(data)), theme)
+        job = Job.loads(json.dumps(data))
+        return (themed(job, theme) if theme else job), catalogue
+    if theme is None:  # drawn the starter kit's way, with its own blocks
+        theme, catalogue = load_theme(STARTER), load_catalogue(STARTER)
     plan = StagePlan.model_validate(data)
-    return job_for(path.stem, plan, theme, catalogue, seconds=PREVIEW_SECONDS, quality="still")
+    job = job_for(path.stem, plan, theme, catalogue, seconds=PREVIEW_SECONDS, quality="still")
+    return job, catalogue
 
 
 def _check(job: Job, catalogue: Catalogue) -> int:

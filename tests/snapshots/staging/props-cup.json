@@ -1,0 +1,5 @@
+[
+["group",{"name":"cup_built","at":{"x":0.0,"y":0.0,"z":0.0}}],
+["shape",{"kind":"cylinder","name":"cup_built.body","size":{"x":0.085,"y":0.085,"z":0.1},"at":{"x":0,"y":0,"z":0.0},"role":"paint"}],
+["shape",{"kind":"box","name":"cup_built.handle","size":{"x":0.012,"y":0.034,"z":0.055},"at":{"x":0.051,"y":0,"z":0.02},"role":"paint"}]
+]

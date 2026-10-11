@@ -83,7 +83,7 @@ FURNISHING: dict[str, list[tuple[str, str, str, int]]] = {
         ("filing cabinet", "against_wall", "floor", 1),
         ("potted plant", "against_wall", "floor", 1),
         ("folder", "stacked_on", "desk", 3),
-        ("mug", "on", "desk", 1),
+        ("coffee mug", "on", "desk", 1),
         ("book", "on", "desk", 2),
     ],
     "boardroom": [

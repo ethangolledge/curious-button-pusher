@@ -18,7 +18,7 @@ from content.blender.api import (
     Thing,
     standing_in,
 )
-from content.blender.blocks.base import Prop
+from content.blender.blocks.base import Prop, read
 from content.blender.bookkeeping import Bookkeeping
 from content.blender.maths import ORIGIN, Quat, Vec, axis_angle, heading_rotation
 
@@ -110,11 +110,19 @@ class RehearsalStage(Bookkeeping):
         )
         return piece
 
-    def model(self, model_id: str, *, name: str, height: float | None = None) -> Thing:
-        self._record("model", model=model_id, name=name, height=height)
+    def model(
+        self,
+        model_id: str,
+        *,
+        name: str,
+        height: float | None = None,
+        settings: Mapping[str, str] | None = None,
+    ) -> Thing:
+        self._record("model", model=model_id, name=name, height=height, **_given(settings))
         if model_id in self._props:
             group = self._new(name, Vec(), Vec(), None)
-            built = self._props[model_id]().build(self, f"{name}.body")
+            prop = self._props[model_id]
+            built = prop(read(prop, settings or {})).build(self, f"{name}.body")
             self.place(built, Vec(), parent=group)
             return group
         if model_id not in self._model_sizes:
@@ -307,3 +315,9 @@ class RecordingCanvas:
 
     def output(self, colour: Any) -> None:
         self.shown = colour
+
+
+def _given(settings: Mapping[str, str] | None) -> dict[str, Any]:
+    """A family's settings, recorded only when there are some (so the record of every other
+    model is as it was)."""
+    return {"settings": dict(settings)} if settings else {}

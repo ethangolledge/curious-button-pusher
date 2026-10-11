@@ -2,6 +2,6 @@
 ["group",{"name":"bottle_built","at":{"x":0.0,"y":0.0,"z":0.0}}],
 ["shape",{"kind":"cylinder","name":"bottle_built.body","size":{"x":0.08,"y":0.08,"z":0.2},"at":{"x":0.0,"y":0.0,"z":0.0},"role":"glass"}],
 ["shape",{"kind":"cone","name":"bottle_built.shoulder","size":{"x":0.08,"y":0.08,"z":0.06},"at":{"x":0,"y":0,"z":0.2},"role":"glass"}],
-["shape",{"kind":"cylinder","name":"bottle_built.neck","size":{"x":0.028,"y":0.028,"z":0.08},"at":{"x":0,"y":0,"z":0.24},"role":"glass"}],
-["shape",{"kind":"cylinder","name":"bottle_built.label","size":{"x":0.084,"y":0.084,"z":0.08},"at":{"x":0,"y":0,"z":0.06},"role":"paper"}]
+["shape",{"kind":"cylinder","name":"bottle_built.neck","size":{"x":0.028,"y":0.028,"z":0.116},"at":{"x":0,"y":0,"z":0.224},"role":"glass"}],
+["shape",{"kind":"cylinder","name":"bottle_built.label","size":{"x":0.083,"y":0.083,"z":0.08},"at":{"x":0,"y":0,"z":0.06},"role":"paper"}]
 ]

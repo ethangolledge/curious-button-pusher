@@ -27,7 +27,7 @@ class Boardroom(Layout):
 
     def build(self, stage: Stage, p: Settings) -> None:
         room(stage, 8.0, 6.5, 3.0, window=True, blinds=p.blinds, door=True)
-        table = stage.model("long_table", name="table")
+        table = stage.model("table", name="table", settings={"style": "conference"})
         stage.place(table, Vec(0, 0.3, 0))
         stage.cast("table", table)
         top = stage.bounds(table)

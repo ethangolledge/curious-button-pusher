@@ -8,13 +8,13 @@ from pathlib import Path
 
 import pytest
 
-from content.blender.job import ActorCall, BlockCall, Job
+from content.blender.job import ActorCall, BlockCall, Job, ModelFile
 from content.blender.materials import linear, nearest_role
 from content.providers.assets import Candidate, licence_terms
 from content.schemas.staging import Thing
 from content.staging.catalogue import load_catalogue, with_models
 from content.staging.library import Model, load_library
-from content.staging.resolve import with_online
+from content.staging.resolve import from_library, with_online
 from content.staging.sourcing import TOO_DETAILED, rank
 from content.staging.store import Store
 
@@ -95,15 +95,15 @@ def test_a_version_is_its_original_repainted_and_resized_with_its_rights(
     library.vary(
         "tall_gold_statue", "gold_statue", describe="Taller", paint={"base": "wood"}, height=1.2
     )
-    library.vary("red_box", "cardboard_box", describe="A red box", paint={"card": "brick"})
+    library.vary("red_box", "box", describe="A red box", paint={"card": "brick"})
     with pytest.raises(ValueError, match="no role velvet"):
-        library.vary("velvet_box", "cardboard_box", describe="?", paint={"card": "velvet"})
+        library.vary("velvet_box", "box", describe="?", paint={"card": "velvet"})
 
     job = Job(
         shot_id="s", seconds=1, layout=BlockCall("studio"), camera=BlockCall("hold"),
         look=BlockCall("plain"),
         actors=tuple(
-            ActorCall(m, "prop", m) for m in ("tall_gold_statue", "red_box", "cardboard_box")
+            ActorCall(m, "prop", m) for m in ("tall_gold_statue", "red_box", "box")
         ),
     )  # fmt: skip
     shipped = {m.model_id: m for m in with_models(job, catalogue).models}
@@ -111,10 +111,10 @@ def test_a_version_is_its_original_repainted_and_resized_with_its_rights(
     tall = shipped["tall_gold_statue"]
     assert tall.path.endswith("statue.glb") and not tall.prop
     assert tall.paint == {"stone": "metal", "base": "wood"}
-    assert tall.height == 1.2 and tall.size == (0.8, 0.6, 1.2)
+    assert tall.fit == (0.0, 0.0, 1.2) and tall.size == (0.8, 0.6, 1.2)
     box = shipped["red_box"]
-    assert box.prop == "cardboard_box" and not box.path and box.paint == {"card": "brick"}
-    assert "cardboard_box" not in shipped  # made in code: Blender builds it from its file
+    assert box.prop == "box" and not box.path and box.paint == {"card": "brick"}
+    assert "box" not in shipped  # made in code: Blender builds it from its file
     # Whoever made the original is credited for every version of it.
     assert library.credit("tall_gold_statue") == (
         "A marble bust by a sculptor (sketchfab, CC-BY): https://statue"
@@ -194,3 +194,34 @@ def test_what_the_library_lacks_is_looked_for_online_once_and_scaled_to_its_heig
     assert first is not None and first.size.z == pytest.approx(0.7)
     assert asked == ["traffic cone", "oil tanker"]  # each looked for once; the desk is on hand
     assert desk is not None and desk.model == "desk"
+
+
+def _resolved(what: str, **extra: object) -> tuple[str, tuple[float, float, float], ModelFile]:
+    library = load_catalogue(None).library
+    thing = Thing.model_validate(
+        {"thing_id": "t", "what": what, "place": {"relation": "on", "target": "floor"}, **extra}
+    )
+    found = from_library(library)(thing)
+    assert found is not None and found.file is not None
+    return found.model, found.file.size, found.file
+
+
+def test_one_family_makes_every_kind_of_its_thing_from_the_words_for_it() -> None:
+    _, espresso, file = _resolved("espresso cup")
+    _, mug, _ = _resolved("coffee mug")
+    _, flute, _ = _resolved("champagne glass")
+
+    assert file.prop == "cup" and file.params == {"style": "espresso"}
+    assert espresso[2] < mug[2]
+    assert flute[2] > 0.2  # on its stem
+
+
+def test_a_family_is_made_to_the_size_asked_and_anything_else_is_stretched_to_it() -> None:
+    _, table, file = _resolved("conference table", width=8.0)
+    _, desk, desk_file = _resolved("desk", width=2.4)
+
+    assert table[0] == pytest.approx(8.0)
+    assert file.params == {"style": "conference", "width": "8"}
+    assert file.fit == (0.0, 0.0, 0.0)
+    # The desk has no setting for its width: it is stretched, its height kept in proportion.
+    assert desk[0] == pytest.approx(2.4) and desk_file.fit == (2.4, 0.0, 0.0)

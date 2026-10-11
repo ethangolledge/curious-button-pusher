@@ -117,13 +117,20 @@ class NoSettings:
 class Prop(Block):
     """A model made in code, offered beside the library's models. Its docstring says what it
     is; `names` are other words for it, so a search finds it however it is asked for. It is
-    built standing on the origin, facing −Y, at its usual size; the shot scales and places it."""
+    built standing on the origin, facing −Y, at its usual size; the shot scales and places it.
+
+    A prop with settings is a family: one shape that fits a whole kind of thing (every cup,
+    from an espresso cup to a mug), its settings chosen from the words a scene uses for it
+    (`staging/resolve.py`). It reads them as `self.p`."""
 
     kind = "props"
-    settings = NoSettings
-    example = NoSettings()
+    settings: ClassVar[type[Any]] = NoSettings
+    example: ClassVar[Any] = NoSettings()
     names: ClassVar[tuple[str, ...]] = ()
     capabilities: ClassVar[frozenset[str]] = frozenset()
+
+    def __init__(self, values: Any = None) -> None:
+        self.p = values if values is not None else self.example
 
     def build(self, stage: Stage, name: str) -> Thing:
         raise NotImplementedError

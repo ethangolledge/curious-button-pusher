@@ -134,8 +134,8 @@ def test_a_lived_in_room_gains_furniture_against_its_walls_and_things_on_its_des
                     RESOLVE, seed="s")  # fmt: skip
 
     assert bare.actors == []
-    models = {a.model for a in lived.actors}
-    assert {"bookcase", "filing_cabinet", "mug"} <= models
+    models = {a.model.split("~")[0] for a in lived.actors}  # a family made to fit: "cup~…"
+    assert {"bookcase", "filing_cabinet", "cup"} <= models
 
 
 def test_words_for_a_things_look_become_the_role_it_is_drawn_in() -> None:

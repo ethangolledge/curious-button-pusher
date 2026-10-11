@@ -69,6 +69,10 @@ class Thing(ImmutableModel):
     count: int = Field(default=1, ge=1, le=40)
     # Its real height in metres: what a model of any size is scaled to. 0 keeps the model's.
     height: float = Field(default=0.0, ge=0.0, le=200.0)
+    # Its width and depth in metres, when they matter (a table eight metres long); 0 keeps
+    # the model's proportions.
+    width: float = Field(default=0.0, ge=0.0, le=500.0)
+    depth: float = Field(default=0.0, ge=0.0, le=500.0)
     # How it looks: colour, material, style, era ("colour: red", "material: brass").
     looks: list[Setting] = Field(default_factory=list)
     place: Placement

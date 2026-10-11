@@ -23,12 +23,19 @@ from content.blender.api import (
     ShapeKind,
     standing_in,
 )
-from content.blender.blocks.base import Look, Prop
+from content.blender.blocks.base import Look, Prop, read
 from content.blender.bookkeeping import Bookkeeping
 from content.blender.imports import import_model, surface
 from content.blender.job import ModelFile
 from content.blender.materials import ROLES, linear, nearest_role
-from content.blender.maths import ORIGIN, Quat, Vec, heading_rotation, look_rotation
+from content.blender.maths import (
+    ORIGIN,
+    Quat,
+    Vec,
+    fit_scale,
+    heading_rotation,
+    look_rotation,
+)
 
 BlenderObject = Any
 
@@ -121,12 +128,21 @@ class BlenderStage(Bookkeeping):
         self._look.dress(obj)
         return self._link(obj, at, parent)
 
-    def model(self, model_id: str, *, name: str, height: float | None = None) -> BlenderObject:
+    def model(
+        self,
+        model_id: str,
+        *,
+        name: str,
+        height: float | None = None,
+        settings: Mapping[str, str] | None = None,
+    ) -> BlenderObject:
         group = self.group(name)
         spec = self._model_files.get(model_id)
         made = spec.prop if spec and spec.prop else model_id
         if made in self._props:
-            body: BlenderObject = self._props[made]().build(self, f"{name}.body")
+            prop = self._props[made]
+            values = read(prop, {**(spec.params if spec else {}), **(settings or {})})
+            body: BlenderObject = prop(values).build(self, f"{name}.body")
             body.parent = group
         elif spec is not None and spec.path:
             for obj in import_model(spec.path):
@@ -136,10 +152,10 @@ class BlenderStage(Bookkeeping):
             raise KeyError(f"no model or prop called '{model_id}'")
         self._paint(group, spec.paint if spec else {}, imported=made not in self._props)
         height = height or (spec.height if spec else None)
-        if height:
-            box = self.bounds(group)
-            if box.size.z > 0:
-                group.scale = (height / box.size.z,) * 3
+        fit = spec.fit if spec else (0.0, 0.0, 0.0)
+        if height or any(fit):
+            target = (fit[0], fit[1], height or fit[2])
+            group.scale = fit_scale(self.bounds(group).size.tuple(), target)
         return group
 
     def _paint(self, group: BlenderObject, paint: Mapping[str, str], *, imported: bool) -> None:

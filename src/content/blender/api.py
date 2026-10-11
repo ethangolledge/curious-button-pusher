@@ -140,9 +140,16 @@ class Stage(Protocol):
         centre of its base; `turn` is degrees about x, y and z."""
         ...
 
-    def model(self, model_id: str, *, name: str, height: float | None = None) -> Thing:
+    def model(
+        self,
+        model_id: str,
+        *,
+        name: str,
+        height: float | None = None,
+        settings: Mapping[str, str] | None = None,
+    ) -> Thing:
         """A model from the library or a prop made in code, standing at the origin facing −Y,
-        scaled to `height` metres if given."""
+        scaled to `height` metres if given; a family made with `settings` (a long table)."""
         ...
 
     def picture(self, model_id: str, *, name: str, width: float, lying: bool = False) -> Thing:

@@ -141,6 +141,20 @@ def heading_rotation(direction: Vec, bank_degrees: float = 0.0, *, level: bool =
     return facing * axis_angle(Vec(0, 1, 0), -bank_degrees) if bank_degrees else facing
 
 
+def fit_scale(
+    size: tuple[float, float, float], fit: tuple[float, float, float]
+) -> tuple[float, float, float]:
+    """The scale that stretches a thing of `size` to `fit` (width, depth, height in metres):
+    each axis given is that size; an axis given 0 keeps the proportions (of the height if it
+    is given, else of the first given)."""
+    ratios = [
+        want / have if want and have > 0 else 0.0 for want, have in zip(fit, size, strict=True)
+    ]
+    uniform = ratios[2] or next((r for r in ratios if r), 1.0)
+    x, y, z = (r or uniform for r in ratios)
+    return x, y, z
+
+
 def degrees_round(direction: Vec) -> float:
     """A ground direction as degrees round from −Y, anticlockwise from above: the convention
     of `Arc`, and of every camera angle measured from a subject's front."""

@@ -15,9 +15,10 @@ from typing import Any
 
 import numpy as np
 
-from content.blender.blocks.base import Prop, summary
+from content.blender.blocks.base import Prop, read, summary
 from content.blender.job import ModelFile
 from content.blender.materials import ROLES
+from content.blender.maths import fit_scale
 from content.blender.registry import discover
 from content.blender.rehearsal import RehearsalStage
 from content.providers.assets import CREDITED
@@ -62,6 +63,7 @@ FILLER = frozenset(
 MATCH, DUPLICATE = 0.45, 0.8
 
 Embed = Callable[[Sequence[str]], np.ndarray]
+Size = tuple[float, float, float]
 
 
 @dataclass(frozen=True)
@@ -109,6 +111,8 @@ class Found:
 class Library:
     folder: Path | None
     models: dict[str, Model] = field(default_factory=dict)
+    # The props made in code, by name: the families things can be made from.
+    props: dict[str, type[Prop]] = field(default_factory=dict)
 
     def get(self, model_id: str) -> Model:
         if model_id not in self.models:
@@ -228,29 +232,39 @@ class Library:
         *,
         key: str = "",
         paint: Mapping[str, str] | None = None,
-        height: float = 0.0,
+        params: Mapping[str, str] | None = None,
+        fit: tuple[float, float, float] = (0.0, 0.0, 0.0),
     ) -> ModelFile | None:
-        """What Blender needs to draw a model: the file (or prop) it is made from, its size,
-        its paint and height, under `key` in the job (its id unless it is made to fit a
-        scene). None for a prop made in code drawn as it is: Blender has its file."""
+        """What Blender needs to draw a model: the file (or prop) it is made from, under
+        `key` in the job (its id, unless it is made to fit a scene), its paint, a family's
+        settings, and its size: as made, or stretched to `fit` (width, depth, height; 0 for
+        any keeps its proportions). None for a prop made in code drawn as it is: Blender
+        has its file."""
         model = self.get(model_id)
         root, painted = self.root(model)
         painted = {**painted, **(paint or {})}
         path = self.path(root)
-        fitted = height or (model.size[2] if model.base else 0.0)
-        if path is None and not model.base and not painted and not fitted:
-            return None
         made_in_code = root.source == MADE_IN_CODE
-        scale = fitted / model.size[2] if fitted and model.size[2] else 1.0
+        size = self.measure(root.model_id, params) if params else model.size
+        if model.base and not any(fit):
+            fit = (0.0, 0.0, model.size[2])
+        if path is None and not model.base and not painted and not params and not any(fit):
+            return None
         return ModelFile(
             key or model_id,
             str(path or ""),
-            (model.size[0] * scale, model.size[1] * scale, model.size[2] * scale),
+            fitted_size(size, fit),
             prop=root.model_id if made_in_code else "",
             paint=painted,
-            height=fitted,
             base=model_id,
+            params=dict(params or {}),
+            fit=fit,
         )
+
+    def measure(self, prop_id: str, params: Mapping[str, str] | None = None) -> Size:
+        """A family's width, depth and height with these settings."""
+        prop = self.props[prop_id]
+        return _measured(prop, read(prop, params or {}))
 
     def credit(self, model_id: str) -> str:
         """The line a video using this model must carry where it is published, naming the
@@ -295,7 +309,8 @@ class Library:
 def load_library(folder: Path | None, channel_blocks: Sequence[Path] = ()) -> Library:
     """The engine's props and, if a channel folder is given, its own models."""
     library = Library(folder)
-    for prop in discover(channel_blocks, ("props",)).props().values():
+    library.props = dict(discover(channel_blocks, ("props",)).props())
+    for prop in library.props.values():
         library.models[prop.name] = Model(
             model_id=prop.name,
             names=prop.names,
@@ -314,11 +329,17 @@ def load_library(folder: Path | None, channel_blocks: Sequence[Path] = ()) -> Li
     return library
 
 
-def _measured(prop: type[Prop]) -> tuple[float, float, float]:
+def _measured(prop: type[Prop], values: Any = None) -> Size:
     """A prop's width, depth and height, from building it without Blender."""
     stage = RehearsalStage(frames=1)
-    size = stage.bounds(prop().build(stage, prop.name)).size
+    size = stage.bounds(prop(values).build(stage, prop.name)).size
     return (round(size.x, 3), round(size.y, 3), round(size.z, 3))
+
+
+def fitted_size(size: Size, fit: tuple[float, float, float]) -> Size:
+    """A thing's size once stretched to `fit`, as Blender stretches it."""
+    x, y, z = fit_scale(size, fit)
+    return (round(size[0] * x, 3), round(size[1] * y, 3), round(size[2] * z, 3))
 
 
 def _replace(model: Model, **changes: object) -> Model:

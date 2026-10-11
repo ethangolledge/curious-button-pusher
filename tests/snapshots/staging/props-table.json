@@ -1,8 +1,8 @@
 [
 ["group",{"name":"table_built","at":{"x":0.0,"y":0.0,"z":0.0}}],
-["shape",{"kind":"box","name":"table_built.top","size":{"x":1.4,"y":0.8,"z":0.04},"at":{"x":0,"y":0,"z":0.71},"role":"wood"}],
-["shape",{"kind":"box","name":"table_built.leg_0","size":{"x":0.06,"y":0.06,"z":0.71},"at":{"x":-0.63,"y":-0.33,"z":0},"role":"wood"}],
-["shape",{"kind":"box","name":"table_built.leg_1","size":{"x":0.06,"y":0.06,"z":0.71},"at":{"x":0.63,"y":-0.33,"z":0},"role":"wood"}],
-["shape",{"kind":"box","name":"table_built.leg_2","size":{"x":0.06,"y":0.06,"z":0.71},"at":{"x":-0.63,"y":0.33,"z":0},"role":"wood"}],
-["shape",{"kind":"box","name":"table_built.leg_3","size":{"x":0.06,"y":0.06,"z":0.71},"at":{"x":0.63,"y":0.33,"z":0},"role":"wood"}]
+["shape",{"kind":"box","name":"table_built.top","size":{"x":1.4,"y":0.8,"z":0.045},"at":{"x":0,"y":0,"z":0.705},"role":"wood"}],
+["shape",{"kind":"box","name":"table_built.leg_0","size":{"x":0.06,"y":0.06,"z":0.705},"at":{"x":-0.63,"y":-0.33,"z":0},"role":"wood"}],
+["shape",{"kind":"box","name":"table_built.leg_1","size":{"x":0.06,"y":0.06,"z":0.705},"at":{"x":0.63,"y":-0.33,"z":0},"role":"wood"}],
+["shape",{"kind":"box","name":"table_built.leg_2","size":{"x":0.06,"y":0.06,"z":0.705},"at":{"x":-0.63,"y":0.33,"z":0},"role":"wood"}],
+["shape",{"kind":"box","name":"table_built.leg_3","size":{"x":0.06,"y":0.06,"z":0.705},"at":{"x":0.63,"y":0.33,"z":0},"role":"wood"}]
 ]

@@ -45,6 +45,10 @@ class ModelFile:
     height: float = 0.0
     # The library model it is made from, when it is made to fit a scene (what it can do).
     base: str = ""
+    # A family made to fit: its settings (a cup's style, a table's length).
+    params: dict[str, str] = field(default_factory=dict)
+    # Stretched to this width, depth and height in metres (0 for any: in proportion).
+    fit: tuple[float, float, float] = (0.0, 0.0, 0.0)
 
 
 @dataclass(frozen=True, slots=True)
@@ -106,7 +110,10 @@ class Job:
         data["lights"] = tuple(BlockCall(**light) for light in data.get("lights", ()))
         data["groups"] = {name: tuple(ids) for name, ids in data.get("groups", {}).items()}
         data["models"] = tuple(
-            ModelFile(**{**model, "size": tuple(model["size"])}) for model in data.get("models", ())
+            ModelFile(
+                **{**model, "size": tuple(model["size"]), "fit": tuple(model.get("fit", (0, 0, 0)))}
+            )
+            for model in data.get("models", ())
         )
         data["channel_blocks"] = tuple(data.get("channel_blocks", ()))
         data["frames"] = tuple(data.get("frames", ()))

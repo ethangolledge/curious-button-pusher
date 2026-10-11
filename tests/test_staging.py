@@ -208,7 +208,7 @@ def test_a_shot_with_a_mistake_is_caught_before_rendering(
         ("dossier", "folder"),
         ("filing cabinets", "filing_cabinet"),
         ("bookshelves", "bookcase"),
-        ("boardroom table", "long_table"),
+        ("boardroom table", "table"),
     ],
 )
 def test_a_model_is_found_however_it_is_asked_for(asked: str, found: str) -> None:

@@ -9,9 +9,11 @@ looked for once."""
 
 import hashlib
 import json
+import re
 from collections.abc import Callable
 from dataclasses import dataclass
 
+from content.blender.blocks.base import Prop, settings
 from content.blender.materials import BY_COLOUR, linear, nearest_role
 from content.blender.maths import Vec
 from content.schemas.staging import Thing
@@ -97,18 +99,68 @@ def with_online(library: Library, find_model: FindModel) -> Resolve:
 
 
 def fitted(library: Library, model: Model, thing: Thing) -> Resolved:
-    """A library model made to fit a thing: painted as its words say, at its height."""
+    """A library model made to fit a thing: a family given the settings its words call for
+    (an espresso cup, a conference table eight metres long), painted as its words say, and
+    stretched to the size given (a family that has a setting for a size takes it there)."""
     look = look_of(thing)
-    height = thing.height or 0.0
-    if not look.paint and not height:
+    params = (
+        settings_for(library.props[model.model_id], thing)
+        if model.model_id in library.props
+        else {}
+    )
+    fit = tuple(
+        0.0 if name in params else given
+        for name, given in (
+            ("width", thing.width),
+            ("depth", thing.depth),
+            ("height", thing.height),
+        )
+    )
+    if not look.paint and not params and not any(fit):
         w, d, h = model.size
-        file = library.model_file(model.model_id)
-        return Resolved(model.model_id, Vec(w, d, h), file, seated=_seated(model))
-    key = f"{model.model_id}~{_digest([look.paint, height])}"
-    file = library.model_file(model.model_id, key=key, paint=look.paint, height=height)
+        return Resolved(model.model_id, Vec(w, d, h), library.model_file(model.model_id),
+                        seated=_seated(model))  # fmt: skip
+    key = f"{model.model_id}~{_digest([look.paint, params, fit])}"
+    file = library.model_file(
+        model.model_id, key=key, paint=look.paint, params=params, fit=(fit[0], fit[1], fit[2])
+    )
     assert file is not None
     w, d, h = file.size
     return Resolved(key, Vec(w, d, h), file, seated=_seated(model))
+
+
+def settings_for(family: type[Prop], thing: Thing) -> dict[str, str]:
+    """A family's settings from a thing's words: a choice named in its words or its looks
+    ("espresso cup": style espresso; "material: brass" for a material), a number its looks
+    give by name, and its width, depth or height where the family has a setting for them.
+    Numbers are kept within the setting's range."""
+    looks = {setting.name.lower(): setting.value for setting in thing.looks}
+    words = set(re.findall(r"[a-z0-9]+", " ".join([thing.what, *looks.values()]).lower()))
+    sizes = {"width": thing.width, "depth": thing.depth, "height": thing.height}
+    chosen: dict[str, str] = {}
+    for setting in settings(family):
+        if setting.options:
+            named = looks.get(setting.name)
+            picked = (
+                named
+                if named in setting.options
+                else next(
+                    (option for option in setting.options if set(option.split("_")) <= words), None
+                )
+            )
+            if picked:
+                chosen[setting.name] = picked
+        elif setting.low is not None and setting.high is not None:
+            value = sizes.get(setting.name) or _number(looks.get(setting.name, ""))
+            if value:
+                value = min(max(value, setting.low), setting.high)
+                chosen[setting.name] = f"{value:g}" if setting.type != "int" else str(round(value))
+    return chosen
+
+
+def _number(text: str) -> float:
+    found = re.search(r"[0-9]+(?:\.[0-9]+)?", text)
+    return float(found.group()) if found else 0.0
 
 
 def _search(library: Library, words: str) -> Model | None:

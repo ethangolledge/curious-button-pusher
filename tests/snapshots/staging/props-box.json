@@ -1,0 +1,5 @@
+[
+["group",{"name":"box_built","at":{"x":0.0,"y":0.0,"z":0.0}}],
+["shape",{"kind":"box","name":"box_built.body","size":{"x":0.42,"y":0.32,"z":0.25},"at":{"x":0.0,"y":0.0,"z":0.0},"role":"card"}],
+["shape",{"kind":"box","name":"box_built.lid","size":{"x":0.426,"y":0.326,"z":0.03},"at":{"x":0,"y":0,"z":0.25},"role":"card"}]
+]
