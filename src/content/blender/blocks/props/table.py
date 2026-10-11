@@ -60,8 +60,9 @@ class Table(Prop):
             stage.shape("cylinder", Vec(deep * 0.6, deep * 0.6, 0.03), Vec(), role=frame,
                         name=f"{name}.foot", parent=table)  # fmt: skip
         else:
+            # Between the places where people sit, not where their legs go.
             for side in (-1, 1):
                 slab(stage, table, f"{name}.pedestal_{side + 1}",
                      Vec(min(0.5, wide * 0.12), deep * 0.55, tall - 0.045),
-                     Vec(side * wide * 0.3, 0, 0), frame)  # fmt: skip
+                     Vec(side * wide * 0.21, 0, 0), frame)  # fmt: skip
         return table

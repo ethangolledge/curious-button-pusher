@@ -201,24 +201,33 @@ class Keyframes(Studio):
             window.frame(window.held_from + window.held / 2, fps),
             window.frame(window.out_from, fps),
         ]
-        try:
-            assert shot.staging is not None
-            base = job_for(
-                shot.scene_id, shot.staging, self.theme, staging[1], seconds=window.seconds,
-                quality="final", frames=sorted(set(frames)), grade=grade, seed=self.config.seed,
+        assert shot.staging is not None
+        staging_plan = shot.staging
+
+        def composed(seed: int) -> Job:
+            return job_for(
+                shot.scene_id, staging_plan, self.theme, staging[1], seconds=window.seconds,
+                quality="final", frames=sorted(set(frames)), grade=grade, seed=seed,
             )  # fmt: skip
+
+        try:
+            base = composed(self.config.seed)
+            signature = render_signature("blender", STAGING_LOOK, base.dumps())
+            attempt = next_attempt(previous, signature, self.config.keyframe_attempts)
+            if attempt is None:
+                return "kept"
+            job = base
+            if attempt > 0 and previous is not None:
+                if _judged_unclean(previous):
+                    # Something physically wrong (a hand short of its glass, a chair through
+                    # a wall): the scene composed again, differently, not only regraded.
+                    job = composed(self.config.seed + attempt)
+                job = replace(job, grade=_regraded(grade, previous))
         except StagingError as exc:
             # Something it needs could not be found or made: drawn, and the gap noted.
             for missing in exc.missing:
                 record_gap(self.theme.root, state["topic"], scene.scene_id, missing)
             return None
-        signature = render_signature("blender", STAGING_LOOK, base.dumps())
-        attempt = next_attempt(previous, signature, self.config.keyframe_attempts)
-        if attempt is None:
-            return "kept"
-        job = base
-        if attempt > 0 and previous is not None:
-            job = replace(base, grade=_regraded(grade, previous))
         return RenderTask(
             scene_id=scene.scene_id,
             attempt=attempt,
@@ -321,7 +330,7 @@ class Keyframes(Studio):
                 ),
             ]
         ]
-        observations, perception_calls = self.perceive([image])
+        observations, perception_calls = self.perceive([image], shot=shot is not None)
         judgements, judge_call = self.judge.evaluate(
             {
                 "stage": "keyframes",

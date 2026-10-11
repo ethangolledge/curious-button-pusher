@@ -45,7 +45,7 @@ and goes in the channel's backlog.
 | storyboard | anchor, focus, camera, motion, bridge | the same, plus `staging`: the description (`agents/visual_director/staging_prompt.md`); or `missing`, saying what the toolkit lacks |
 | storyboard gate | structure | also the free check: the room, the blocks and their settings, every relation's target, and the shot composed (`staging.plan.staging_issues`). A thing the library lacks is not a problem yet when the run can find models: it is looked for before rendering. A shot that still fails after the Visual Director's revisions is drawn instead |
 | before rendering | — | what the staged scenes lack is found or made, and taken automatically (`Keyframes._prepare_models`); each model taken without a person is named in the run's warnings for review |
-| keyframe | drawn by the image model | the shot's first, middle and last frames rendered; then the same measures and judging: brightness and colour against the feeling, the vision model's description, Jev. Too dark or cool: rendered again with a corrected grade. A shot that cannot be built (it fails the audit) or that Jev finds does not show its scene is drawn instead, at once, its reason in the scene's `missing` and the backlog |
+| keyframe | drawn by the image model | the shot's first, middle and last frames rendered; then the same measures and judging: brightness and colour against the feeling, the vision model's description, Jev. The vision model is also told the frame is a 3D shot (`production/shot_perception.md`), so it reports what is physically wrong (a hand short of its glass, a thing floating or passing through another, a person sat in the furniture) as an artefact, and `keyframe_clean` fails on it: the shot is then composed again with the next seed, not only regraded (about 1p a look). Too dark or cool: rendered again with a corrected grade. A shot that cannot be built (it fails the audit) or that Jev finds does not show its scene is drawn instead, at once, its reason in the scene's `missing` and the backlog |
 | the feeling | colour words in the prompt, the ripples' tint | a grade on the render (`job.Grade`: exposure, and warmth by white balance), and the same ripples' tint |
 | Pictures sign-off | the animatic moves the stills | the animatic plays a quick draft of the shot |
 | morphs | from keyframe to keyframe | AI morphs (`production.joins: "ai"`) or rendered joins (`"rendered"`) that play over both shots' moving frames |
@@ -75,8 +75,8 @@ and goes in the channel's backlog.
 | a thing's `what` | plain words, as a prop master would ask ("leather briefcase", "oil tanker"): what the toolkit resolves |
 | `count`, `height`, `width`, `depth` | how many, and its real size in metres: a model of any size is scaled (or a family made) to it |
 | `looks` | colour and material ("colour: red", "material: brass"): they become the role it is drawn in, and choose a family's settings |
-| `place` | a relation to a target (another thing, the room's furniture or marks, or `floor`), `each` for one per copy of the target: `on`, `scattered_on`, `stacked_on`, `in_row_on`, `beside`, `in_front_of`, `behind`, `around`, `seated_at` (chairs added where there are none), `against_wall`, `at` |
-| `person` | for people: `who` (a particular person the library holds), or sex, age, build, dress, pose (standing, seated, walking) and motion (breathing, talking, walking, still) |
+| `place` | a relation to a target (another thing, the room's furniture or marks, or `floor`), `each` for one per copy of the target: `on`, `scattered_on`, `stacked_on`, `in_row_on`, `beside`, `in_front_of`, `behind`, `around`, `seated_at` (chairs added where there are none), `against_wall`, `at`, `held_by` (in people's hands: a drink, a document, a pen, a phone; `each` for everyone, else `count` of them) |
+| `person` | for people: `who` (a particular person the library holds), or sex, age, build, dress, pose (standing, seated, walking), activity (what the hands do: resting, lap, folded, pointing, pockets) and motion (breathing, talking, walking, still). Age, build and activity left empty vary across a group |
 | `furnish` | `bare`, `some` (pieces against the walls), `lived_in` (also small things on surfaces), by the room's own rules |
 | `actions` | an action block done by every copy of `who`, each `stagger` of the shot after the last |
 | `camera` | a move; its `subject` may name a thing, and every copy is framed together |
@@ -151,7 +151,12 @@ library never holds one thing twice under different names.
 clothes and hair (about 650 MB). Then a person a scene describes is made from one parametric
 body (`blender/person.py`): shaped by sex, age and build, made the height asked, dressed
 (suit, casual, work, uniform) with shoes and hair, and posed by code so the pose fits any body
-(standing, seated at a table, mid-stride). Still people are baked to plain meshes; moving ones
+(standing, seated at a table, mid-stride). What their hands do (`ACTIVITIES` in
+`person.py`) is reached for, not set joint by joint: each hand is given a point (on the table,
+by the hips, at the chest) and inverse kinematics bends the arm to it, an elbow target keeping
+it natural, then the fingers close by how much the grip needs (flat, rest, hold, point). A
+person holding something reports where it sits in their hand (`holds`), so the composer puts
+the glass there. Still people are baked to plain meshes; moving ones
 keep their skeleton and a looping motion written in code for every body alike (breathing,
 talking, walking). Every surface is named for its role, so every look draws them its own way.
 Each description is made once (3 to 4 seconds) and kept in the library by it; a seated
@@ -174,6 +179,14 @@ wall facing into the room, or at a mark. Every copy is kept clear of every piece
 and of everything placed before; one with no room is left out and said. Copies are a named
 group, so a camera move frames them all and an action is given to each in turn. The result
 is an ordinary job of `put` actors.
+
+People in a group are made different, as a room of real people is: what the scene leaves open
+(age, build, what their hands do) is filled per copy from short lists (`NATURAL`, `AGES`,
+`BUILDS` in `compose.py`) in a seeded order, so no two neighbours do the same thing; each is
+turned a few degrees off square (`SWAY`) and starts breathing at a different moment. A thing
+`held_by` people decides their activity (a glass: drinking; papers: reading; a pen: writing; a
+phone: on the phone, by the words in `HELD`), and it is placed at their hand, one per holder:
+three glasses held by eight men are three men drinking, not eight hands round eight cups.
 
 ## Commands
 
@@ -277,6 +290,7 @@ channel copies it into its own `blender/looks/` and changes what it draws.
 | placement | as the shot is composed | things passing into each other or out of the room: never placed so; a thing with no room where it was asked is a problem the Visual Director is told ("room: no space for …") |
 | every prop | every test run | each stands on its base (or hangs from its top) |
 | inside the set | every camera position | the camera behind a wall: it stays in the layout's `interior` |
+| the look at each still | every staged keyframe | what is physically wrong as a vision model sees it (a hand not touching what it holds, floating or interpenetrating things, impossible poses): the shot composed again with a new seed |
 | the audit, before rendering | sampled frames | the camera inside a solid thing, the subject hidden, the camera turning faster than 20° a frame, and two separate things passing into each other by more than 1 cm (3 cm for a moving character). A failing audit stops the render; in a run, the scene is then drawn instead |
 | a model taken automatically | as it is found | scored by eye; under 0.5 it is not taken |
 | stills and contact sheet | `preview` | composition, light, scale |
@@ -338,7 +352,7 @@ CC BY models are credited with the video. Renders belong to whoever makes them.
 
 | Step | What |
 |---|---|
-| richer motions | motion capture (CMU) retargeted onto made people; gestures that reach for things |
+| richer motions | motion capture (CMU) retargeted onto made people; gestures that move to and from what they hold |
 | a particular face on a made person | a likeness from reference photos on the parametric body |
 | `travel` joins | one camera move between two framings of a shared set |
 | cloud rendering | finals on a rented GPU; this laptop takes seconds a frame |

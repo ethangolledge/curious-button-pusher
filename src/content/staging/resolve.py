@@ -194,8 +194,10 @@ def _person(library: Library, thing: Thing, *, make: bool) -> Resolved | None:
     model = made_person(library, thing.person, thing.height, make=make) or library.get(figurine)
     w, d, h = model.size
     motion = thing.person.motion if thing.person.motion in model.motions else ""
+    holds = {name: Vec(*at) for name, at in model.holds.items()}
     return Resolved(model.model_id, Vec(w, d, h), library.model_file(model.model_id),
-                    seated=_seated(model), seat=model.seat, motion=motion)  # fmt: skip
+                    seated=_seated(model), seat=model.seat, motion=motion,
+                    holds=holds)  # fmt: skip
 
 
 def _seated(model: Model) -> bool:

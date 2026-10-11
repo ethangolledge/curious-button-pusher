@@ -4,7 +4,7 @@ A register of every model the pipeline calls or runs: what it does, where, what 
 fails, and how to test or replace it. Local and learned models have a deeper write-up in
 [machine-learning.md](machine-learning.md); the narration path is in [narration.md](narration.md).
 
-Last reviewed: 2026-10-04.
+Last reviewed: 2026-10-11.
 
 ## At a Glance
 
@@ -154,7 +154,9 @@ Detailed in [narration.md](narration.md). In short:
 
 - Describes each keyframe, sampled morph frames, and reference photos as structured
   `Observation`s (subject, setting, composition, rendering style, colours, text, artefacts,
-  framing, focus). Jev judges these descriptions.
+  framing, focus). Jev judges these descriptions. For a 3D shot it is also given
+  `production/shot_perception.md`, and reports physical mistakes (a hand not touching what it
+  holds, things floating or passing through each other) as artefacts.
 - Cheap and fast. Its descriptions are the weak link in visual judging: Jev can only be as right
   as the description.
 

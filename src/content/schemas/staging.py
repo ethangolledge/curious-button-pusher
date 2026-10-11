@@ -26,6 +26,14 @@ Relation = Literal[
     "seated_at",  # on chairs round it, facing it (chairs are added where none are free)
     "against_wall",  # back to a wall, facing into the room
     "at",  # standing on one of the room's marks: a man at the window
+    "held_by",  # in a person's hand (a glass, a phone, a document): they are posed to hold it
+]
+
+
+# What a person's hands do. Holding something (a drink, a document, writing on paper, a
+# phone) is usually set by what a scene puts in their hand (`held_by`).
+Activity = Literal[
+    "resting", "lap", "folded", "pointing", "pockets", "drink", "reading", "writing", "phone"
 ]
 
 
@@ -50,14 +58,18 @@ class Placement(ImmutableModel):
 
 class Person(ImmutableModel):
     """Who a person is, for a figure built to fit: a particular person from the library
-    (`who`), or anyone of this description."""
+    (`who`), or anyone of this description. What is left empty varies from one copy to the
+    next (eight men at a table are not eight of the same man doing the same thing)."""
 
     who: str = ""
     sex: Literal["man", "woman"] = "man"
-    age: Literal["young", "middle", "old"] = "middle"
-    build: Literal["slim", "average", "heavy"] = "average"
+    age: Literal["young", "middle", "old"] | None = None
+    build: Literal["slim", "average", "heavy"] | None = None
     dress: Literal["suit", "casual", "uniform", "work"] = "suit"
     pose: Literal["standing", "seated", "walking"] = "standing"
+    # What their hands do: resting on the table, in the lap, arms folded, pointing, hands in
+    # pockets; holding something is set by what they hold (`held_by`).
+    activity: Activity | None = None
     # How they move through the shot: alive and breathing, talking (head and hands), walking
     # (in step, wherever an action takes them), or quite still.
     motion: Literal["breathing", "talking", "walking", "still"] = "breathing"

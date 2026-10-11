@@ -1,17 +1,18 @@
 """Composing a shot from a description: every copy of every thing placed by its relation, on
 what it should stand on, clear of everything else and inside the room; what cannot be found
-said plainly; and an action given to every copy in turn."""
+said plainly; an action given to every copy in turn; and people varied, each holding what
+they are given in their hand."""
 
 import math
 from typing import Any
 
 from content.blender.api import Box
 from content.blender.blocks.base import Layout
-from content.blender.maths import Vec
+from content.blender.maths import UP, Vec, axis_angle
 from content.blender.rehearsal import RehearsalStage
-from content.schemas.staging import StagePlan, Thing
+from content.schemas.staging import Person, StagePlan, Thing
 from content.staging.catalogue import load_catalogue
-from content.staging.compose import Composition, compose
+from content.staging.compose import Composition, Resolved, compose
 from content.staging.resolve import from_library, look_of
 
 CATALOGUE = load_catalogue(None)
@@ -172,3 +173,57 @@ def test_a_thing_too_big_for_where_it_was_asked_is_said_not_squeezed_in() -> Non
 
     assert shot.missing == ["room: no space for box on desk"]
     assert shot.actors == []
+
+
+class _People:
+    """Resolves people as figures posed for what their hands do (a holder's glass 0.4 m in
+    front of their feet), noting who was asked for; anything else as the library has it."""
+
+    def __init__(self) -> None:
+        self.asked: list[Person] = []
+
+    def __call__(self, thing: Thing) -> Resolved | None:
+        if thing.person is None:
+            return RESOLVE(thing)
+        self.asked.append(thing.person)
+        holds = {"drink": Vec(0.0, -0.4, 0.8)} if thing.person.activity == "drink" else {}
+        return Resolved("seated_person", Vec(0.5, 0.5, 1.3), seated=True, holds=holds)
+
+
+def _people_compose(things: list[dict[str, Any]], resolve: _People) -> Composition:
+    plan = StagePlan.model_validate(
+        {"layout": {"block": "boardroom"}, "things": things, "furnish": "bare",
+         "camera": {"block": "hold"}}
+    )  # fmt: skip
+    return compose(plan, CATALOGUE.registry, resolve, seed="test")
+
+
+def test_a_group_left_open_is_varied_with_no_two_neighbours_doing_the_same() -> None:
+    people = _People()
+    _people_compose(
+        [_thing("men", "man", "seated_at", "table", count=8, person={"pose": "seated"})], people
+    )
+
+    men = people.asked[-8:]
+    activities = [m.activity for m in men]
+    assert all(a != b for a, b in zip(activities, activities[1:], strict=False))
+    assert len({m.age for m in men}) > 1 and len({m.build for m in men}) > 1
+
+
+def test_three_glasses_held_by_men_are_three_men_each_with_one_in_his_hand() -> None:
+    people = _People()
+    shot = _people_compose(
+        [
+            _thing("men", "man", "seated_at", "table", count=8, person={"pose": "seated"}),
+            _thing("glasses", "water glass", "held_by", "men", count=3),
+        ],
+        people,
+    )
+
+    activities = [m.activity for m in people.asked[-8:]]
+    assert activities[:3] == ["drink"] * 3 and "drink" not in activities[3:]
+    for index in range(3):
+        man, glass = _where(shot, f"men_{index}"), _where(shot, f"glasses_{index}")
+        actor = next(a for a in shot.actors if a.actor_id == f"men_{index}")
+        turn = axis_angle(UP, float(actor.settings["heading"]))
+        assert (glass - (man + turn.rotate(Vec(0.0, -0.4, 0.8)))).length() < 0.01

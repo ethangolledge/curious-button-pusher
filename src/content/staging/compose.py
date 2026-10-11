@@ -10,6 +10,7 @@ before a run and when the shot is rendered."""
 
 import math
 import random
+import re
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 
@@ -51,6 +52,8 @@ class Resolved:
     motion: str = ""
     # A picture (a map, a painting): drawn on a card, lying flat on what it is on.
     picture: bool = False
+    # A figure posed to hold something: where each held thing's base goes, from its feet.
+    holds: dict[str, Vec] = field(default_factory=dict)
 
 
 Resolve = Callable[[Thing], Resolved | None]
@@ -63,6 +66,9 @@ class Placed:
     box: Box
     heading: float
     support: str = ""  # what it stands on
+    at: Vec = Vec()
+    # A figure posed to hold something: where each held thing goes, in the room.
+    holds: dict[str, Vec] = field(default_factory=dict)
 
     @property
     def facing(self) -> Vec:
@@ -107,6 +113,29 @@ FURNISHING: dict[str, list[tuple[str, str, str, int]]] = {
     "corridor": [("potted plant", "against_wall", "floor", 2)],
 }
 SMALL = {"on", "scattered_on", "stacked_on", "in_row_on"}
+# What holding a thing has a person do, by the words for it, and what the hold is called on
+# the person (where it goes); each only in the poses it suits.
+HELD = {
+    "drink": ("glass", "cup", "mug", "bottle", "drink", "coffee", "tea", "wine", "beer",
+              "whisky", "water", "champagne"),
+    "reading": ("document", "paper", "papers", "file", "folder", "report", "letter",
+                "newspaper", "book", "dossier", "memo", "map"),
+    "writing": ("pen", "pencil", "notepad", "notebook"),
+    "phone": ("phone", "telephone", "mobile", "smartphone", "handset"),
+}  # fmt: skip
+HOLD = {"drink": "drink", "reading": "document", "writing": "paper", "phone": "phone"}
+HOLDING_POSES = {"seated": {"drink", "reading", "writing"}, "standing": {"drink", "phone"}}
+# How a group varies when a scene leaves it open: activities by pose (None: arms at rest),
+# ages and builds. Copies take them in a shuffled order, so no two neighbours match.
+NATURAL: dict[str, tuple[str | None, ...]] = {
+    "seated": ("resting", "lap", "folded", "resting", "pointing", "lap"),
+    "standing": (None, "pockets", "folded", None, "pockets"),
+    "walking": (None,),
+}
+AGES = ("middle", "old", "young", "middle", "old")
+BUILDS = ("average", "slim", "heavy", "average", "slim")
+# People are never quite square to what they face (degrees either way).
+SWAY = 7.0
 
 
 class Composer:
@@ -114,6 +143,8 @@ class Composer:
         self._registry = registry
         self._resolve = resolve
         self._chance = random.Random(seed)
+        # Where each group of people starts in the ways people vary (one shuffle a group).
+        self._turns: dict[str, int] = {}
         self._placed: list[Placed] = []
         self._copies: dict[str, list[Placed]] = {}
         self._out = Composition()
@@ -145,6 +176,16 @@ class Composer:
 
     def compose(self, plan: StagePlan) -> Composition:
         self._build_room(plan)
+        people = {t.thing_id: t.person.pose for t in plan.things if t.person}
+        # What each person holds decides what their hands do: every copy (`each`), or as
+        # many copies as there are things held.
+        counts = {t.thing_id: t.count for t in plan.things}
+        self._holding = {
+            t.place.target: (kind, counts[t.place.target] if t.place.each else t.count)
+            for t in plan.things
+            if t.place.relation == "held_by" and t.place.target in people
+            and (kind := holding(t.what, people[t.place.target]))
+        }  # fmt: skip
         for thing in _in_order(plan.things):
             self._place_thing(thing, required=True)
         if plan.furnish != "bare":
@@ -168,28 +209,31 @@ class Composer:
         return self._out
 
     def _place_thing(self, thing: Thing, *, required: bool) -> None:
-        resolved = self._resolve(thing)
+        resolved = self._resolve(self._copy_of(thing, 0))
         if resolved is None:
             if required:
                 self._out.missing.append(f"model: {thing.what}")
             return
-        if resolved.file is not None and resolved.file not in self._out.models:
-            self._out.models.append(resolved.file)
         relation, target = thing.place.relation, thing.place.target
         anchors = self._copies.get(target, [])
         groups = [[a] for a in anchors] if thing.place.each and anchors else [anchors]
+        if relation == "held_by" and not thing.place.each:
+            # One for each of the first holders.
+            groups = [[a] for a in anchors[: thing.count]] or [anchors]
         copies: list[Placed] = []
         for group in groups:
             anchor = _union([a.box for a in group]) if group else self._target_box(target)
             if anchor is None and relation != "against_wall" and target != "floor":
                 self._out.missing.append(f"place: '{target}' for {thing.what}")
                 return
-            for index in range(thing.count):
-                actor_id = (
-                    thing.thing_id
-                    if thing.count * len(groups) == 1
-                    else f"{thing.thing_id}_{len(copies)}"
-                )
+            for index in range(1 if relation == "held_by" else thing.count):
+                many = (1 if relation == "held_by" else thing.count) * len(groups) > 1
+                actor_id = f"{thing.thing_id}_{len(copies)}" if many else thing.thing_id
+                if thing.person is not None and len(copies):
+                    # Each person in a group is someone a little different.
+                    resolved = self._resolve(self._copy_of(thing, len(copies))) or resolved
+                if resolved.file is not None and resolved.file not in self._out.models:
+                    self._out.models.append(resolved.file)
                 spot = self._spot(relation, target, anchor, group, resolved, index, thing.count)
                 if spot is None:
                     if required:
@@ -197,15 +241,45 @@ class Composer:
                         self._out.missing.append(f"room: no space for {thing.what} {where}")
                     break
                 at, heading, support = spot
+                if thing.person is not None:
+                    heading += self._jitter(SWAY)
+                turn = axis_angle(UP, heading)
+                holds = {name: at + turn.rotate(point) for name, point in resolved.holds.items()}
                 box = _box(at, resolved.size, heading)
-                placed = Placed(actor_id, thing.thing_id, box, heading, support)
+                placed = Placed(actor_id, thing.thing_id, box, heading, support, at, holds)
                 self._placed.append(placed)
                 copies.append(placed)
                 lying = relation in SMALL
-                self._out.actors.append(_put(actor_id, resolved, at, heading, lying=lying))
+                begins = self._chance.uniform(0, 0.3) if resolved.motion else 0.0
+                self._out.actors.append(
+                    _put(actor_id, resolved, at, heading, lying=lying, start=begins)
+                )
         self._copies[thing.thing_id] = copies
         if len(copies) > 1:
             self._out.groups[thing.thing_id] = tuple(p.actor_id for p in copies)
+
+    def _copy_of(self, thing: Thing, index: int) -> Thing:
+        """A thing as its copy `index` is made: a person given what the scene leaves open
+        (their age, build and what their hands do) so a group is not one man repeated."""
+        person = thing.person
+        if person is None:
+            return thing
+        if thing.thing_id not in self._turns:
+            self._turns[thing.thing_id] = self._chance.randrange(len(AGES))
+        turn = self._turns[thing.thing_id]
+        natural = NATURAL[person.pose]
+        filled = {
+            "age": person.age or AGES[(index + turn) % len(AGES)],
+            "build": person.build or BUILDS[(index * 2 + turn) % len(BUILDS)],
+            "activity": person.activity
+            or self._held_by(thing.thing_id, index)
+            or natural[(index + turn) % len(natural)],
+        }
+        return thing.model_copy(update={"person": person.model_copy(update=filled)})
+
+    def _held_by(self, thing_id: str, index: int) -> str | None:
+        kind, holders = self._holding.get(thing_id, (None, 0))
+        return kind if index < holders else None
 
     def _target_box(self, target: str) -> Box | None:
         if target == "floor":
@@ -234,6 +308,11 @@ class Composer:
         facing = group[0].facing if len(group) == 1 else FRONT
         if relation == "against_wall":
             return self._against_wall(size)
+        if relation == "held_by":
+            hand = self._in_hand(group)
+            if hand is not None:
+                return hand
+            relation = "in_front_of"  # a figure not posed to hold it: set before them
         if anchor is None:
             return None
         if relation == "at":
@@ -279,6 +358,15 @@ class Composer:
         heading = degrees_round(facing)
         z, support = self._support_under(point, below=anchor.top + 0.05)
         return self._nudged(Vec(point.x, point.y, z), size, heading, support, ignore=group)
+
+    def _in_hand(self, group: Sequence[Placed]) -> tuple[Vec, float, str] | None:
+        """Where a person posed to hold something has it: in their hand, or set down where
+        their hand is (a glass on the table under it)."""
+        if len(group) != 1 or not group[0].holds:
+            return None
+        holder = group[0]
+        point = next(iter(holder.holds.values()))
+        return point, holder.heading, holder.actor_id
 
     def _clear_on(
         self, surface: Box, size: Vec, target: str, spin: float
@@ -445,15 +533,32 @@ def _settings(given: Sequence[Setting]) -> dict[str, str]:
     return {setting.name: setting.value for setting in given}
 
 
+def holding(what: str, pose: str) -> str | None:
+    """What holding this thing has a person in this pose do, if anything."""
+    words = set(re.findall(r"[a-z]+", what.lower()))
+    for kind, names in HELD.items():
+        if words & set(names) and kind in HOLDING_POSES.get(pose, set()):
+            return kind
+    return None
+
+
 def _put(
-    actor_id: str, resolved: Resolved, at: Vec, heading: float, *, lying: bool = False
+    actor_id: str,
+    resolved: Resolved,
+    at: Vec,
+    heading: float,
+    *,
+    lying: bool = False,
+    start: float = 0.0,
 ) -> ActorCall:
-    """A placed thing, drawn at the size it was resolved to."""
+    """A placed thing, drawn at the size it was resolved to; a moving figure starts its
+    motion at `start` (so a group does not move in step)."""
     values = {"x": _n(at.x), "y": _n(at.y), "z": _n(at.z), "heading": _n(heading)}
     if resolved.file is None:
         values["height"] = _n(resolved.size.z)
     if resolved.motion:
         values["motion"] = resolved.motion
+        values["start"] = _n(start)
     if resolved.picture:
         values = {**values, "picture": _n(resolved.size.x), "lying": "yes" if lying else "no"}
         values.pop("height", None)

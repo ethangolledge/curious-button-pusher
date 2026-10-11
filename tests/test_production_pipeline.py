@@ -483,6 +483,43 @@ def test_failed_keyframe_is_rerendered_before_the_storyboard(
 
 
 @pytest.mark.video
+def test_a_3d_shot_with_something_physically_wrong_is_composed_again(
+    video_config: ContentConfig, tmp_path: Path
+) -> None:
+    """A shot's still is looked at for what is physically wrong (a hand short of its
+    glass); one that fails is composed afresh, not only regraded, and the cut keeps it."""
+    assert video_config.production is not None
+    # A copy of the channel: what it could not stage is noted in its folder.
+    root = tmp_path / "channel"
+    shutil.copytree(video_config.theme.root, root)
+    config = replace(
+        video_config,
+        theme=Theme(root, video_config.theme.spec, video_config.theme.skill),
+        production=replace(video_config.production, pictures="staged"),
+    )
+    scenes = 6
+    spent: list[bool] = []
+
+    def every_still_unclean_once(question_id: str, state: Mapping[str, Any]) -> dict[str, Any]:
+        if question_id == "keyframe_clean" and len(spent) < scenes:
+            spent.append(True)
+            return {"kind": "noul", "noul": 0.02}
+        return demo_answer(question_id, state)
+
+    media, blender = FakeMediaProvider(), FakeBlender()
+    decisions = FakeDecisionProvider(every_still_unclean_once)
+    result, _ = _run(config, media, renderer=blender, decisions=decisions)
+
+    stills = [job for job in blender.jobs if isinstance(job, Job) and job.quality == "final"]
+    for shot_id in ("S2", "S4"):
+        first, again = (job for job in stills if job.shot_id == shot_id and job.frames)
+        assert again.seed == first.seed + 1
+        assert Job.loads(result["keyframes"][shot_id].shot).seed == again.seed
+        # S2's room of things falls out differently; S4's one card stands where it stood.
+        assert (again.actors != first.actors) == (shot_id == "S2")
+
+
+@pytest.mark.video
 def test_narration_far_longer_than_planned_is_flagged_not_forced(
     video_config: ContentConfig,
 ) -> None:

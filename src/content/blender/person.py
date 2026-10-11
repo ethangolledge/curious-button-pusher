@@ -59,6 +59,71 @@ POSES: dict[str, dict[str, tuple[float, float, float]]] = {
 }  # fmt: skip
 # Mid-stride the right side does the opposite.
 OPPOSED = {"walking"}
+# What a person does with their hands, by pose: where each wrist that moves goes (metres right,
+# back and up from the hips, or up from the table top or the floor), how its fingers close, and
+# where what they hold goes.
+# Body measures are for a 1.8 m person and scale with height; tables and floors do not.
+Point = tuple[float, float, float, str]
+ACTIVITIES: dict[tuple[str, str], dict[str, Any]] = {
+    ("seated", "resting"): {
+        "hands": {"L": (0.17, -0.42, 0.06, "table"), "R": (-0.17, -0.42, 0.06, "table")},
+        "fingers": {"L": "flat", "R": "flat"},
+    },
+    ("seated", "drink"): {
+        "hands": {"L": (0.17, -0.42, 0.06, "table"), "R": (-0.12, -0.45, 0.08, "table")},
+        "fingers": {"L": "flat", "R": "hold"},
+        "holds": {"drink": (-0.15, -0.53, 0.0, "table")},
+    },
+    ("seated", "reading"): {
+        "hands": {"L": (0.13, -0.44, 0.06, "table"), "R": (-0.13, -0.44, 0.06, "table")},
+        "fingers": {"L": "hold", "R": "hold"},
+        "holds": {"document": (0.0, -0.5, 0.0, "table")},
+    },
+    ("seated", "writing"): {
+        "hands": {"L": (0.15, -0.44, 0.06, "table"), "R": (-0.06, -0.47, 0.07, "table")},
+        "fingers": {"L": "flat", "R": "hold"},
+        "holds": {"paper": (0.02, -0.52, 0.0, "table")},
+    },
+    ("seated", "pointing"): {
+        "hands": {"L": (0.17, -0.42, 0.06, "table"), "R": (-0.14, -0.78, 0.22, "table")},
+        "fingers": {"L": "flat", "R": "point"},
+    },
+    ("seated", "lap"): {
+        "hands": {"L": (0.12, -0.24, 0.12, "hips"), "R": (-0.12, -0.24, 0.12, "hips")},
+        "fingers": {"L": "rest", "R": "rest"},
+    },
+    ("seated", "folded"): {
+        "hands": {"L": (-0.13, -0.2, 0.3, "hips"), "R": (0.13, -0.22, 0.33, "hips")},
+        "fingers": {"L": "rest", "R": "rest"},
+    },
+    ("standing", "drink"): {
+        "hands": {"R": (-0.17, -0.2, 0.12, "hips")},
+        "fingers": {"R": "hold"},
+        "holds": {"drink": (-0.17, -0.27, 0.06, "hips")},
+    },
+    ("standing", "phone"): {
+        "hands": {"R": (-0.1, -0.02, 0.66, "hips")},
+        "fingers": {"R": "hold"},
+        "holds": {"phone": (-0.08, -0.06, 0.7, "hips")},
+    },
+    ("standing", "pockets"): {
+        "hands": {"L": (0.19, -0.04, -0.02, "hips"), "R": (-0.19, -0.04, -0.02, "hips")},
+        "fingers": {"L": "rest", "R": "rest"},
+    },
+    ("standing", "folded"): {
+        "hands": {"L": (-0.13, -0.2, 0.3, "hips"), "R": (0.13, -0.22, 0.33, "hips")},
+        "fingers": {"L": "rest", "R": "rest"},
+    },
+    ("standing", "pointing"): {
+        "hands": {"R": (-0.22, -0.55, 0.45, "hips")},
+        "fingers": {"R": "point"},
+    },
+}
+# How far each finger joint closes, by grip (degrees): the thumb, then the four fingers.
+GRIPS = {"flat": (5.0, 5.0), "rest": (15.0, 30.0), "hold": (30.0, 70.0), "point": (40.0, 80.0)}
+# Where an elbow points as an arm reaches: out to the side and back.
+ELBOW = (0.55, 0.45, -0.1)
+
 # How each motion moves a body, over one loop of so many frames: each bone turned to and fro
 # about an axis of the world (x: nodding forward, z: turning), by up to so many degrees,
 # so many times a loop, starting so far round (a fraction of a turn).
@@ -119,9 +184,11 @@ def main(description: dict[str, Any], target: Path, facts: Path) -> int:
         bpy.context.view_layer.update()
     _pose(rig, description["pose"])
     hips = rig.matrix_world @ rig.pose.bones["root"].head
+    activity = ACTIVITIES.get((description["pose"], description.get("activity", "")), {})
+    held = _act(rig, activity, hips, description) if activity else {}
     motion = description.get("motion", "")
     if motion:
-        _move(rig, motion, description["pose"])
+        _move(rig, motion, description["pose"], still=frozenset(activity.get("hands", ())))
         _name_roles(roles)
         bpy.context.scene.frame_set(1)  # measured as it starts
     else:
@@ -143,6 +210,11 @@ def main(description: dict[str, Any], target: Path, facts: Path) -> int:
         # Seated: how high the seat they fit is (the underside of their thighs).
         "seat": round(seat, 3) if description["pose"] == "seated" else 0.0,
         "motions": [motion] if motion else [],
+        # Where what they hold goes (its base), from where they stand.
+        "holds": {
+            name: [round(at.x - hips.x, 3), round(at.y - hips.y, 3), round(at.z - low.z, 3)]
+            for name, at in held.items()
+        },
     }))  # fmt: skip
     return 0
 
@@ -169,12 +241,83 @@ def _pose(rig: Any, pose: str) -> None:
     bpy.context.view_layer.update()
 
 
-def _move(rig: Any, motion: str, pose: str) -> None:
+def _act(
+    rig: Any, activity: dict[str, Any], hips: Vector, description: dict[str, Any]
+) -> dict[str, Vector]:
+    """Hands put where the activity has them, each arm bent to reach by inverse kinematics
+    (the elbow out and back), the pose then kept and the fingers closed. Returns where what
+    they hold goes, in the world as they stand."""
+    meshes = [obj for obj in bpy.data.objects if obj.type == "MESH"]
+    low, _ = _extent(meshes)
+    scale = (description["height"] or 1.8) / 1.8
+    # A seated person is raised to sit on the chair: the table top, from their feet.
+    lift = (
+        description["chair"] - (_seat(meshes, hips) - low.z)
+        if description["pose"] == "seated"
+        else 0
+    )
+    table = low.z + description["table"] - max(0.0, lift)
+
+    def where(point: Point) -> Vector:
+        x, y, z, ref = point
+        base = {"table": table, "floor": low.z, "hips": hips.z}[ref]
+        body = scale if ref == "hips" else 1.0
+        return Vector((hips.x + x * scale, hips.y + y * scale, base + z * body))
+
+    bpy.context.view_layer.objects.active = rig
+    bpy.ops.object.mode_set(mode="POSE")
+    made = []
+    for side, point in activity["hands"].items():
+        target = bpy.data.objects.new(f"reach.{side}", None)
+        pole = bpy.data.objects.new(f"elbow.{side}", None)
+        sign = 1 if side == "L" else -1
+        target.location = where(point)
+        pole.location = hips + Vector((ELBOW[0] * sign, ELBOW[1], ELBOW[2])) * scale
+        for empty in (target, pole):
+            bpy.context.scene.collection.objects.link(empty)
+            made.append(empty)
+        reach = rig.pose.bones[f"lowerarm02.{side}"].constraints.new("IK")
+        reach.target, reach.pole_target, reach.chain_count = target, pole, 4
+        reach.pole_angle = math.radians(-90)
+    bpy.context.view_layer.update()
+    bpy.ops.pose.select_all(action="SELECT")
+    bpy.ops.pose.visual_transform_apply()
+    for side in activity["hands"]:
+        bone = rig.pose.bones[f"lowerarm02.{side}"]
+        for constraint in list(bone.constraints):
+            bone.constraints.remove(constraint)
+        _close(rig, side, activity["fingers"][side])
+    bpy.ops.object.mode_set(mode="OBJECT")
+    for empty in made:
+        bpy.data.objects.remove(empty)
+    bpy.context.view_layer.update()
+    return {name: where(point) for name, point in activity.get("holds", {}).items()}
+
+
+def _close(rig: Any, side: str, grip: str) -> None:
+    """A hand's fingers closed for its grip: each joint turned about its own crosswise axis;
+    pointing keeps the index finger straight."""
+    thumb, fingers = GRIPS[grip]
+    for finger in range(1, 6):
+        for joint in range(1, 4):
+            bone = rig.pose.bones.get(f"finger{finger}-{joint}.{side}")
+            if bone is None:
+                continue
+            bent = thumb if finger == 1 else fingers
+            if grip == "point" and finger == 2:
+                bent = 0.0
+            bone.rotation_mode = "XYZ"
+            bone.rotation_euler.x += math.radians(bent)
+
+
+def _move(rig: Any, motion: str, pose: str, still: frozenset[str] = frozenset()) -> None:
     """A looping motion, named for what it is, on top of the pose: each bone keyed every
     few frames, turned about a world axis expressed in the bone's own frame. Every posed
     bone is keyed too, so the pose is part of the motion (an unkeyed bone falls back to
     the skeleton's rest wherever the model is used)."""
-    frames, moves = MOTIONS[motion]
+    frames, every = MOTIONS[motion]
+    # Hands on something keep the body still under them: only the head moves.
+    moves = {name: move for name, move in every.items() if not still or name == "head"}
     action = bpy.data.actions.new(motion)
     rig.animation_data_create().action = action
     posed = {f"{limb}.{side}" for limb in POSES[pose] for side in ("L", "R")}

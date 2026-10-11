@@ -89,6 +89,9 @@ class Model:
     score: float = 0.0
     # A seated figure: how high the seat it fits is (metres), so it is sat on any chair.
     seat: float = 0.0
+    # A figure posed to hold something: where each held thing's base goes (metres right, back
+    # and up from where the figure stands), by name ("drink", "document", "phone").
+    holds: dict[str, tuple[float, float, float]] = field(default_factory=dict)
     # A set's named parts (marks, surfaces, paths, actors, interior), each with where it is,
     # which way it faces and its size: what a shot using the set can refer to.
     parts: tuple[dict[str, Any], ...] = ()
@@ -326,6 +329,7 @@ def load_library(folder: Path | None, channel_blocks: Sequence[Path] = ()) -> Li
         for listed in ("names", "size", "capabilities", "parts", "motions"):
             data[listed] = tuple(data.get(listed, ()))
         data["paint"] = dict(data.get("paint", {}))
+        data["holds"] = {name: tuple(at) for name, at in data.get("holds", {}).items()}
         model = Model(**data)
         if model.model_id in library.models:
             raise ValueError(f"{folder}: '{model.model_id}' is already a prop made in code")

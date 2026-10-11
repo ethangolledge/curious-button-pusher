@@ -11,6 +11,7 @@ import json
 import tempfile
 from pathlib import Path
 
+from content.blender.blocks.props.chair import SEAT_HEIGHT
 from content.providers.blender import LocalBlender
 from content.schemas.staging import Person
 from content.staging.library import Library, Model
@@ -19,6 +20,11 @@ from content.staging.store import Store
 SOURCE = "MakeHuman (MPFB)"
 # The standing height a person is made when the scene gives none.
 USUAL_HEIGHT = {"man": 1.78, "woman": 1.65}
+# What a seated person is posed for: the engine's chairs, and a table's usual height.
+TABLE_HEIGHT = 0.75
+# How people are made (`blender/person.py`): raised when that changes, so everyone is made
+# again rather than kept as they were.
+MAKER = 3
 
 
 def person_id(person: Person, height: float) -> str:
@@ -43,9 +49,9 @@ def made_person(library: Library, person: Person, height: float, *, make: bool) 
         kept = store.keep_file(made)
     model = Model(
         model_id=model_id,
-        names=(f"{person.age} {person.sex} {person.dress} {person.pose}",),
-        describe=f"A {person.build} {person.age} {person.sex} in {person.dress} clothes, "
-        f"{person.pose}",
+        names=(f"{described['age']} {person.sex} {person.dress} {person.pose}",),
+        describe=f"A {described['build']} {described['age']} {person.sex} in {person.dress} "
+        f"clothes, {person.pose}" + (f", {person.activity}" if person.activity else ""),
         size=(facts["width"], facts["depth"], facts["height"]),
         capabilities=("person", *(("seated",) if person.pose == "seated" else ())),
         source=SOURCE,
@@ -53,6 +59,7 @@ def made_person(library: Library, person: Person, height: float, *, make: bool) 
         file=kept,
         seat=facts.get("seat", 0.0),
         motions=tuple(facts.get("motions", ())),
+        holds={name: tuple(at) for name, at in facts.get("holds", {}).items()},
     )
     library.add(model, alongside=True)
     store.note(model_id, "made", described)
@@ -60,12 +67,17 @@ def made_person(library: Library, person: Person, height: float, *, make: bool) 
 
 
 def _description(person: Person, height: float) -> dict[str, object]:
+    """Everything that shapes a person (what a scene leaves open, the most usual)."""
     return {
         "sex": person.sex,
-        "age": person.age,
-        "build": person.build,
+        "age": person.age or "middle",
+        "build": person.build or "average",
         "dress": person.dress,
         "pose": person.pose,
         "motion": "" if person.motion == "still" else person.motion,
+        "activity": person.activity or "",
         "height": round(height or USUAL_HEIGHT[person.sex], 2),
+        "table": TABLE_HEIGHT,
+        "chair": SEAT_HEIGHT,
+        "maker": MAKER,
     }

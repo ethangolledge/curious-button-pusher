@@ -72,13 +72,16 @@ with a change). `AGENTS.md` says which applies when a session starts.
 ## State (2026-10-11)
 
 - Engine: about 16,000 lines in layered packages (`docs/codebase.md`), about 250 deterministic
-  tests in 20 s plus 12 whole-video renders (`pytest -m video`), ruff and strict mypy clean, no
+  tests in 20 s plus 13 whole-video renders (`pytest -m video`), ruff and strict mypy clean, no
   import cycles and one-way layers (enforced by a test). Validated end to end on a first
   long-form production.
 - 3D shots (Blender 5.2): scenes described and composed (relations, groups, furnishing);
   things resolved through a cascade into a SQLite catalogue with lineage (families, versions,
   people made with MakeHuman, Infinigen, an Objaverse index, Sketchfab, Poly Pizza, Gazebo
-  Fuel, the Smithsonian; CLIP scoring, automatic taking with keep/veto); 41 blocks, 35 props;
+  Fuel, the Smithsonian; CLIP scoring, automatic taking with keep/veto); people posed by
+  inverse kinematics to touch what they use, varied across a group, holding what is `held_by`
+  them; each staged still looked at by the vision model for physical mistakes and composed
+  again once if it fails (about 1p); 41 blocks, 35 props;
   `production.pictures: "staged"` and `production.joins: "rendered"` make a video one moving
   picture ([docs/staging.md](docs/staging.md)). Not yet: motion capture, likenesses on made
   people, cloud rendering.

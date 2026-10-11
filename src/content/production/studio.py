@@ -66,6 +66,8 @@ DRAFT_FPS = 12
 
 # What the vision model is told when it describes rendered frames for Jev.
 PERCEPTION_PROMPT = Path(__file__).with_name("perception_prompt.md")
+# Added when the frames are 3D shots: what is physically wrong is what goes wrong there.
+SHOT_PERCEPTION = Path(__file__).with_name("shot_perception.md")
 
 
 class NarrationTask(TypedDict):
@@ -156,19 +158,29 @@ class Studio:
         # What a staged scene lacks, found online and taken automatically (None: never).
         self.find_model = find_model
 
-    def perceive(self, images: Sequence[Path]) -> tuple[list[Observation], list[CallRecord]]:
-        """Describe rendered frames (cached by their content) so Jev can judge them."""
+    def perceive(
+        self, images: Sequence[Path], *, shot: bool = False
+    ) -> tuple[list[Observation], list[CallRecord]]:
+        """Describe rendered frames (cached by their content) so Jev can judge them; a 3D
+        shot's (`shot`) also for what is physically wrong in it."""
         model = self.config.vision_model
+        instructions = self.perception_instructions
+        if shot:
+            instructions = f"{instructions}\n\n{load_prompt(SHOT_PERCEPTION)}"
 
         def describe() -> tuple[bytes, Usage]:
             observations, usage = self.media.perceive(
-                model=model, instructions=self.perception_instructions, images=images
+                model=model, instructions=instructions, images=images
             )
             return json.dumps([o.model_dump() for o in observations]).encode(), usage
 
         stored, calls = self.fetch(
             "perception",
-            {"model": model, "images": [file_digest(path) for path in images]},
+            {
+                "model": model,
+                "images": [file_digest(path) for path in images],
+                **({"shot": True} if shot else {}),
+            },
             ".json",
             "perception",
             describe,

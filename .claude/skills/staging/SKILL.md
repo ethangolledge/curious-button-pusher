@@ -20,7 +20,8 @@ the camera. The composer finds or makes every thing and places it.
 2. **Write the description** (JSON) in the scratchpad or the run's folder, never in the
    repository: a shot belongs to a video. Name things as a prop master would; give every
    thing its real height; use `each` for one per copy (a glass before each man); people get a
-   `person` (pose, dress, motion).
+   `person` (pose, dress, motion), and a thing in their hands is `held_by` them (three glasses
+   held by eight men: three drink). Leave age, build and activity empty so a group varies.
 3. **Check it:** `content staging check scene.json --config <channel>`. Fix every line.
 4. **Preview it:** `content staging preview scene.json --config <channel>` makes any people,
    resolves every thing, renders stills in the channel's look and prints a contact sheet. Look
@@ -98,7 +99,7 @@ on two real keyframes (a join job: `docs/staging.md`) at small size before anyth
 ## A character
 
 Anyone a scene describes is made free, to fit (`docs/staging.md`, "People"): describe them
-(`person`: sex, age, build, dress, pose, motion) and they are made once and kept; run
+(`person`: sex, age, build, dress, pose, activity, motion) and they are made once and kept; run
 `content staging people` once first. A particular person (`who`) is made only with the
 director's sign-off, once: a figurine model sheet (front approved first), a multiview
 image-to-3D model with a rig, then `content staging add … --can humanoid --turn … --height …`.

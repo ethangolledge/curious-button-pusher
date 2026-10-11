@@ -25,8 +25,8 @@ A scene left unstaged is drawn as a keyframe, as before; `missing` is how the to
   - `count`: how many (eight men round a table, a stack of five files);
   - `height`: its real height in metres, always (a mug 0.1, a briefcase 0.35, a traffic cone 0.7, a man 1.8, a lorry 3.5): a model found online can be any size, and is scaled to this;
   - `looks`: its colour or material when the story needs it ("colour: red", "material: brass");
-  - `place`: where it goes: a `relation` to a `target` (a thing's id, the room's furniture or marks, or `floor`), and `each: true` for one per copy of the target (a glass in front of each man). Relations: `on`, `scattered_on`, `stacked_on`, `in_row_on`, `beside`, `in_front_of`, `behind`, `around`, `seated_at` (people on chairs round a table; chairs are added where there are none), `against_wall`, `at` (a mark);
-  - `person`, for people only: `who` (a person the things on hand list by name, or empty for anyone), `sex`, `age`, `build`, `dress`, `pose` (`standing`, `seated`, `walking`). People round a table are `seated_at` it with pose `seated`.
+  - `place`: where it goes: a `relation` to a `target` (a thing's id, the room's furniture or marks, or `floor`), and `each: true` for one per copy of the target (a glass in front of each man). Relations: `on`, `scattered_on`, `stacked_on`, `in_row_on`, `beside`, `in_front_of`, `behind`, `around`, `seated_at` (people on chairs round a table; chairs are added where there are none), `against_wall`, `at` (a mark), `held_by` (in the hand of people: a drink, a document, a pen or a phone; with `each: true` everyone holds one, without it `count` of them do);
+  - `person`, for people only: `who` (a person the things on hand list by name, or empty for anyone), `sex`, `age` (`young`, `middle`, `old`), `build` (`slim`, `average`, `heavy`), `dress`, `pose` (`standing`, `seated`, `walking`), `activity` (what their hands do: `resting`, `lap`, `folded`, `pointing`, `pockets`) and `motion` (`breathing`, `talking`, `walking`, `still`). Leave `age`, `build` and `activity` empty unless the story needs them: a group is then varied, as real people are, rather than eight copies of one man. People round a table are `seated_at` it with pose `seated`. Give a thing to people with `held_by` rather than an activity: they are posed to hold it.
 - **furnish**: `bare`, `some` (pieces against the walls) or `lived_in` (also small things on surfaces): background detail beyond what you name. Use `lived_in` for working rooms, `bare` when emptiness is the point.
 - **actions**: what happens, in order: an action from the catalogue with `who` (a thing's id: every copy does it, each `stagger` of the shot after the last) and its settings; a setting that names the actor takes `who`. Their `start` and `end` are fractions of the scene's length.
 - **lights**: one to three, matching the anchor's `light_and_colour`: a practical lamp, a window, overhead, or outdoor sky; at night, the sources in the scene.
@@ -38,7 +38,7 @@ Name only what the story needs and what makes the place believable; the furnishi
 
 ## Example
 
-A board meeting at night: eight men in suits round the long table, a glass before each, files piled at one end, the camera circling them.
+A board meeting at night: eight men in suits round the long table, three of them holding a glass of water, files piled at one end, the camera circling them.
 
 ```json
 {"layout": {"block": "boardroom", "settings": [{"name": "chairs", "value": "4"}]},
@@ -46,8 +46,8 @@ A board meeting at night: eight men in suits round the long table, a glass befor
    {"thing_id": "men", "what": "man in a suit", "count": 8,
     "height": 1.8, "person": {"pose": "seated", "dress": "suit"},
     "place": {"relation": "seated_at", "target": "table"}},
-   {"thing_id": "glasses", "what": "water glass", "height": 0.12,
-    "place": {"relation": "in_front_of", "target": "men", "each": true}},
+   {"thing_id": "glasses", "what": "water glass", "count": 3, "height": 0.12,
+    "place": {"relation": "held_by", "target": "men"}},
    {"thing_id": "files", "what": "folder", "count": 5, "height": 0.02,
     "place": {"relation": "stacked_on", "target": "table"}}],
  "furnish": "some",
