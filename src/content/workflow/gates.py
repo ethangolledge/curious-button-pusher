@@ -333,6 +333,7 @@ def check_visuals(
     theme: Theme,
     catalogue: Catalogue | None = None,
     most_revisions: int = 0,
+    finds_models: bool = False,
 ) -> ContentState:
     visuals, script = state.get("visual_package"), state.get("script_package")
     if visuals is None or script is None:
@@ -343,7 +344,7 @@ def check_visuals(
     ]
     unstaged: ContentState = {}
     if catalogue is not None:
-        staging = staging_issues(visuals, theme, catalogue)
+        staging = staging_issues(visuals, theme, catalogue, finds_models=finds_models)
         if staging and state.get("visual_revision_count", 0) >= most_revisions:
             # Out of revisions: the scenes whose staging cannot be built are drawn instead.
             failing = {issue.split(" ", 1)[0] for issue in staging}

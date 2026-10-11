@@ -1,13 +1,12 @@
 """The models a channel can put in a shot: the props the engine makes in code, and the
-channel's own library of fetched or generated models (`themes/<name>/assets/library.json`,
-private, kept in its archive with the rest of the channel).
+channel's own library of fetched or generated models (kept in `themes/<name>/assets/` by
+`store.py`, private, saved with the rest of the channel).
 
 Search is by meaning, not spelling: every model has one id and the other words for it, and a
 search matches whole phrases, the words in them, and (when a local embedding model is
 available) what they mean. Adding a model that a search already finds is refused, so the
 library never holds the same thing twice under different names."""
 
-import json
 import re
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import asdict, dataclass, field
@@ -22,8 +21,8 @@ from content.blender.materials import ROLES
 from content.blender.registry import discover
 from content.blender.rehearsal import RehearsalStage
 from content.providers.assets import CREDITED
+from content.staging.store import Store
 
-LIBRARY = "library.json"
 MADE_IN_CODE = "made in code"
 # Words that say nothing about what a thing is.
 FILLER = frozenset(
@@ -79,7 +78,11 @@ class Model:
     author: str = ""
     cost_usd: float = 0.0
     file: str = ""  # relative to the library folder
-    used_in: tuple[str, ...] = ()
+    # "kept" (a person chose it, or made it), "auto" (taken automatically for a scene, for a
+    # person to review), "vetoed" (turned down: never used again).
+    status: str = "kept"
+    # How sure the automatic choice was, from 0 to 1 (`sourcing.score`).
+    score: float = 0.0
     # A set's named parts (marks, surfaces, paths, actors, interior), each with where it is,
     # which way it faces and its size: what a shot using the set can refer to.
     parts: tuple[dict[str, Any], ...] = ()
@@ -114,18 +117,16 @@ class Library:
 
     def search(self, words: str, embed: Embed | None = None, limit: int = 5) -> list[Found]:
         query = _terms(words)
-        scores = {
-            m.model_id: max(_lexical(query, _terms(w)) for w in m.words)
-            for m in self.models.values()
-        }
-        if embed is not None and self.models:
-            texts = [f"{m.words[0]}: {m.describe}" for m in self.models.values()]
+        usable = [m for m in self.models.values() if m.status != "vetoed"]
+        scores = {m.model_id: max(_lexical(query, _terms(w)) for w in m.words) for m in usable}
+        if embed is not None and usable:
+            texts = [f"{m.words[0]}: {m.describe}" for m in usable]
             vectors = embed([words, *texts])
             asked, rest = vectors[0], vectors[1:]
             similarity = (
                 rest @ asked / (np.linalg.norm(rest, axis=1) * np.linalg.norm(asked) + 1e-12)
             )
-            for model, close in zip(self.models.values(), similarity, strict=True):
+            for model, close in zip(usable, similarity, strict=True):
                 scores[model.model_id] = max(scores[model.model_id], float(close))
         ranked = sorted(scores.items(), key=lambda item: (-item[1], item[0]))
         return [
@@ -151,7 +152,17 @@ class Library:
                     "really a different thing."
                 )
         self.models[model.model_id] = model
-        self.save()
+        self._store().write(asdict(model))
+        self._store().note(
+            model.model_id,
+            "added",
+            {
+                "source": model.source,
+                "page": model.page,
+                "licence": model.licence,
+                "status": model.status,
+            },
+        )
 
     def name(self, model_id: str, words: str) -> None:
         """Another word for a model, so searches find it."""
@@ -160,7 +171,7 @@ class Library:
             raise ValueError(f"'{model_id}' is made in code: add the words to its file's `names`")
         if words not in model.names:
             self.models[model_id] = _replace(model, names=(*model.names, words))
-            self.save()
+            self._store().write(asdict(self.models[model_id]))
 
     def vary(
         self,
@@ -251,20 +262,34 @@ class Library:
         return f"{model.describe}{maker} ({model.source}, {model.licence}): {model.page}"
 
     def used(self, model_id: str, video: str) -> None:
+        """Note that a video used a model (and, for a version, the model it is made from)."""
+        model, _ = self.root(self.get(model_id))
+        if model.source != MADE_IN_CODE:
+            self._store().used(model.model_id, video)
+
+    def veto(self, model_id: str, reason: str) -> None:
+        """Turn a model down: searches never find it again, and the source it came from is
+        not offered again for the same words."""
         model = self.get(model_id)
-        if model.source != MADE_IN_CODE and video not in model.used_in:
-            self.models[model_id] = _replace(model, used_in=(*model.used_in, video))
-            self.save()
+        if model.source == MADE_IN_CODE:
+            raise ValueError(f"'{model_id}' is made in code: change or delete its file instead")
+        self.models[model_id] = _replace(model, status="vetoed")
+        self._store().write(asdict(self.models[model_id]))
+        self._store().note(model_id, "vetoed", {"reason": reason})
+
+    def keep(self, model_id: str) -> None:
+        """A person has looked at a model taken automatically, and keeps it."""
+        self.models[model_id] = _replace(self.get(model_id), status="kept")
+        self._store().write(asdict(self.models[model_id]))
+        self._store().note(model_id, "kept", {})
 
     def path(self, model: Model) -> Path | None:
         return self.folder / model.file if self.folder is not None and model.file else None
 
-    def save(self) -> None:
-        assert self.folder is not None
-        kept = [asdict(m) for m in self.models.values() if m.source != MADE_IN_CODE]
-        self.folder.mkdir(parents=True, exist_ok=True)
-        text = json.dumps({"models": sorted(kept, key=lambda m: m["model_id"])}, indent=2)
-        (self.folder / LIBRARY).write_text(text + "\n", encoding="utf-8")
+    def _store(self) -> Store:
+        if self.folder is None:
+            raise ValueError("models can only be kept in a channel's library")
+        return Store(self.folder)
 
 
 def load_library(folder: Path | None, channel_blocks: Sequence[Path] = ()) -> Library:
@@ -278,20 +303,14 @@ def load_library(folder: Path | None, channel_blocks: Sequence[Path] = ()) -> Li
             size=_measured(prop),
             capabilities=tuple(sorted(prop.capabilities)),
         )
-    stored = folder / LIBRARY if folder is not None else None
-    if stored is not None and stored.is_file():
-        for data in json.loads(stored.read_text(encoding="utf-8"))["models"]:
-            data["names"] = tuple(data["names"])
-            data["size"] = tuple(data["size"])
-            data["capabilities"] = tuple(data.get("capabilities", ()))
-            data["used_in"] = tuple(data.get("used_in", ()))
-            data["parts"] = tuple(data.get("parts", ()))
-            data["motions"] = tuple(data.get("motions", ()))
-            data["paint"] = dict(data.get("paint", {}))
-            model = Model(**data)
-            if model.model_id in library.models:
-                raise ValueError(f"{stored}: '{model.model_id}' is already a prop made in code")
-            library.models[model.model_id] = model
+    for data in Store(folder).records() if folder is not None else []:
+        for listed in ("names", "size", "capabilities", "parts", "motions"):
+            data[listed] = tuple(data.get(listed, ()))
+        data["paint"] = dict(data.get("paint", {}))
+        model = Model(**data)
+        if model.model_id in library.models:
+            raise ValueError(f"{folder}: '{model.model_id}' is already a prop made in code")
+        library.models[model.model_id] = model
     return library
 
 

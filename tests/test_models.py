@@ -3,6 +3,7 @@ offered, best match first; an imported model's surfaces take the roles their col
 nearest; a version of a model is the same shape repainted and resized, made from the
 original's file (or code) and carrying its rights."""
 
+import json
 from pathlib import Path
 
 import pytest
@@ -10,9 +11,12 @@ import pytest
 from content.blender.job import ActorCall, BlockCall, Job
 from content.blender.materials import linear, nearest_role
 from content.providers.assets import Candidate, licence_terms
+from content.schemas.staging import Thing
 from content.staging.catalogue import load_catalogue, with_models
-from content.staging.library import Model
+from content.staging.library import Model, load_library
+from content.staging.resolve import with_online
 from content.staging.sourcing import TOO_DETAILED, rank
+from content.staging.store import Store
 
 
 @pytest.mark.parametrize(
@@ -116,3 +120,77 @@ def test_a_version_is_its_original_repainted_and_resized_with_its_rights(
         "A marble bust by a sculptor (sketchfab, CC-BY): https://statue"
     )
     assert library.credit("red_box") == ""
+
+
+def test_the_catalogue_keeps_one_copy_of_a_file_and_every_step_and_use(tmp_path: Path) -> None:
+    store = Store(tmp_path)
+    first, second = tmp_path / "a.glb", tmp_path / "b.glb"
+    first.write_bytes(b"the same model")
+    second.write_bytes(b"the same model")
+
+    assert store.keep_file(first) == store.keep_file(second)
+    store.note("vase", "fetched", {"from": "https://models/vase"})
+    store.note("vase", "chosen", {"score": 0.8})
+    store.used("vase", "video one")
+    store.used("vase", "video one")
+
+    assert [step for _, step, _ in store.lineage("vase")] == ["fetched", "chosen"]
+    assert store.usage("vase") == ["video one"]
+
+
+def test_an_old_json_library_is_moved_into_the_catalogue_once(tmp_path: Path) -> None:
+    old = {"model_id": "vase", "names": ["urn"], "describe": "A vase", "size": [0.2, 0.2, 0.4],
+           "source": "sketchfab", "licence": "CC0", "file": "vase.glb",
+           "used_in": ["v1"]}  # fmt: skip
+    (tmp_path / "library.json").write_text(json.dumps({"models": [old]}), encoding="utf-8")
+
+    library = load_library(tmp_path)
+    again = load_library(tmp_path)
+
+    assert library.get("vase").names == ("urn",) and again.get("vase").licence == "CC0"
+    assert not (tmp_path / "library.json").exists()
+    assert library.search("urn")[0].model.model_id == "vase"
+
+
+def test_a_turned_down_model_is_never_found_again(tmp_path: Path) -> None:
+    library = load_library(tmp_path)
+    library.add(Model(model_id="urn_scan", names=("urn",), describe="A broken scan",
+                      size=(0.2, 0.2, 0.4), source="fuel", licence="CC0", file="u.glb",
+                      status="auto", score=0.6))  # fmt: skip
+
+    library.veto("urn_scan", "it is a mess")
+
+    assert library.search("urn") == []
+    assert load_library(tmp_path).get("urn_scan").status == "vetoed"
+
+
+def test_what_the_library_lacks_is_looked_for_online_once_and_scaled_to_its_height(
+    tmp_path: Path,
+) -> None:
+    library = load_library(tmp_path)
+    asked: list[str] = []
+
+    def find_model(what: str) -> Model | None:
+        asked.append(what)
+        if what != "traffic cone":
+            return None
+        cone = Model(model_id="traffic_cone", names=(what,), describe="A toy cone",
+                     size=(0.08, 0.08, 0.08), source="fuel", licence="CC0", file="c.glb",
+                     status="auto")  # fmt: skip
+        library.add(cone, alongside=True)
+        return cone
+
+    resolve = with_online(library, find_model)
+    cone = {"thing_id": "cone", "what": "traffic cone", "height": 0.7,
+            "place": {"relation": "on", "target": "floor"}}  # fmt: skip
+    ship = {**cone, "thing_id": "ship", "what": "oil tanker"}
+
+    first = resolve(Thing.model_validate(cone))
+    resolve(Thing.model_validate(cone))
+    resolve(Thing.model_validate(ship))
+    resolve(Thing.model_validate(ship))
+    desk = resolve(Thing.model_validate({**cone, "what": "desk", "height": 0}))
+
+    assert first is not None and first.size.z == pytest.approx(0.7)
+    assert asked == ["traffic cone", "oil tanker"]  # each looked for once; the desk is on hand
+    assert desk is not None and desk.model == "desk"

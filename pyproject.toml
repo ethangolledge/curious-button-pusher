@@ -31,6 +31,8 @@ music = [
   "soxr",
   "rotary-embedding-torch",
 ]
+# Reading the COLLADA models some free collections (Gazebo Fuel) are made of.
+models = ["trimesh>=4.4", "pycollada>=0.8"]
 # Keeping finished runs and the theme's locks in a Google Cloud Storage bucket (storage.py).
 cloud = ["google-cloud-storage>=3.4,<4"]
 # Finding each keyframe's focal point (Grounding DINO), so the camera glides toward it.

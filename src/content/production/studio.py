@@ -43,6 +43,7 @@ from content.schemas.perception import Observation
 from content.schemas.story import Feeling
 from content.schemas.visuals import Scene, SceneAnchor
 from content.staging.catalogue import Catalogue
+from content.staging.resolve import FindModel
 from content.state import CallRecord, ContentState, call_record
 from content.story.field import (
     ripple_tint,
@@ -140,6 +141,7 @@ class Studio:
         image_sources: Sequence[ImageSource],
         renderer: Renderer | None = None,
         catalogue: Catalogue | None = None,
+        find_model: FindModel | None = None,
     ) -> None:
         self.config = config
         self.theme = theme
@@ -151,6 +153,8 @@ class Studio:
         # Staged scenes (`production.pictures` "staged"): Blender, and what shots are made of.
         self.renderer = renderer
         self.catalogue = catalogue
+        # What a staged scene lacks, found online and taken automatically (None: never).
+        self.find_model = find_model
 
     def perceive(self, images: Sequence[Path]) -> tuple[list[Observation], list[CallRecord]]:
         """Describe rendered frames (cached by their content) so Jev can judge them."""

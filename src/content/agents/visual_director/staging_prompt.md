@@ -23,7 +23,7 @@ A scene left unstaged is drawn as a keyframe, as before; `missing` is how the to
   - `thing_id`: a short name you choose, used everywhere else to refer to it;
   - `what`: plain words for it, as a prop master would ask for it ("water glass", "leather briefcase", "oil tanker", "man in a suit");
   - `count`: how many (eight men round a table, a stack of five files);
-  - `height`: its real height in metres when it matters (0 otherwise);
+  - `height`: its real height in metres, always (a mug 0.1, a briefcase 0.35, a traffic cone 0.7, a man 1.8, a lorry 3.5): a model found online can be any size, and is scaled to this;
   - `looks`: its colour or material when the story needs it ("colour: red", "material: brass");
   - `place`: where it goes: a `relation` to a `target` (a thing's id, the room's furniture or marks, or `floor`), and `each: true` for one per copy of the target (a glass in front of each man). Relations: `on`, `scattered_on`, `stacked_on`, `in_row_on`, `beside`, `in_front_of`, `behind`, `around`, `seated_at` (people on chairs round a table; chairs are added where there are none), `against_wall`, `at` (a mark);
   - `person`, for people only: `who` (a person the things on hand list by name, or empty for anyone), `sex`, `age`, `build`, `dress`, `pose` (`standing`, `seated`, `walking`). People round a table are `seated_at` it with pose `seated`.
@@ -44,11 +44,11 @@ A board meeting at night: eight men in suits round the long table, a glass befor
 {"layout": {"block": "boardroom", "settings": [{"name": "chairs", "value": "4"}]},
  "things": [
    {"thing_id": "men", "what": "man in a suit", "count": 8,
-    "person": {"pose": "seated", "dress": "suit"},
+    "height": 1.8, "person": {"pose": "seated", "dress": "suit"},
     "place": {"relation": "seated_at", "target": "table"}},
-   {"thing_id": "glasses", "what": "water glass",
+   {"thing_id": "glasses", "what": "water glass", "height": 0.12,
     "place": {"relation": "in_front_of", "target": "men", "each": true}},
-   {"thing_id": "files", "what": "folder", "count": 5,
+   {"thing_id": "files", "what": "folder", "count": 5, "height": 0.02,
     "place": {"relation": "stacked_on", "target": "table"}}],
  "furnish": "some",
  "actions": [],

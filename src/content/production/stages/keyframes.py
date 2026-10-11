@@ -37,8 +37,10 @@ from content.schemas.staging import StagedScene
 from content.schemas.story import Feeling
 from content.schemas.visuals import Scene
 from content.staging.backlog import record_gap
+from content.staging.compose import compose
 from content.staging.plan import StagingError, job_for, staged, unstage
-from content.state import CallRecord, ContentState
+from content.staging.resolve import with_online
+from content.state import CallRecord, ContentState, merge_warnings
 from content.story.field import (
     circumplex,
     colour_units,
@@ -65,7 +67,35 @@ class Keyframes(Studio):
         """The person approved the narration they heard: remember it, so re-timing the same
         narration after storyboard notes does not ask again."""
         timeline = required(state.get("timeline"), "a timeline")
-        return {"current_stage": "keyframes", "listened_narration": timeline.narration_path}
+        return {
+            "current_stage": "keyframes",
+            "listened_narration": timeline.narration_path,
+            "warnings": merge_warnings(state.get("warnings", []), self._prepare_models(state)),
+        }
+
+    def _prepare_models(self, state: ContentState) -> list[str]:
+        """Before any shot is rendered, what the staged scenes need and the library lacks is
+        found online and taken (free; it is kept for every later video). Each model taken
+        without a person is named for review."""
+        staging = self.staging()
+        if staging is None or self.find_model is None:
+            return []
+        catalogue = staging[1]
+        before = set(catalogue.library.models)
+        resolve = with_online(catalogue.library, self.find_model)
+        visuals = required(state.get("visual_package"), "a storyboard")
+        for scene in visuals.scenes:
+            shot = staged(scene)
+            if shot is not None and shot.staging is not None:
+                compose(shot.staging, catalogue.registry, resolve, seed=shot.scene_id)
+        taken = [catalogue.library.get(m) for m in sorted(set(catalogue.library.models) - before)]
+        return [
+            f"Model taken automatically for '{model.names[0]}': {model.describe} by "
+            f"{model.author} ({model.source}, {model.licence}, sure {model.score:.2f}). If it "
+            f"is wrong: content staging veto {model.model_id}"
+            for model in taken
+            if model.status == "auto"
+        ]
 
     def keyframe_tasks(self, state: ContentState) -> list[Send] | str:
         visuals = required(state.get("visual_package"), "a storyboard")

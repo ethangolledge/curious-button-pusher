@@ -161,8 +161,12 @@ def staged(scene: object) -> StagedScene | None:
     return scene if isinstance(scene, StagedScene) and scene.staging is not None else None
 
 
-def staging_issues(visuals: VisualPackage, theme: Theme, catalogue: Catalogue) -> list[str]:
-    """Every problem with a storyboard's staging that can be found without Blender."""
+def staging_issues(
+    visuals: VisualPackage, theme: Theme, catalogue: Catalogue, *, finds_models: bool = False
+) -> list[str]:
+    """Every problem with a storyboard's staging that can be found without Blender. When
+    the run finds models online, a thing the library lacks is not a problem yet: it is
+    looked for before the shot is rendered (and the scene drawn if nothing fits)."""
     if not isinstance(visuals, StagedVisualPackage):
         return []
     issues = []
@@ -175,7 +179,8 @@ def staging_issues(visuals: VisualPackage, theme: Theme, catalogue: Catalogue) -
                 quality="still",
             )  # fmt: skip
         except StagingError as exc:
-            issues += [f"{scene.scene_id} staging: {missing}" for missing in exc.missing]
+            if not (finds_models and all(m.startswith("model:") for m in exc.missing)):
+                issues += [f"{scene.scene_id} staging: {missing}" for missing in exc.missing]
             continue
         issues += [f"{scene.scene_id} staging: {issue}" for issue in check(job, catalogue)]
     for scene in visuals.scenes:

@@ -21,6 +21,7 @@ from content.staging import sourcing
 from content.staging.backlog import most_wanted
 from content.staging.catalogue import Catalogue, check, describe, load_catalogue, with_models
 from content.staging.plan import StagingError, job_for, themed
+from content.staging.store import Store
 from content.staging.templates import TEMPLATES, render
 from content.theme import Theme, load_theme
 
@@ -80,6 +81,15 @@ def _staging(arguments: list[str]) -> int:
     )
     vary.add_argument("--names", default="", help="Other words for it, comma separated")
     vary.add_argument("--height", type=float, help="Its height in metres")
+    for verb, about in (
+        ("keep", "Keep a model that was taken automatically"),
+        ("veto", "Turn a model down: it is never used again"),
+        ("history", "Where a model came from and every step that made it"),
+    ):
+        command = actions.add_parser(verb, parents=[common], help=about)
+        command.add_argument("model_id")
+        if verb == "veto":
+            command.add_argument("--why", default="", help="What is wrong with it")
     name = actions.add_parser("name", parents=[common], help="Another word for a library model")
     name.add_argument("model_id")
     name.add_argument("words")
@@ -119,6 +129,10 @@ def _staging(arguments: list[str]) -> int:
     elif args.action == "name":
         catalogue.library.name(args.model_id, args.words)
         print(f"{args.model_id} is also found as '{args.words}'.")
+    elif args.action in ("keep", "veto", "history"):
+        if theme is None:
+            parser.error("models are a channel's: pass --config themes/<name>/config.json")
+        return _review(catalogue, args)
     elif args.action in ("find", "add", "vary"):
         if theme is None:
             parser.error("models are added to a channel: pass --config themes/<name>/config.json")
@@ -178,6 +192,24 @@ def _listed(text: str) -> list[str]:
     return [item.strip() for item in text.split(",") if item.strip()]
 
 
+def _review(catalogue: Catalogue, args: argparse.Namespace) -> int:
+    library = catalogue.library
+    if args.action == "keep":
+        library.keep(args.model_id)
+        print(f"✓ {args.model_id} kept.")
+    elif args.action == "veto":
+        library.veto(args.model_id, args.why)
+        print(f"✓ {args.model_id} turned down: it will not be used or offered again.")
+    else:
+        assert library.folder is not None
+        store = Store(library.folder)
+        for at, step, detail in store.lineage(args.model_id):
+            print(f"{at}  {step:9} {json.dumps(detail)}")
+        used = store.usage(args.model_id)
+        print(f"Used in: {', '.join(used) if used else 'no video yet'}")
+    return 0
+
+
 def _models(catalogue: Catalogue, words: str) -> None:
     library = catalogue.library
     found = (
@@ -193,6 +225,8 @@ def _models(catalogue: Catalogue, words: str) -> None:
     for model in found:
         w, d, h = model.size
         origin = model.source + (f", {model.licence}" if model.licence else "")
+        if model.status != "kept":
+            origin += f", {model.status}"
         print(f"{model.model_id:20} {w:.2f}×{d:.2f}×{h:.2f} m  ({origin})  {model.describe}")
 
 

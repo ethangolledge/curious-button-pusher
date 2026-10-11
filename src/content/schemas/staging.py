@@ -67,7 +67,7 @@ class Thing(ImmutableModel):
     thing_id: str
     what: str
     count: int = Field(default=1, ge=1, le=40)
-    # Its real height in metres, when it matters (a tall vase, a short man); 0 leaves it.
+    # Its real height in metres: what a model of any size is scaled to. 0 keeps the model's.
     height: float = Field(default=0.0, ge=0.0, le=200.0)
     # How it looks: colour, material, style, era ("colour: red", "material: brass").
     looks: list[Setting] = Field(default_factory=list)

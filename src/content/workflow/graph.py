@@ -41,7 +41,7 @@ from content.workflow.gates import (
     script_verdict,
     visual_verdict,
 )
-from content.workflow.providers import build_renderer
+from content.workflow.providers import build_model_finder, build_renderer
 from content.workflow.review_requests import mark_review_stopped, request_human_review
 from content.workflow.routing import (
     fan_out_audience,
@@ -98,6 +98,7 @@ def build_graph(
     staged = config.production is not None and config.production.pictures == "staged"
     catalogue = load_catalogue(theme.root) if staged else None
     renderer = renderer or build_renderer(config)
+    find_model = build_model_finder(config, catalogue)
     # A run that makes video keeps every paid answer in its asset cache, text included.
     cache = AssetCache(config.production.cache_directory) if config.production else None
 
@@ -153,6 +154,7 @@ def build_graph(
             image_sources=image_sources,
             renderer=renderer,
             catalogue=catalogue,
+            find_model=find_model,
         )
     limits = config.workflow
     # The locked bed's map, when the run makes video: the plan is sized to its edits.
@@ -199,6 +201,7 @@ def build_graph(
             theme=theme,
             catalogue=catalogue,
             most_revisions=limits.max_revisions.visuals,
+            finds_models=find_model is not None,
         ),
     )
     workflow.add_node("visual_verdict", visual_verdict)

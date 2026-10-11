@@ -1,15 +1,22 @@
 """Which providers a run talks to: real ones for a live configuration, the deterministic demo
 for an offline one, and the run's cap fitted to what the OpenRouter key can pay."""
 
+import re
 from collections.abc import Mapping
 from dataclasses import replace
 
 from content.config import ContentConfig
 from content.errors import InputError
 from content.production.media import FakeMediaProvider, MediaProvider
+from content.providers.assets import ready_sources
 from content.providers.base import DecisionProvider, ModelProvider
-from content.providers.blender import FakeBlender, LocalBlender, Renderer
+from content.providers.blender import FakeBlender, LocalBlender, Renderer, blender_path
 from content.providers.images import FakeImageSource, ImageSource, WikimediaCommons
+from content.staging.catalogue import Catalogue
+from content.staging.library import Model
+from content.staging.resolve import FindModel
+from content.staging.scoring import clip_scorer
+from content.staging.sourcing import find
 from content.workflow.demo import create_demo_decision_provider, create_demo_provider
 
 
@@ -95,6 +102,24 @@ def build_renderer(config: ContentConfig) -> Renderer | None:
         tone = config.theme.spec.visual.tone
         return FakeBlender(brightness=tone.brightness.neutral, saturation=tone.saturation.neutral)
     return LocalBlender()
+
+
+def build_model_finder(config: ContentConfig, catalogue: Catalogue | None) -> FindModel | None:
+    """Finding what staged scenes lack among the free model collections, scored on this
+    computer: for real runs of a staging channel with Blender and the vision extra."""
+    production = config.production
+    if catalogue is None or production is None or production.provider == "fake":
+        return None
+    scorer = clip_scorer()
+    if scorer is None or blender_path() is None:
+        return None
+    sources = ready_sources()
+
+    def find_model(what: str) -> Model | None:
+        model_id = re.sub(r"[^a-z0-9]+", "_", what.lower()).strip("_")
+        return find(what, catalogue, sources, scorer, model_id=model_id)
+
+    return find_model
 
 
 def build_image_sources(config: ContentConfig) -> list[ImageSource]:

@@ -18,6 +18,8 @@ from content.schemas.staging import Thing
 from content.staging.compose import Resolve, Resolved
 from content.staging.library import Library, Model
 
+# Finding a model online for some words: taken into the library, or None.
+FindModel = Callable[[str], Model | None]
 # A library model is taken for a thing when a search scores it at least this.
 GOOD_MATCH = 0.6
 # Words for what a thing is made of, and the role that draws it.
@@ -71,6 +73,24 @@ def from_library(library: Library, *, people: Callable[[Thing], str] | None = No
 
     def resolve(thing: Thing) -> Resolved | None:
         model = _person(library, thing) if thing.person else _search(library, thing.what)
+        return None if model is None else fitted(library, model, thing)
+
+    return resolve
+
+
+def with_online(library: Library, find_model: FindModel) -> Resolve:
+    """Things resolved from the library, and what it lacks found online (each looked for
+    once): the cascade a run uses."""
+    local = from_library(library)
+    tried: dict[str, Model | None] = {}
+
+    def resolve(thing: Thing) -> Resolved | None:
+        found = local(thing)
+        if found is not None or thing.person is not None:
+            return found
+        if thing.what not in tried:
+            tried[thing.what] = find_model(thing.what)
+        model = tried[thing.what]
         return None if model is None else fitted(library, model, thing)
 
     return resolve

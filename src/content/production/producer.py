@@ -15,6 +15,7 @@ from content.production.stages.segments import Segments
 from content.providers.blender import Renderer
 from content.providers.images import ImageSource
 from content.staging.catalogue import Catalogue
+from content.staging.resolve import FindModel
 from content.theme import Theme
 
 
@@ -32,6 +33,7 @@ class Producer:
         image_sources: Sequence[ImageSource],
         renderer: Renderer | None = None,
         catalogue: Catalogue | None = None,
+        find_model: FindModel | None = None,
     ) -> None:
         parts: dict[str, Any] = {
             "config": config,
@@ -41,6 +43,7 @@ class Producer:
             "image_sources": image_sources,
             "renderer": renderer,
             "catalogue": catalogue,
+            "find_model": find_model,
         }
         self.references = References(**parts)
         self.narration = Narration(**parts)

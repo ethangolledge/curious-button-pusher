@@ -6,10 +6,13 @@ the licence, the page) so the finished video can credit it.
 
 Everything here is free; the only cost is Blender's time on this computer."""
 
+import importlib
 import io
 import json
+import math
 import re
 import shutil
+import tempfile
 import zipfile
 from collections.abc import Sequence
 from dataclasses import asdict, dataclass, replace
@@ -23,6 +26,8 @@ from content.providers.blender import LocalBlender
 from content.staging.catalogue import Catalogue, with_models
 from content.staging.library import Model, match
 from content.staging.plan import themed
+from content.staging.scoring import ACCEPT, Scorer
+from content.staging.store import Store
 from content.theme import Theme
 
 # A library model has at most this many faces (more are simplified away as it is added).
@@ -116,6 +121,8 @@ def add_file(
     turn: float = 0.0,
     capabilities: Sequence[str] = (),
     alongside: bool = False,
+    status: str = "kept",
+    score: float = 0.0,
 ) -> Model:
     """A model file (or a picture) brought into the library's form and added, with its
     rights. Refused, leaving nothing behind, if its licence is not free enough or the
@@ -129,14 +136,17 @@ def add_file(
             f"'{candidate.licence}' forbids commercial use or changes"
         )
     model_id = re.sub(r"[^a-z0-9_]+", "_", model_id.lower()).strip("_")
-    if file.suffix.lower() in PICTURES:
-        target = library.folder / f"{model_id}{file.suffix.lower()}"
-        facts = _picture_facts(file, target, width=height or 1.0)
-    else:
-        target = library.folder / f"{model_id}.glb"
-        facts = LocalBlender().ingest(
-            file, target, height=height, max_faces=MAX_FACES, turn=turn, up=candidate.up
-        )
+    store = Store(library.folder)
+    with tempfile.TemporaryDirectory() as work:
+        if file.suffix.lower() in PICTURES:
+            prepared = Path(work) / f"picture{file.suffix.lower()}"
+            facts = _picture_facts(file, prepared, width=height or 1.0)
+        else:
+            prepared = Path(work) / "model.glb"
+            facts = LocalBlender().ingest(
+                file, prepared, height=height, max_faces=MAX_FACES, turn=turn, up=candidate.up
+            )
+        kept = store.keep_file(prepared)
     model = Model(
         model_id=model_id,
         names=tuple(names),
@@ -146,16 +156,18 @@ def add_file(
         licence=candidate.licence,
         page=candidate.page,
         author=candidate.author,
-        file=target.name,
+        file=kept,
         parts=tuple(facts.get("parts", ())),
         motions=tuple(facts.get("motions", ())),
         capabilities=tuple(sorted(capabilities)),
+        status=status,
+        score=score,
     )
-    try:
-        library.add(model, alongside=alongside)
-    except ValueError:
-        target.unlink(missing_ok=True)
-        raise
+    library.add(model, alongside=alongside)
+    store.note(model_id, "prepared", {
+        "from": candidate.file_url, "up": candidate.up, "turn": turn, "height": height,
+        "faces": facts.get("faces"), "size": model.size, "file": kept,
+    })  # fmt: skip
     return model
 
 
@@ -176,10 +188,35 @@ def _unpack(data: bytes, folder: Path, file_type: str) -> Path:
             found = sorted(folder.rglob(f"*{suffix}"))
             if found:
                 return found[0]
+        collada = sorted(folder.rglob("*.dae"))
+        if collada:
+            return _from_collada(collada[0], folder / "converted.glb")
         raise ValueError("no model file inside the download")
     path = folder / f"model.{file_type or 'glb'}"
     path.write_bytes(data)
     return path
+
+
+def _from_collada(source: Path, target: Path) -> Path:
+    """A COLLADA model (which Blender no longer reads) as glTF, in metres with Y up as glTF
+    expects: its own unit applied, and the scale a Gazebo model file gives it."""
+    try:
+        trimesh: Any = importlib.import_module("trimesh")
+    except ImportError as exc:
+        raise ValueError("a COLLADA model: install the models extra to read it") from exc
+    text = source.read_text(encoding="utf-8", errors="ignore")
+    unit = re.search(r'<unit[^>]*meter="([0-9.eE+-]+)"', text)
+    scale = float(unit.group(1)) if unit else 1.0
+    sdf = next(source.parent.parent.glob("model.sdf"), None)
+    if sdf is not None:
+        given = re.search(r"<scale>\s*([0-9.eE+-]+)", sdf.read_text(encoding="utf-8"))
+        scale *= float(given.group(1)) if given else 1.0
+    scene = trimesh.load(str(source), force="scene")
+    scene.apply_scale(scale)
+    if "<up_axis>Z_UP" in text:
+        scene.apply_transform(trimesh.transformations.rotation_matrix(-math.pi / 2, [1, 0, 0]))
+    scene.export(str(target))
+    return target
 
 
 def _prepare(
@@ -240,3 +277,52 @@ def folder_for(words: str) -> Path:
     """Where a search's shortlist is kept."""
     slug = re.sub(r"[^a-z0-9]+", "-", words.lower()).strip("-")
     return Path(".cache/staging/candidates") / slug
+
+
+def find(
+    what: str,
+    catalogue: Catalogue,
+    sources: Sequence[AssetSource],
+    scorer: Scorer,
+    *,
+    model_id: str,
+) -> Model | None:
+    """A model for `what`, found and taken without a person: every source searched, the
+    best candidates prepared and drawn plainly, each scored by eye (`scoring.py`) and by
+    its title, and the best taken if it is plainly the thing. It joins the library as
+    `auto`, for a person to keep or turn down; every candidate's score is in its lineage.
+    None when nothing is good enough: the scene is drawn instead."""
+    library = catalogue.library
+    turned_down = {m.page for m in library.models.values() if m.status == "vetoed"}
+    folder = folder_for(what)
+    entries, _ = shortlist(what, sources, folder, catalogue, None)
+    scored = [
+        (score_of(scorer, entry, what), entry)
+        for entry in entries
+        if entry.still and entry.candidate.page not in turned_down
+    ]
+    if not scored:
+        return None
+    (best, seen), entry = max(scored, key=lambda pair: pair[0][0])
+    if seen < ACCEPT:
+        return None
+    unique = model_id
+    while unique in library.models:
+        unique = f"{model_id}_{len(unique)}"
+    model = add_file(
+        catalogue, Path(entry.download), entry.candidate, model_id=unique,
+        describe=entry.candidate.title, names=(what,), status="auto", score=best,
+        alongside=True,
+    )  # fmt: skip
+    Store(library.folder or folder).note(model.model_id, "chosen", {
+        "asked": what,
+        "candidates": [{"title": e.candidate.title, "page": e.candidate.page,
+                        "seen": s[1], "score": s[0]} for s, e in scored],
+    })  # fmt: skip
+    return model
+
+
+def score_of(scorer: Scorer, entry: Entry, what: str) -> tuple[float, float]:
+    """How sure a candidate is the thing: mostly by eye, a little by its title."""
+    seen = scorer(Path(entry.still), what)
+    return round(0.8 * seen + 0.2 * match(what, entry.candidate.title), 3), seen
