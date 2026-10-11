@@ -164,6 +164,15 @@ class RehearsalStage(Bookkeeping):
         if facing is not None:
             piece.turn = heading_rotation(facing)
 
+    def hold(self, thing: Thing, holder: Thing) -> None:
+        piece, parent = self._piece(thing), self._piece(holder)
+        self._record("hold", name=piece.name, holder=parent.name)
+        at = piece.world() - parent.world()
+        if piece.parent is not None:
+            piece.parent.children.remove(piece)
+        piece.parent, piece.at = parent, at
+        parent.children.append(piece)
+
     def bounds(self, thing: Thing) -> Box:
         return self._piece(thing).extent()
 

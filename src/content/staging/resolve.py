@@ -197,7 +197,7 @@ def _person(library: Library, thing: Thing, *, make: bool) -> Resolved | None:
     holds = {name: Vec(*at) for name, at in model.holds.items()}
     return Resolved(model.model_id, Vec(w, d, h), library.model_file(model.model_id),
                     seated=_seated(model), seat=model.seat, motion=motion,
-                    holds=holds)  # fmt: skip
+                    holds=holds, middle=Vec(*model.middle, 0.0))  # fmt: skip
 
 
 def _seated(model: Model) -> bool:

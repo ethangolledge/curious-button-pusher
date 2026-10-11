@@ -234,6 +234,12 @@ class BlenderStage(Bookkeeping):
             thing.rotation_mode = "QUATERNION"
             thing.rotation_quaternion = heading_rotation(facing).tuple()
 
+    def hold(self, thing: BlenderObject, holder: BlenderObject) -> None:
+        bpy.context.view_layer.update()
+        world = thing.matrix_world.copy()
+        thing.parent = holder
+        thing.matrix_world = world
+
     def bounds(self, thing: BlenderObject) -> Box:
         bpy.context.view_layer.update()
         corners: list[Vector] = []

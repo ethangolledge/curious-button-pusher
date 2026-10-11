@@ -32,6 +32,9 @@ CHAIR_REACH = 0.3
 REACH = 0.6
 # Random spots tried for each copy before settling for the best one found.
 TRIES = 60
+# A piece of the set no higher than a step (a pavement, a kerb, a low platform) is ground:
+# things stand on it rather than in it.
+STEP = 0.3
 # An open place without walls is used out to this far from its centre.
 OPEN_REACH = 12.0
 
@@ -54,6 +57,9 @@ class Resolved:
     picture: bool = False
     # A figure posed to hold something: where each held thing's base goes, from its feet.
     holds: dict[str, Vec] = field(default_factory=dict)
+    # Where the middle of the room it takes up is, from where it stands (a seated figure's
+    # knees and arms reach forward of its hips).
+    middle: Vec = Vec()
 
 
 Resolve = Callable[[Thing], Resolved | None]
@@ -245,14 +251,17 @@ class Composer:
                     heading += self._jitter(SWAY)
                 turn = axis_angle(UP, heading)
                 holds = {name: at + turn.rotate(point) for name, point in resolved.holds.items()}
-                box = _box(at, resolved.size, heading)
+                box = _box(at + turn.rotate(resolved.middle), resolved.size, heading)
                 placed = Placed(actor_id, thing.thing_id, box, heading, support, at, holds)
                 self._placed.append(placed)
                 copies.append(placed)
                 lying = relation in SMALL
                 begins = self._chance.uniform(0, 0.3) if resolved.motion else 0.0
+                # In a holder's hand (not set down for want of one), it moves with them.
+                in_hand = relation == "held_by" and any(a.actor_id == support for a in group)
+                held = support if in_hand else ""
                 self._out.actors.append(
-                    _put(actor_id, resolved, at, heading, lying=lying, start=begins)
+                    _put(actor_id, resolved, at, heading, lying=lying, start=begins, held_by=held)
                 )
         self._copies[thing.thing_id] = copies
         if len(copies) > 1:
@@ -320,10 +329,16 @@ class Composer:
             heading = degrees_round(mark.facing)
             if mark.surface is not None:
                 return resting_on(mark), heading, target
-            # A place in the room (the window, a door): stood just in front of it, on the floor.
+            # A place in the room (the window, a door): stood just in front of it, on the
+            # ground (never on a chair under the window); a long thing that does not fit across
+            # the place lies along it (a car on a road).
             point = mark.at + mark.facing * (max(size.x, size.y) / 2 + GAP)
-            z, support = self._support_under(point, below=mark.at.z + 0.05)
-            return self._nudged(Vec(point.x, point.y, z), size, heading, support, ignore=[])
+            z, support = self._support_under(point, below=min(mark.at.z + 0.05, STEP))
+            for turned in (heading, heading + 90.0):
+                spot = self._nudged(Vec(point.x, point.y, z), size, turned, support, ignore=[])
+                if spot is not None:
+                    return spot
+            return None
         if relation == "stacked_on":
             base = self._stacked_height(target, anchor)
             return Vec(anchor.centre.x, anchor.centre.y, base), self._jitter(4), target
@@ -371,12 +386,14 @@ class Composer:
     def _clear_on(
         self, surface: Box, size: Vec, target: str, spin: float
     ) -> tuple[Vec, float, str] | None:
-        for _ in range(TRIES):
-            heading = self._jitter(spin)
+        for attempt in range(TRIES):
+            # Half the tries square to the surface, then turned a quarter (a long map laid
+            # along a table's free middle).
+            heading = self._jitter(spin) + (90.0 if attempt >= TRIES // 2 else 0.0)
             footprint = _box(Vec(), size, heading)
             hx, hy = footprint.size.x / 2, footprint.size.y / 2
             if surface.size.x < 2 * hx or surface.size.y < 2 * hy:
-                return None
+                continue
             at = Vec(
                 self._chance.uniform(surface.low.x + hx, surface.high.x - hx),
                 self._chance.uniform(surface.low.y + hy, surface.high.y - hy),
@@ -464,9 +481,12 @@ class Composer:
         return None
 
     def _support_under(self, point: Vec, *, below: float) -> tuple[float, str]:
-        """The highest top under a spot that is no higher than `below`: a table, or the
-        floor."""
+        """The highest top under a spot that is no higher than `below`: a table, the
+        ground (a pavement), or the floor."""
         tops = [(0.0, "floor")]
+        for box in self._solids:
+            if box.top <= min(STEP, below) and _over(box, point):
+                tops.append((box.top, "ground"))
         for name, box in self._furniture.items():
             if box in self._fixed and _over(box, point) and box.top <= below:
                 tops.append((box.top, name))
@@ -550,9 +570,11 @@ def _put(
     *,
     lying: bool = False,
     start: float = 0.0,
+    held_by: str = "",
 ) -> ActorCall:
     """A placed thing, drawn at the size it was resolved to; a moving figure starts its
-    motion at `start` (so a group does not move in step)."""
+    motion at `start` (so a group does not move in step); a thing in a hand is `held_by`
+    its holder."""
     values = {"x": _n(at.x), "y": _n(at.y), "z": _n(at.z), "heading": _n(heading)}
     if resolved.file is None:
         values["height"] = _n(resolved.size.z)
@@ -562,6 +584,8 @@ def _put(
     if resolved.picture:
         values = {**values, "picture": _n(resolved.size.x), "lying": "yes" if lying else "no"}
         values.pop("height", None)
+    if held_by:
+        values["held_by"] = held_by
     return ActorCall(actor_id, "put", resolved.model, values)
 
 

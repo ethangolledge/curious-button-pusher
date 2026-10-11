@@ -187,6 +187,12 @@ turned a few degrees off square (`SWAY`) and starts breathing at a different mom
 `held_by` people decides their activity (a glass: drinking; papers: reading; a pen: writing; a
 phone: on the phone, by the words in `HELD`), and it is placed at their hand, one per holder:
 three glasses held by eight men are three men drinking, not eight hands round eight cups.
+A held thing hangs from its holder (`put`'s `held_by`), so it moves with them and the audit
+counts it as part of them. A person's room is measured round their real middle (`middle`: a
+seated person's knees and arms reach forward of their hips), so nothing is set under their
+hands. Low pieces of a set (up to `STEP`, 0.3 m: a pavement, a kerb) are ground to stand on;
+whatever is put at a mark stands on the ground there, never on a chair under a window; and a
+long thing that does not fit across a place lies along it (a car on a road).
 
 ## Commands
 
@@ -353,6 +359,7 @@ CC BY models are credited with the video. Renders belong to whoever makes them.
 | Step | What |
 |---|---|
 | richer motions | motion capture (CMU) retargeted onto made people; gestures that move to and from what they hold |
+| carrying while walking | a walking person holding a folder or a briefcase (holding is posed for seated and standing people only; a thing `held_by` a walker is set down in front of them) |
 | a particular face on a made person | a likeness from reference photos on the parametric body |
 | `travel` joins | one camera move between two framings of a shared set |
 | cloud rendering | finals on a rented GPU; this laptop takes seconds a frame |

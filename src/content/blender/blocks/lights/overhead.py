@@ -28,7 +28,8 @@ class Overhead(Light):
 
     def build(self, stage: Stage, p: Settings) -> None:
         box = where(stage, p.over.name)
-        at = Vec(box.centre.x, box.centre.y, box.low.z + p.height)
+        # Above the floor, whatever it hangs over (a table, or a light's mark on the ceiling).
+        at = Vec(box.centre.x, box.centre.y, p.height)
         if p.kind == "panel":
             light = stage.light(
                 "area",

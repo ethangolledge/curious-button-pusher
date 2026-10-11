@@ -227,3 +227,37 @@ def test_three_glasses_held_by_men_are_three_men_each_with_one_in_his_hand() -> 
         actor = next(a for a in shot.actors if a.actor_id == f"men_{index}")
         turn = axis_angle(UP, float(actor.settings["heading"]))
         assert (glass - (man + turn.rotate(Vec(0.0, -0.4, 0.8)))).length() < 0.01
+        # In his hand, it moves with him.
+        held = next(a for a in shot.actors if a.actor_id == f"glasses_{index}")
+        assert held.settings["held_by"] == f"men_{index}"
+
+
+def test_outdoors_people_stand_on_the_pavement_and_a_car_lies_along_the_road() -> None:
+    shot = _compose(
+        "street",
+        [
+            _thing("men", "man", "at", "kerb", count=2, person={"pose": "standing"}),
+            _thing("car", "car", "at", "crossing"),
+        ],
+    )
+
+    assert shot.missing == []
+    assert all(_where(shot, f"men_{i}").z == 0.15 for i in range(2))  # on the kerb's top
+    car = _boxes(shot)["car"]
+    assert car.size.x > car.size.y  # along the road, not across it
+
+
+def test_a_man_at_the_window_stands_on_the_floor_not_on_the_chair_beneath_it() -> None:
+    shot = _compose("office", [_thing("man", "man", "at", "window", person={"pose": "standing"})])
+
+    assert shot.missing == [] and _where(shot, "man").z == 0.0
+
+
+def test_a_long_thing_too_long_for_a_surfaces_depth_is_laid_along_it() -> None:
+    desk = _furniture("office", "desk")
+    long = desk.size.y + 0.1  # longer than the desk is deep, shorter than it is wide
+    shot = _compose("office", [_thing("rule", "box", "on", "desk", depth=long, height=0.05)])
+
+    assert shot.missing == []
+    heading = float(next(a for a in shot.actors if a.actor_id == "rule").settings["heading"])
+    assert abs(abs(heading) - 90) < 15  # turned a quarter, give or take its spin

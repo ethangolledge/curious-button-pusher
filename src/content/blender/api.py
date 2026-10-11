@@ -168,6 +168,11 @@ class Stage(Protocol):
         """Stand a thing at `at` (its base), turned to face `facing` on the ground."""
         ...
 
+    def hold(self, thing: Thing, holder: Thing) -> None:
+        """Hang a placed thing from another where it stands, so it moves with it and is part
+        of it (a glass in a hand)."""
+        ...
+
     def bounds(self, thing: Thing) -> Box: ...
 
     def parts(self, thing: Thing, prefix: str) -> list[Thing]:

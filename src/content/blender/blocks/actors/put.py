@@ -1,7 +1,8 @@
 """A model put exactly where the shot's composer worked out it goes (`staging/compose.py`):
 standing at a point, turned to a heading, and, for a figure with a skeleton, playing one of
 its motions (breathing, talking, walking) all through the shot. What the composer places,
-every placed thing is: a cup on a table, a man in a chair, a chair round a table."""
+every placed thing is: a cup on a table, a man in a chair, a chair round a table, a glass
+in a hand (held by its holder, it moves with them)."""
 
 from dataclasses import dataclass
 from typing import Annotated
@@ -24,6 +25,7 @@ class Settings:
     # A picture (a map, a painting) on a card this wide, lying flat or upright.
     picture: Annotated[float, Range(0, 200, "metres wide, when the model is a picture")] = 0.0
     lying: bool = False
+    held_by: Annotated[str, About("the actor holding it: it moves with them")] = ""
 
 
 class Put(Actor):
@@ -41,4 +43,6 @@ class Put(Actor):
         if p.motion:
             begins = round(p.start * stage.frames) + 1
             stage.play(thing, p.motion, start_frame=begins, speed=p.speed)
+        if p.held_by:
+            stage.hold(thing, stage.actor(p.held_by))
         stage.cast(actor_id, thing)

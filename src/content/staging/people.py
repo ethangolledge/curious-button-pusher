@@ -24,7 +24,7 @@ USUAL_HEIGHT = {"man": 1.78, "woman": 1.65}
 TABLE_HEIGHT = 0.75
 # How people are made (`blender/person.py`): raised when that changes, so everyone is made
 # again rather than kept as they were.
-MAKER = 3
+MAKER = 4
 
 
 def person_id(person: Person, height: float) -> str:
@@ -58,6 +58,7 @@ def made_person(library: Library, person: Person, height: float, *, make: bool) 
         licence="CC0",
         file=kept,
         seat=facts.get("seat", 0.0),
+        middle=tuple(facts.get("middle", (0.0, 0.0))),
         motions=tuple(facts.get("motions", ())),
         holds={name: tuple(at) for name, at in facts.get("holds", {}).items()},
     )

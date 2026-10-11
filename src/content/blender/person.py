@@ -206,6 +206,10 @@ def main(description: dict[str, Any], target: Path, facts: Path) -> int:
     size = high - low
     facts.write_text(json.dumps({
         "width": round(size.x, 3), "depth": round(size.y, 3), "height": round(size.z, 3),
+        # The middle of the room they take up, from where they stand (a seated person's knees
+        # and arms reach forward of their hips).
+        "middle": [round((low.x + high.x) / 2 - hips.x, 3),
+                   round((low.y + high.y) / 2 - hips.y, 3)],
         "faces": sum(len(obj.data.polygons) for obj in meshes),
         # Seated: how high the seat they fit is (the underside of their thighs).
         "seat": round(seat, 3) if description["pose"] == "seated" else 0.0,
