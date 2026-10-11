@@ -16,7 +16,7 @@ from typing import Literal
 from content.config import ContentConfig, load_config
 from content.errors import ConfigurationError
 from content.providers.assets import SOURCES
-from content.providers.blender import VERSION, blender_path
+from content.providers.blender import VERSION, blender_path, people_ready
 from content.workflow.providers import MIN_RUN_USD
 
 Status = Literal["ready", "missing", "optional"]
@@ -48,8 +48,20 @@ def checks(config_path: Path | None) -> list[Check]:
         _extra("vision", "transformers", "aiming the camera at each picture's focal point"),
         _blender(),
         _model_sources(),
+        _people(),
     ]
     return found
+
+
+def _people() -> Check:
+    if people_ready():
+        return Check("People in 3D", "ready", "made to fit each scene (MakeHuman, CC0)")
+    return Check(
+        "People in 3D",
+        "optional",
+        "simple figurines only",
+        "To make real-looking people for 3D shots: content staging people (once, ~650 MB).",
+    )
 
 
 def _model_sources() -> Check:

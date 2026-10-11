@@ -58,6 +58,9 @@ class Person(ImmutableModel):
     build: Literal["slim", "average", "heavy"] = "average"
     dress: Literal["suit", "casual", "uniform", "work"] = "suit"
     pose: Literal["standing", "seated", "walking"] = "standing"
+    # How they move through the shot: alive and breathing, talking (head and hands), walking
+    # (in step, wherever an action takes them), or quite still.
+    motion: Literal["breathing", "talking", "walking", "still"] = "breathing"
 
 
 class Thing(ImmutableModel):

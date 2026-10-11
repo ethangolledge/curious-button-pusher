@@ -14,6 +14,7 @@ from content.providers.assets import Candidate, licence_terms
 from content.schemas.staging import Thing
 from content.staging.catalogue import load_catalogue, with_models
 from content.staging.library import Model, load_library
+from content.staging.people import person_id
 from content.staging.resolve import from_library, with_online
 from content.staging.sourcing import TOO_DETAILED, rank
 from content.staging.store import Store
@@ -225,3 +226,26 @@ def test_a_family_is_made_to_the_size_asked_and_anything_else_is_stretched_to_it
     assert file.fit == (0.0, 0.0, 0.0)
     # The desk has no setting for its width: it is stretched, its height kept in proportion.
     assert desk[0] == pytest.approx(2.4) and desk_file.fit == (2.4, 0.0, 0.0)
+
+
+def test_a_described_person_is_made_once_and_is_a_figurine_until_then(tmp_path: Path) -> None:
+    library = load_library(tmp_path)
+    seated = {"thing_id": "men", "what": "man in a suit", "height": 1.8,
+              "person": {"pose": "seated", "motion": "talking"},
+              "place": {"relation": "seated_at", "target": "table"}}  # fmt: skip
+    thing = Thing.model_validate(seated)
+    assert thing.person is not None
+
+    before = from_library(library)(thing)
+    made = Model(model_id=person_id(thing.person, 1.8), names=("middle man suit seated",),
+                 describe="A man", size=(0.5, 0.8, 1.39), source="MakeHuman (MPFB)",
+                 licence="CC0", file="p.glb", capabilities=("person", "seated"), seat=0.375,
+                 motions=("talking",))  # fmt: skip
+    library.add(made, alongside=True)
+    after = from_library(library)(thing)
+    other = from_library(library)(Thing.model_validate({**seated, "height": 1.6}))
+
+    assert before is not None and before.model == "seated_person"
+    assert after is not None and after.model == made.model_id
+    assert after.seat == 0.375 and after.motion == "talking" and after.seated
+    assert other is not None and other.model == "seated_person"  # a shorter man: not made yet

@@ -15,6 +15,7 @@ from dataclasses import dataclass, field
 
 from content.blender.api import Box, Mark, standing_in
 from content.blender.blocks.base import Layout, SettingError, read, settings
+from content.blender.blocks.props.chair import SEAT_HEIGHT as CHAIR_SEAT
 from content.blender.job import ActorCall, BlockCall, ModelFile
 from content.blender.maths import FRONT, UP, Vec, axis_angle, degrees_round
 from content.blender.registry import Registry, RegistryError
@@ -44,6 +45,10 @@ class Resolved:
     size: Vec
     file: ModelFile | None = None
     seated: bool = False  # a figure already in a seated pose: it needs a seat
+    # How high the seat it fits is (0: the engine's chair, or not seated).
+    seat: float = 0.0
+    # The motion it plays all through the shot (a figure with a skeleton), if any.
+    motion: str = ""
 
 
 Resolve = Callable[[Thing], Resolved | None]
@@ -229,7 +234,13 @@ class Composer:
             return None
         if relation == "at":
             mark = self._stage.find_mark(target)
-            return resting_on(mark), degrees_round(mark.facing), target
+            heading = degrees_round(mark.facing)
+            if mark.surface is not None:
+                return resting_on(mark), heading, target
+            # A place in the room (the window, a door): stood just in front of it, on the floor.
+            point = mark.at + mark.facing * (max(size.x, size.y) / 2 + GAP)
+            z, support = self._support_under(point, below=mark.at.z + 0.05)
+            return self._nudged(Vec(point.x, point.y, z), size, heading, support, ignore=[])
         if relation == "stacked_on":
             base = self._stacked_height(target, anchor)
             return Vec(anchor.centre.x, anchor.centre.y, base), self._jitter(4), target
@@ -297,17 +308,19 @@ class Composer:
         target: str,
     ) -> tuple[Vec, float, str] | None:
         seated = relation == "seated_at"
+        # A seated figure made for a lower seat is raised to sit on the chair, not in it.
+        lift = Vec(0, 0, max(0.0, CHAIR_SEAT - resolved.seat) if resolved.seat else 0.0)
         if seated:
             seat = self._free_seat(anchor)
             if seat is not None:
-                return seat.at, degrees_round(seat.facing), seat.name
+                return seat.at + lift, degrees_round(seat.facing), seat.name
         depth = max(resolved.size.x, resolved.size.y)
         margin = CHAIR_REACH if seated else depth / 2 + 0.25
         point, facing = _round_edge(anchor, margin, (index + 0.5) / count)
         heading = degrees_round(facing)
         if seated:
             self._add_chair(point, heading)
-            return point, heading, f"chair for {target}"
+            return point + lift, heading, f"chair for {target}"
         return self._nudged(point, resolved.size, heading, "floor", ignore=[])
 
     def _free_seat(self, anchor: Box) -> Mark | None:
@@ -433,6 +446,8 @@ def _put(actor_id: str, resolved: Resolved, at: Vec, heading: float) -> ActorCal
     values = {"x": _n(at.x), "y": _n(at.y), "z": _n(at.z), "heading": _n(heading)}
     if resolved.file is None:
         values["height"] = _n(resolved.size.z)
+    if resolved.motion:
+        values["motion"] = resolved.motion
     return ActorCall(actor_id, "put", resolved.model, values)
 
 

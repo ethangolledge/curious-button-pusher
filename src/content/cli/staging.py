@@ -15,12 +15,13 @@ from content.config import load_config
 from content.production.assemble import contact_sheet
 from content.providers import ffmpeg
 from content.providers.assets import ALLOWED, SOURCES, AssetSource, Candidate, ready_sources
-from content.providers.blender import LocalBlender
+from content.providers.blender import LocalBlender, install_people, people_ready
 from content.schemas.staging import StagePlan
 from content.staging import sourcing
 from content.staging.backlog import most_wanted
 from content.staging.catalogue import Catalogue, check, describe, load_catalogue, with_models
 from content.staging.plan import StagingError, job_for, themed
+from content.staging.resolve import from_library
 from content.staging.store import Store
 from content.staging.templates import TEMPLATES, render
 from content.theme import Theme, load_theme
@@ -109,6 +110,11 @@ def _staging(arguments: list[str]) -> int:
             shot.add_argument(
                 "--scene", action="store_true", help="Also save the scene to open in Blender"
             )
+    actions.add_parser(
+        "people",
+        parents=[common],
+        help="Install what making people needs (MPFB for Blender, CC0 clothes and hair)",
+    )
     backlog = actions.add_parser(
         "backlog", parents=[common], help="What scenes could not be staged for, most wanted first"
     )
@@ -129,6 +135,12 @@ def _staging(arguments: list[str]) -> int:
     elif args.action == "name":
         catalogue.library.name(args.model_id, args.words)
         print(f"{args.model_id} is also found as '{args.words}'.")
+    elif args.action == "people":
+        if people_ready():
+            print("✓ People can be made already.")
+            return 0
+        install_people(LocalBlender(), print)
+        print("✓ People can be made: describe them in a scene, and they are made to fit.")
     elif args.action in ("keep", "veto", "history"):
         if theme is None:
             parser.error("models are a channel's: pass --config themes/<name>/config.json")
@@ -240,7 +252,12 @@ def _shot(path: Path, theme: Theme | None, catalogue: Catalogue) -> tuple[Job, C
     if theme is None:  # drawn the starter kit's way, with its own blocks
         theme, catalogue = load_theme(STARTER), load_catalogue(STARTER)
     plan = StagePlan.model_validate(data)
-    job = job_for(path.stem, plan, theme, catalogue, seconds=PREVIEW_SECONDS, quality="still")
+    # People the plan describes are made here (free, a few seconds each, kept for later).
+    resolve = from_library(catalogue.library, make_people=people_ready())
+    job = job_for(
+        path.stem, plan, theme, catalogue, seconds=PREVIEW_SECONDS, quality="still",
+        resolve=resolve,
+    )  # fmt: skip
     return job, catalogue
 
 

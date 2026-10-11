@@ -85,10 +85,12 @@ class Model:
     status: str = "kept"
     # How sure the automatic choice was, from 0 to 1 (`sourcing.score`).
     score: float = 0.0
+    # A seated figure: how high the seat it fits is (metres), so it is sat on any chair.
+    seat: float = 0.0
     # A set's named parts (marks, surfaces, paths, actors, interior), each with where it is,
     # which way it faces and its size: what a shot using the set can refer to.
     parts: tuple[dict[str, Any], ...] = ()
-    # A character's motions, by name (what the figure actor can play).
+    # A character's motions, by name (what a placed figure can play).
     motions: tuple[str, ...] = ()
     # A version of another model (`base`): its parts, materials or roles drawn as other roles
     # (`paint`), and its own size. It has no file of its own.

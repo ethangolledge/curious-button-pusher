@@ -28,6 +28,7 @@ from content.production.studio import (
     render_signature,
     required,
 )
+from content.providers.blender import LocalBlender, people_ready
 from content.providers.cache import file_digest
 from content.schemas.media import (
     ColourCheck,
@@ -78,11 +79,12 @@ class Keyframes(Studio):
         found online and taken (free; it is kept for every later video). Each model taken
         without a person is named for review."""
         staging = self.staging()
-        if staging is None or self.find_model is None:
+        people = people_ready() and isinstance(staging[0], LocalBlender) if staging else False
+        if staging is None or (self.find_model is None and not people):
             return []
         catalogue = staging[1]
         before = set(catalogue.library.models)
-        resolve = with_online(catalogue.library, self.find_model)
+        resolve = with_online(catalogue.library, self.find_model, make_people=people)
         visuals = required(state.get("visual_package"), "a storyboard")
         for scene in visuals.scenes:
             shot = staged(scene)

@@ -11,7 +11,7 @@ import hashlib
 import json
 import re
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 from content.blender.blocks.base import Prop, settings
 from content.blender.materials import BY_COLOUR, linear, nearest_role
@@ -19,6 +19,7 @@ from content.blender.maths import Vec
 from content.schemas.staging import Thing
 from content.staging.compose import Resolve, Resolved
 from content.staging.library import Library, Model
+from content.staging.people import made_person
 
 # Finding a model online for some words: taken into the library, or None.
 FindModel = Callable[[str], Model | None]
@@ -70,25 +71,30 @@ def look_of(thing: Thing) -> Look:
     return Look()
 
 
-def from_library(library: Library, *, people: Callable[[Thing], str] | None = None) -> Resolve:
-    """Things resolved from the library alone (what the free check before a run can do)."""
+def from_library(library: Library, *, make_people: bool = False) -> Resolve:
+    """Things resolved from the library alone (what the free check before a run can do);
+    people the scene describes are made when `make_people`, else drawn as figurines."""
 
     def resolve(thing: Thing) -> Resolved | None:
-        model = _person(library, thing) if thing.person else _search(library, thing.what)
+        if thing.person is not None:
+            return _person(library, thing, make=make_people)
+        model = _search(library, thing.what)
         return None if model is None else fitted(library, model, thing)
 
     return resolve
 
 
-def with_online(library: Library, find_model: FindModel) -> Resolve:
-    """Things resolved from the library, and what it lacks found online (each looked for
-    once): the cascade a run uses."""
-    local = from_library(library)
+def with_online(
+    library: Library, find_model: FindModel | None, *, make_people: bool = False
+) -> Resolve:
+    """Things resolved from the library, what it lacks found online (each looked for once),
+    and people made: the cascade a run uses."""
+    local = from_library(library, make_people=make_people)
     tried: dict[str, Model | None] = {}
 
     def resolve(thing: Thing) -> Resolved | None:
         found = local(thing)
-        if found is not None or thing.person is not None:
+        if found is not None or thing.person is not None or find_model is None:
             return found
         if thing.what not in tried:
             tried[thing.what] = find_model(thing.what)
@@ -168,13 +174,23 @@ def _search(library: Library, words: str) -> Model | None:
     return found[0].model if found and found[0].score >= GOOD_MATCH else None
 
 
-def _person(library: Library, thing: Thing) -> Model | None:
-    """A particular person from the library, or a figurine in the pose asked for."""
+def _person(library: Library, thing: Thing, *, make: bool) -> Resolved | None:
+    """A particular person from the library, a person made to the description (at their
+    height: a seated person is not stretched to a standing height), or a figurine."""
     assert thing.person is not None
-    if thing.person.who and thing.person.who in library.models:
-        return library.get(thing.person.who)
-    wanted = "seated_person" if thing.person.pose == "seated" else "person"
-    return library.models.get(wanted)
+    who = thing.person.who
+    if who and who in library.models:
+        # Their own model, playing the motion asked for, or the one it has.
+        own = library.get(who)
+        wanted = thing.person.motion
+        moving = wanted if wanted in own.motions else next(iter(own.motions), "")
+        return replace(fitted(library, own, thing), motion="" if wanted == "still" else moving)
+    figurine = "seated_person" if thing.person.pose == "seated" else "person"
+    model = made_person(library, thing.person, thing.height, make=make) or library.get(figurine)
+    w, d, h = model.size
+    motion = thing.person.motion if thing.person.motion in model.motions else ""
+    return Resolved(model.model_id, Vec(w, d, h), library.model_file(model.model_id),
+                    seated=_seated(model), seat=model.seat, motion=motion)  # fmt: skip
 
 
 def _seated(model: Model) -> bool:

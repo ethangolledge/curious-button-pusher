@@ -1,12 +1,13 @@
 """A model put exactly where the shot's composer worked out it goes (`staging/compose.py`):
-standing at a point, turned to a heading. What the composer places, every placed thing
-is: a cup on a table, a man in a chair, a chair round a table."""
+standing at a point, turned to a heading, and, for a figure with a skeleton, playing one of
+its motions (breathing, talking, walking) all through the shot. What the composer places,
+every placed thing is: a cup on a table, a man in a chair, a chair round a table."""
 
 from dataclasses import dataclass
 from typing import Annotated
 
 from content.blender.api import Stage
-from content.blender.blocks.base import Actor, Range
+from content.blender.blocks.base import About, Actor, Range
 from content.blender.maths import FRONT, UP, Vec, axis_angle
 
 
@@ -17,6 +18,9 @@ class Settings:
     z: Annotated[float, Range(-50, 200, "metres up: where its base stands")] = 0.0
     heading: Annotated[float, Range(-360, 360, "degrees turned from facing the front")] = 0.0
     height: Annotated[float, Range(0, 200, "metres tall; 0 keeps the model's own size")] = 0.0
+    motion: Annotated[str, About("one of the model's motions; empty keeps it still")] = ""
+    start: Annotated[float, Range(0, 1, "when the motion starts, as a fraction of the shot")] = 0.0
+    speed: Annotated[float, Range(0.1, 4, "how fast the motion plays")] = 1.0
 
 
 class Put(Actor):
@@ -27,4 +31,7 @@ class Put(Actor):
     def build(self, stage: Stage, p: Settings, actor_id: str, model: str) -> None:
         thing = stage.model(model, name=actor_id, height=p.height or None)
         stage.place(thing, Vec(p.x, p.y, p.z), facing=axis_angle(UP, p.heading).rotate(FRONT))
+        if p.motion:
+            begins = round(p.start * stage.frames) + 1
+            stage.play(thing, p.motion, start_frame=begins, speed=p.speed)
         stage.cast(actor_id, thing)
