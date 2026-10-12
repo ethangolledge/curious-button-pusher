@@ -58,7 +58,8 @@ class Painted(Look):
 
     def render(self, scene: Any, quality: str) -> None:
         scene.render.engine = ENGINE
-        scene.eevee.taa_render_samples = {"still": 16, "draft": 8, "final": 32}[quality]
+        # Unlit, nothing is noisy: samples only smooth the edges.
+        scene.eevee.taa_render_samples = {"still": 8, "draft": 4, "final": 16}[quality]
         scene.eevee.use_raytracing = False
         scene.render.filter_size = self.values.sharpness
         scene.view_settings.view_transform = "Standard"
