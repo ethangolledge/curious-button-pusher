@@ -169,7 +169,6 @@ def lift(
         "beyond_reach": _grown(band, GRID)[inside],
         "people": alphas,
         "joints": joints3d,
-        "grid": np.array(GRID),
     }
     lens = SENSOR_MM * (shape.focal[0] if width >= height else shape.focal[1])
     ahead = float(np.median(depth))

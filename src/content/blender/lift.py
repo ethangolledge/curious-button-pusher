@@ -1,8 +1,10 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
-"""A lifted picture (`staging/lift.py`, one `.npz` file) built as a set: the background as one
-mesh where the picture shows it, painted in behind its people, and each person a mesh of their
-own with a skeleton made from their pose, so they can breathe and move a little. Every surface
-shows the picture's own colours, unlit, so the camera at `mark_camera` sees the picture itself.
+"""A lifted picture (`staging/lift.py`, one `.npz` file) built as a set: the background as a
+mesh where the picture shows it (painted in behind its people, cut at its depth edges), a mesh
+behind each edge's near side carrying the far side on (seen only as the camera moves past), and
+each person a mesh of their own with a skeleton made from their pose, so they can breathe and
+move a little. Every surface shows the picture's own colours, unlit, so the camera at
+`mark_camera` sees the picture itself.
 
 Its parts are the set's vocabulary (`blocks/layouts/set.py`): `mark_camera`, `mark_ahead`,
 `actor_person_<n>` and `interior`."""
