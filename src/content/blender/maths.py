@@ -380,6 +380,17 @@ def even(curve: Curve, steps: int = 512) -> Even:
     return Even(curve, tuple(table), table[-1])
 
 
+@dataclass(frozen=True, slots=True)
+class Partway:
+    """The first `fraction` of a curve: a journey that stops short of the end."""
+
+    curve: Curve
+    fraction: float
+
+    def at(self, u: float) -> Vec:
+        return self.curve.at(u * self.fraction)
+
+
 def length(curve: Curve, steps: int = 512) -> float:
     return even(curve, steps).total
 

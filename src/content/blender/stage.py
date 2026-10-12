@@ -27,6 +27,7 @@ from content.blender.blocks.base import Look, Prop, read
 from content.blender.bookkeeping import Bookkeeping
 from content.blender.imports import import_model, surface
 from content.blender.job import ModelFile
+from content.blender.lift import PAINTED
 from content.blender.materials import ROLES, linear, nearest_role
 from content.blender.maths import (
     ORIGIN,
@@ -171,6 +172,8 @@ class BlenderStage(Bookkeeping):
                 obj.data.materials.append(None)
             for slot in obj.material_slots:
                 current = slot.material.name.split(".")[0] if slot.material else ""
+                if current.startswith(PAINTED):
+                    continue  # a picture's own colours (a lifted picture): no look redraws them
                 if current in ROLES:
                     role = current  # named for its role (a figure made to fit, a prop)
                 elif imported:

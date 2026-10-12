@@ -19,10 +19,11 @@ from typing import Any
 
 import addon_utils  # type: ignore[import-not-found]
 import bpy  # type: ignore[import-not-found]
-from mathutils import Matrix, Quaternion, Vector  # type: ignore[import-not-found]
+from mathutils import Matrix, Vector  # type: ignore[import-not-found]
+
+from content.blender.rigging import loop
 
 EXTENSION = "bl_ext.user_default.mpfb"
-AXES = {"x": (1.0, 0.0, 0.0), "z": (0.0, 0.0, 1.0)}
 # The MakeHuman sliders (0 to 1) each word sets.
 SEX = {"man": 1.0, "woman": 0.0}
 AGE = {"young": 0.4, "middle": 0.6, "old": 0.88}
@@ -315,33 +316,12 @@ def _close(rig: Any, side: str, grip: str) -> None:
 
 
 def _move(rig: Any, motion: str, pose: str, still: frozenset[str] = frozenset()) -> None:
-    """A looping motion, named for what it is, on top of the pose: each bone keyed every
-    few frames, turned about a world axis expressed in the bone's own frame. Every posed
-    bone is keyed too, so the pose is part of the motion (an unkeyed bone falls back to
-    the skeleton's rest wherever the model is used)."""
+    """A looping motion on top of the pose (`rigging.loop`); every posed bone is keyed too.
+    Hands on something keep the body still under them: only the head moves."""
     frames, every = MOTIONS[motion]
-    # Hands on something keep the body still under them: only the head moves.
     moves = {name: move for name, move in every.items() if not still or name == "head"}
-    action = bpy.data.actions.new(motion)
-    rig.animation_data_create().action = action
     posed = {f"{limb}.{side}" for limb in POSES[pose] for side in ("L", "R")}
-    # Each bone's pose as a quaternion (the rig turns its bones by Euler angles).
-    rest = {name: rig.pose.bones[name].matrix_basis.to_quaternion() for name in posed | set(moves)}
-    axes = {
-        name: (rig.pose.bones[name].matrix.to_3x3().inverted() @ Vector(AXES[axis])).normalized()
-        for name, (axis, *_) in moves.items()
-    }
-    for frame in range(1, frames + 2, 4):
-        u = (frame - 1) / frames
-        for name, held in rest.items():
-            bone = rig.pose.bones[name]
-            bone.rotation_mode = "QUATERNION"
-            bone.rotation_quaternion = held
-            if name in moves:
-                _, degrees, times, phase = moves[name]
-                angle = math.radians(degrees) * math.sin(math.tau * (u * times + phase))
-                bone.rotation_quaternion = held @ Quaternion(axes[name], angle)
-            bone.keyframe_insert("rotation_quaternion", frame=frame)
+    loop(rig, motion, (frames, moves), keep=posed)
 
 
 def _name_roles(roles: dict[str, str]) -> None:

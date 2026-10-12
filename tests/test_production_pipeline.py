@@ -10,6 +10,7 @@ from langchain_core.runnables import RunnableConfig
 from langgraph.types import Command
 from pydantic import BaseModel
 
+import content.staging.plan
 from content.blender.job import Job, Join
 from content.choices import RunChoices, configure_run
 from content.config import ContentConfig, load_config
@@ -28,6 +29,7 @@ from content.schemas.plan import EditorialBrief
 from content.schemas.review import ReviewRequest, ReviewResponse
 from content.schemas.visuals import VisualPackage
 from content.staging.backlog import most_wanted
+from content.staging.library import Library, Model
 from content.staging.plan import staged as staged_scene
 from content.state import ContentOutput
 from content.theme import Theme
@@ -100,6 +102,52 @@ def test_a_staged_channel_renders_the_scenes_it_can_stage_and_draws_the_rest(
         ("its 3d shot was not rendered (frame 1: desk and safe pass into each other)", 1),
         ("layout: a reading room", 1),
     ]
+
+
+@pytest.mark.video
+def test_an_animated_channel_moves_each_drawn_keyframe_as_itself(
+    video_config: ContentConfig, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Each keyframe is drawn and judged as before, then lifted into depth and moved in
+    Blender as itself (docs/picture-shots.md): nothing is paid for twice, and the cut plays
+    every scene's shot in full. The lifting is stood in for."""
+    assert video_config.production is not None
+    root = tmp_path / "channel"
+    shutil.copytree(video_config.theme.root, root)
+    config = replace(
+        video_config,
+        theme=Theme(root, video_config.theme.spec, video_config.theme.skill),
+        production=replace(video_config.production, pictures="animated"),
+    )
+
+    def lifted(library: Library, picture: Path, *, make: bool) -> Model:
+        model = Model(
+            model_id=f"lifted_{picture.stem}"[:40], names=(f"lifted {picture.stem}",),
+            describe="a lifted picture", size=(3.0, 4.0, 2.5), capabilities=("set", "lifted"),
+            file="lifted.npz", parts=(
+                {"name": "mark_camera", "at": [0, -2, 1], "facing": [0, 1, 0],
+                 "size": [0, 0, 0], "lens": 27.0},
+                {"name": "mark_ahead", "at": [0, 1, 1], "facing": [0, -1, 0], "size": [0, 0, 0]},
+                {"name": "interior", "at": [0, 0, 1.2], "facing": [0, -1, 0],
+                 "size": [4, 6, 3]},
+            ),
+        )  # fmt: skip
+        library.models.setdefault(model.model_id, model)
+        return model
+
+    monkeypatch.setattr(content.staging.plan, "lifted", lifted)
+    media, blender = FakeMediaProvider(), FakeBlender()
+
+    result, _ = _run(config, media, renderer=blender)
+
+    keyframes = result["keyframes"]
+    jobs = [Job.loads(asset.shot) for asset in keyframes.values()]
+    assert len(jobs) == len(keyframes) and all(asset.first_frame for asset in keyframes.values())
+    assert {job.look.block for job in jobs} == {"painted"}
+    assert {job.camera.block for job in jobs} == {"glide"}
+    assert media.calls.count("image") == len(keyframes)  # each drawn once, animated free
+    played = [job for job in blender.jobs if isinstance(job, Job) and not job.frames]
+    assert {job.shot_id for job in played if job.quality == "final"} == set(keyframes)
 
 
 @pytest.mark.video

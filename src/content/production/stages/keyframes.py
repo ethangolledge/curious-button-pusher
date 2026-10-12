@@ -1,6 +1,7 @@
 """The pictures: how many the budget affords, each scene's keyframe drawn and judged, then the
 animatic and story sheet for the Pictures sign-off."""
 
+import json
 import math
 from collections.abc import Sequence
 from dataclasses import replace
@@ -19,6 +20,7 @@ from content.production.story_sheet import write_story_sheet
 from content.production.studio import (
     STAGING_LOOK,
     RenderTask,
+    ShotWindow,
     Studio,
     anchor_text,
     corrections,
@@ -39,7 +41,7 @@ from content.schemas.story import Feeling
 from content.schemas.visuals import Scene
 from content.staging.backlog import record_gap
 from content.staging.compose import compose
-from content.staging.plan import StagingError, job_for, staged, unstage
+from content.staging.plan import StagingError, job_for, picture_job, staged, unstage
 from content.staging.resolve import with_online
 from content.state import CallRecord, ContentState, merge_warnings
 from content.story.field import (
@@ -169,6 +171,7 @@ class Keyframes(Studio):
                         expected_shift=None,
                         shot=None,
                         join=None,
+                        animate=self._animation(state, scene),
                     ),
                 )
             )
@@ -189,25 +192,16 @@ class Keyframes(Studio):
             if staging is not None and isinstance(scene, StagedScene) and scene.missing:
                 record_gap(self.theme.root, state["topic"], scene.scene_id, scene.missing)
             return None
-        timeline = required(state.get("timeline"), "a timeline")
         spec = self.theme.spec.visual.field
-        window = self.window(timeline, scene.scene_id)
-        fps = self.theme.spec.format.fps
+        window, frames = self._hold(state, scene.scene_id)
         grade = Grade(warmth=warmth(feeling, spec))
-        # Where its picture starts holding, the middle of the hold, and where the morph out
-        # of it begins: the frames it is judged by and morphed from.
-        frames = [
-            window.frame(window.held_from, fps),
-            window.frame(window.held_from + window.held / 2, fps),
-            window.frame(window.out_from, fps),
-        ]
         assert shot.staging is not None
         staging_plan = shot.staging
 
         def composed(seed: int) -> Job:
             return job_for(
                 shot.scene_id, staging_plan, self.theme, staging[1], seconds=window.seconds,
-                quality="final", frames=sorted(set(frames)), grade=grade, seed=seed,
+                quality="final", frames=frames, grade=grade, seed=seed,
             )  # fmt: skip
 
         try:
@@ -246,7 +240,65 @@ class Keyframes(Studio):
             expected_shift=None,
             shot=job.dumps(),
             join=None,
+            animate=None,
         )
+
+    def _hold(self, state: ContentState, scene_id: str) -> tuple[ShotWindow, list[int]]:
+        """A scene's shot window, and the frames it is judged by and morphed from: where its
+        picture starts holding, the middle of the hold, and where the morph out begins."""
+        window = self.window(required(state.get("timeline"), "a timeline"), scene_id)
+        fps = self.theme.spec.format.fps
+        frames = {
+            window.frame(window.held_from, fps),
+            window.frame(window.held_from + window.held / 2, fps),
+            window.frame(window.out_from, fps),
+        }
+        return window, sorted(frames)
+
+    def _animation(self, state: ContentState, scene: Scene) -> str | None:
+        """What animating a scene's drawn keyframe needs (`production.pictures` "animated"):
+        its hold and its camera move."""
+        if self.config.pictures != "animated":
+            return None
+        window, frames = self._hold(state, scene.scene_id)
+        return json.dumps(
+            {"seconds": window.seconds, "frames": frames, "move": scene.camera,
+             "topic": state["topic"]}
+        )  # fmt: skip
+
+    def _animated(self, task: RenderTask, judged: ContentState) -> ContentState:
+        """A drawn keyframe that passed, animated in Blender as a picture shot
+        (docs/picture-shots.md): lifted into depth, its camera gliding, its people breathing.
+        The drawing stays the scene's picture (its signature, its judgements); the shot is
+        added to it, so the cut plays the shot and the morphs meet its frames. A picture that
+        cannot be animated stays a drawn keyframe, and the gap is noted."""
+        asset = judged["keyframes"][task["scene_id"]]
+        staging = self.staging()
+        if task["animate"] is None or staging is None or asset.failed or not asset.rendered:
+            return judged
+        plan = json.loads(task["animate"])
+        try:
+            job = picture_job(
+                task["scene_id"], Path(asset.path), plan["move"], self.theme, staging[1],
+                seconds=plan["seconds"], quality="final", frames=plan["frames"],
+            )  # fmt: skip
+            report = self.render_shot(job)
+        except StagingError as exc:
+            for missing in exc.missing:
+                record_gap(self.theme.root, plan["topic"], task["scene_id"], missing)
+            return judged
+        if not report.frames:
+            for issue in report.issues:
+                record_gap(self.theme.root, plan["topic"], task["scene_id"], f"animate: {issue}")
+            return judged
+        moving = asset.model_copy(
+            update={
+                "shot": job.dumps(),
+                "first_frame": report.frames[0],
+                "last_frame": report.frames[-1],
+            }
+        )
+        return {**judged, "keyframes": {task["scene_id"]: moving}}
 
     def _fixes(self, retry: RenderedAsset) -> list[str]:
         """What a redrawn keyframe is told, from the exact problems code measured."""
@@ -292,7 +344,7 @@ class Keyframes(Studio):
             )
         except GenerationRefused as refusal:
             return {"keyframes": {task["scene_id"]: refused(task, refusal)}}
-        return self._judged(task, image, calls)
+        return self._animated(task, self._judged(task, image, calls))
 
     def _judged(
         self,

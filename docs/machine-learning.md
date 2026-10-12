@@ -15,7 +15,11 @@ Most of the "intelligence" lies in language models (the writers, and Jev as the 
 | Component | Kind | Learns from our runs? | Code | Data |
 |---|---|---|---|---|
 | Beat and bar tracking | Pretrained transformer (Beat This!) | No, inference only | `production/music_map.py` | CPJKU's training set |
-| Focal point | Pretrained open-vocabulary detector (Grounding DINO tiny) | No, inference only | `production/focus.py` | Each scene's `focus` phrase against its keyframe |
+| Focal point | Pretrained open-vocabulary detector (Grounding DINO tiny) | No, inference only | `production/focus.py`, `providers/vision.py` | Each scene's `focus` phrase against its keyframe |
+| Picture geometry | Pretrained monocular geometry (MoGe-2 ViT-L, MIT) | No, inference only | `providers/vision.py`, `staging/lift.py` | Each animated keyframe ([picture-shots.md](picture-shots.md)) |
+| People's outlines | Pretrained promptable segmentation (SAM 2.1 large, Apache-2.0) | No, inference only | same | The detector's person boxes |
+| People's poses | Pretrained pose estimator (ViTPose base, Apache-2.0) | No, inference only | same | The same boxes |
+| Painting in behind | Pretrained inpainting (LaMa, ONNX, Apache-2.0) | No, inference only | same | The holes behind people and depth edges |
 | Taste models | Sentence embeddings + logistic regression, one per question | **Yes, after every run with new labels** | `learning/` | `learning/examples.jsonl`, `labels.jsonl`, `flags.jsonl` |
 | Active learning | Uncertainty sampling + teacher model | On `train --budget` only (paid) | `learning/train.py` | Same, plus `training.jsonl` |
 | Colour from emotion | Published regression (Valdez and Mehrabian), inverted | Records kept for refitting | `story/field.py`, theme `tone` | `learning/keyframes.jsonl` |

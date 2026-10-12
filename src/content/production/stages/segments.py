@@ -114,6 +114,7 @@ class Segments(Studio):
                             expected_shift=shifted,
                             shot=None,
                             join=join,
+                            animate=None,
                         ),
                     )
                 )

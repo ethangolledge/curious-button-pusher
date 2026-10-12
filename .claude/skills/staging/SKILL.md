@@ -8,6 +8,15 @@ description: Build 3D shots in Blender the same way every time - compose a shot 
 The whole design is in `docs/staging.md`; read it first. The person directs; you do the
 technical work and show them stills before anything is final.
 
+Load the `blender` skill (the Blender manual and `bpy` reference) before writing or changing
+any Blender code, and look up exact operators, `bpy` paths and enum values there.
+
+**A scene that has a keyframe is moved as the keyframe itself** (`docs/picture-shots.md`):
+lifted into depth and filmed with `glide`, its people breathing. That is the channel's look at
+full quality; build a scene from models only when there is no picture for it. Preview a
+picture shot by building its job (`staging.plan.picture_job`) and rendering a few frames;
+check frame one against the keyframe before anything else.
+
 ## Composing a shot
 
 Describe it; do not assemble it. A shot is a scene's description (the shape in

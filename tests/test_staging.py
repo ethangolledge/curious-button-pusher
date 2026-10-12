@@ -363,3 +363,27 @@ def test_every_prop_stands_on_its_base_or_hangs_from_its_top(name: str) -> None:
         assert box.high.z == pytest.approx(0, abs=0.005)
     else:
         assert box.low.z == pytest.approx(0, abs=0.005)
+
+
+def test_a_walker_given_too_long_a_path_stops_short_rather_than_sliding() -> None:
+    stage = _stage()
+    block = REGISTRY.get("actions", "travel")
+    seconds = stage.frames / stage.fps
+    block().build(stage, read(block, {"actor": "thing", "path": "road", "speed": "1.4"}))
+
+    poses = stage.poses(stage.actor("thing"))
+    covered = sum((b.at - a.at).length() for a, b in zip(poses, poses[1:], strict=False))
+    assert covered == pytest.approx(1.4 * seconds, rel=0.05)  # the road is 40 m
+
+
+def test_a_turn_no_faster_than_its_rate_takes_longer() -> None:
+    stage = _stage()
+    block = REGISTRY.get("actions", "turn")
+    block().build(stage, read(block, {"actor": "thing", "degrees": "180", "rate": "90",
+                                      "start": "0", "end": "0.1"}))  # fmt: skip
+
+    poses = stage.poses(stage.actor("thing"))
+    turned = [angle_between(poses[0].rotation, pose.rotation) for pose in poses]
+    done = next(pose.frame for pose, angle in zip(poses, turned, strict=True) if angle > 179.99)
+    # 180 degrees at 90 a second takes two seconds, not the tenth of the shot it was given.
+    assert (done - 1) / stage.fps == pytest.approx(2.0, abs=0.1)

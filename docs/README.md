@@ -26,6 +26,7 @@ Otherwise, start with the one you need:
 | go deep on the local and learned models (taste models, colour, NLI, beat tracking) | [machine-learning.md](machine-learning.md) |
 | find my way around the code, its trade-offs and quirks, and where to optimise | [codebase.md](codebase.md) |
 | build 3D shots in Blender: sets, models, movement, looks, and how to add to them | [staging.md](staging.md) |
+| move a scene's own keyframe in Blender: lifting it into depth, the camera's glide, its people's life | [picture-shots.md](picture-shots.md) |
 
 Also:
 

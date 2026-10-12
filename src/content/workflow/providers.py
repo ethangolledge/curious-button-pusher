@@ -94,9 +94,12 @@ def build_media_provider(config: ContentConfig) -> MediaProvider | None:
 
 
 def build_renderer(config: ContentConfig) -> Renderer | None:
-    """Blender, for a channel that stages scenes in 3D or renders its joins."""
+    """Blender, for a channel that stages scenes in 3D, animates its pictures, or renders its
+    joins."""
     production = config.production
-    if production is None or (production.pictures != "staged" and production.joins != "rendered"):
+    if production is None or (
+        production.pictures == "keyframes" and production.joins != "rendered"
+    ):
         return None
     if production.provider == "fake":
         tone = config.theme.spec.visual.tone

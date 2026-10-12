@@ -35,9 +35,19 @@ music = [
 models = ["trimesh>=4.4", "pycollada>=0.8"]
 # Keeping finished runs and the theme's locks in a Google Cloud Storage bucket (storage.py).
 cloud = ["google-cloud-storage>=3.4,<4"]
-# Finding each keyframe's focal point (Grounding DINO), so the camera glides toward it.
-# Install PyTorch's CPU build first: pip install torch --index-url https://download.pytorch.org/whl/cpu
-vision = ["transformers>=4.46,<6", "pillow>=10"]
+# Published vision models (`providers/vision.py`): each keyframe's focal point (Grounding
+# DINO), and lifting a keyframe into depth for picture shots (MoGe-2, SAM 2, ViTPose, LaMa).
+# Install PyTorch and torchvision's CPU builds first (a GPU's when there is one):
+#   pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
+vision = [
+  "transformers>=5,<6",
+  "pillow>=10",
+  "onnxruntime>=1.20",
+  "huggingface-hub>=1",
+  "opencv-python-headless>=4.10",
+  "scipy>=1.13",
+  "moge @ git+https://github.com/microsoft/MoGe.git",
+]
 dev = [
   "mypy>=1.15,<2",
   "pytest>=8.3,<10",
@@ -80,5 +90,5 @@ explicit_package_bases = true
 mypy_path = "src"
 
 [[tool.mypy.overrides]]
-module = ["openai", "textstat", "fastembed", "onnxruntime", "nltk", "beat_this.*", "transformers", "torch", "PIL.*", "google.cloud.*"]
+module = ["openai", "textstat", "fastembed", "onnxruntime", "nltk", "beat_this.*", "transformers", "torch", "PIL.*", "google.cloud.*", "moge.*", "huggingface_hub", "scipy.*"]
 ignore_missing_imports = true

@@ -108,6 +108,10 @@ class RenderTask(TypedDict):
     shot: str | None
     # A rendered join: the transition job (JSON) instead of a prompt to the video model.
     join: str | None
+    # A keyframe to animate once drawn and passed (`production.pictures` "animated"): its
+    # scene's hold, the frames it is judged and morphed by, and the theme's camera move
+    # (JSON). See docs/picture-shots.md.
+    animate: str | None
 
 
 @dataclass(frozen=True)
@@ -525,8 +529,9 @@ class Studio:
         return spent(state.get("call_log", []), past)
 
     def staging(self) -> tuple[Renderer, Catalogue] | None:
-        """Blender and the catalogue, when this channel stages scenes."""
-        if self.config.pictures != "staged" or self.renderer is None or self.catalogue is None:
+        """Blender and the catalogue, when this channel stages scenes or animates its
+        pictures."""
+        if self.config.pictures == "keyframes" or self.renderer is None or self.catalogue is None:
             return None
         return self.renderer, self.catalogue
 
@@ -556,7 +561,7 @@ class Studio:
             return Report(**json.loads(report.read_text(encoding="utf-8")))
         staging = self.staging()
         if staging is None:
-            raise ValueError("A staged scene needs Blender (production.pictures: staged)")
+            raise ValueError("A 3D shot needs Blender (production.pictures: staged or animated)")
         return staging[0].render(job, folder)
 
     def window(self, timeline: Timeline, scene_id: str) -> "ShotWindow":

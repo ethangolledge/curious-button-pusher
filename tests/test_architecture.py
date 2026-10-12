@@ -95,7 +95,8 @@ def test_dependencies_run_one_way_from_the_data_up_to_the_command_line() -> None
 USES_BLENDER = (
     "content.blender.stage", "content.blender.canvas", "content.blender.worker",
     "content.blender.audit", "content.blender.ingest", "content.blender.imports",
-    "content.blender.person", "content.blender.generate",
+    "content.blender.person", "content.blender.generate", "content.blender.lift",
+    "content.blender.rigging",
     "content.blender.blocks.looks.",
 )  # fmt: skip
 

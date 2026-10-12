@@ -142,6 +142,10 @@ AGES = ("middle", "old", "young", "middle", "old")
 BUILDS = ("average", "slim", "heavy", "average", "slim")
 # People are never quite square to what they face (degrees either way).
 SWAY = 7.0
+# What a person can do, given to any action of theirs that has the setting (unless the
+# scene says otherwise): walk at a walker's pace (metres a second), turn as a body turns
+# (degrees a second).
+HUMAN = {"speed": "1.4", "rate": "90"}
 
 
 class Composer:
@@ -151,6 +155,8 @@ class Composer:
         self._chance = random.Random(seed)
         # Where each group of people starts in the ways people vary (one shuffle a group).
         self._turns: dict[str, int] = {}
+        # The things that are people: their actions are done at a person's pace.
+        self._people: set[str] = set()
         self._placed: list[Placed] = []
         self._copies: dict[str, list[Placed]] = {}
         self._out = Composition()
@@ -183,6 +189,7 @@ class Composer:
     def compose(self, plan: StagePlan) -> Composition:
         self._build_room(plan)
         people = {t.thing_id: t.person.pose for t in plan.things if t.person}
+        self._people = set(people)
         # What each person holds decides what their hands do: every copy (`each`), or as
         # many copies as there are things held.
         counts = {t.thing_id: t.count for t in plan.things}
@@ -526,12 +533,15 @@ class Composer:
         members = [p.actor_id for p in self._copies.get(action.who, [])] or [action.who]
         try:
             block = self._registry.get("actions", action.block)
-            timed = {s.name for s in settings(block) if s.name in ("start", "when")}
+            named = {s.name for s in settings(block)}
         except RegistryError:
-            timed = set()
+            named = set()
+        timed = named & {"start", "when"}
+        human = {k: v for k, v in HUMAN.items() if k in named} if action.who in self._people else {}
         calls = []
         for index, member in enumerate(members):
             values = {s.name: member if s.value == action.who else s.value for s in action.settings}
+            values = {**human, **values}
             for name in timed:
                 begins = float(values.get(name, "0") or 0)
                 values[name] = _n(min(0.9, begins + index * action.stagger))

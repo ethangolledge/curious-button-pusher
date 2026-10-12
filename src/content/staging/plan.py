@@ -3,6 +3,7 @@ can be built: the bridge between the Visual Director's plan and the Blender tool
 
 from collections.abc import Mapping, Sequence
 from dataclasses import replace
+from pathlib import Path
 from typing import Any, TypeVar
 
 from content.blender.blocks.base import SettingError, read
@@ -18,11 +19,14 @@ from content.schemas.staging import (
 from content.schemas.visuals import Scene, VisualPackage
 from content.staging.catalogue import Catalogue, check, with_models
 from content.staging.compose import Resolve, compose
+from content.staging.lift import lifted
 from content.staging.resolve import from_library
 from content.theme import BlockPreset, Theme
 
 Package = TypeVar("Package", bound=VisualPackage)
 
+# The look a picture shot is drawn in: the picture's own (`blocks/looks/painted.py`).
+PAINTED = "painted"
 # How long a scene is taken to be when its staging is checked before the narration is timed.
 CHECK_SECONDS = 6.0
 
@@ -106,6 +110,73 @@ def job_for(
     return with_models(job, catalogue)
 
 
+def picture_job(
+    shot_id: str,
+    picture: Path,
+    move: str,
+    theme: Theme,
+    catalogue: Catalogue,
+    *,
+    seconds: float,
+    quality: Quality,
+    frames: Sequence[int] = (),
+    fps: int | None = None,
+    scale: float = 1.0,
+    motion: str = "breathing",
+    seed: int = 1,
+) -> Job:
+    """The render job for a picture shot (`docs/picture-shots.md`): the scene's keyframe
+    lifted into depth (once; `lift.lifted`), seen from where it was taken in its own look,
+    the camera gliding the way the theme's `move` goes, its people playing `motion`."""
+    lifted_set = lifted(catalogue.library, picture, make=True)
+    if lifted_set is None:
+        raise StagingError(["lift: the vision models are not installed (the `vision` extra)"])
+    camera = next(part for part in lifted_set.parts if part["name"] == "mark_camera")
+    people = [p["name"] for p in lifted_set.parts if p["name"].startswith("actor_person")]
+    spec = theme.spec
+    job = Job(
+        shot_id=shot_id,
+        seconds=seconds,
+        layout=BlockCall("set", {"model": lifted_set.model_id, "motion": motion}),
+        camera=BlockCall(
+            "glide",
+            {
+                **_glide(spec.staging.moves.get(move)),
+                "lens": str(camera["lens"]),
+                "subject": people[0].removeprefix("actor_") if people else "ahead",
+            },
+        ),
+        look=BlockCall(PAINTED, {}),
+        actors=(),
+        groups={},
+        models=(),
+        actions=(),
+        lights=(),
+        palette=dict(spec.palette),
+        grade=NEUTRAL,
+        width=_even(spec.format.width * scale),
+        height=_even(spec.format.height * scale),
+        fps=fps or spec.format.fps,
+        quality=quality,
+        frames=tuple(frames),
+        seed=seed,
+    )
+    return with_models(job, catalogue)
+
+
+def _glide(preset: BlockPreset | None) -> dict[str, str]:
+    """A picture shot's glide that goes the way one of the theme's camera moves goes: a dolly
+    its direction, an orbit round; anything else (a held, drifting camera) barely moving."""
+    if preset is None:
+        return {"direction": "in"}
+    if preset.block == "dolly":
+        return {"direction": str(preset.settings.get("direction", "in"))}
+    if preset.block == "orbit":
+        clockwise = float(str(preset.settings.get("degrees", 60))) < 0
+        return {"direction": "round_right" if clockwise else "round_left"}
+    return {"direction": "right", "amount": "0.015"}
+
+
 def join_for(
     scene: Scene,
     theme: Theme,
@@ -144,12 +215,13 @@ def themed(job: Job, theme: Theme) -> Job:
     if preset is not None:
         base = {name: _text(value) for name, value in preset.settings.items()}
         camera = BlockCall(preset.block, {**base, **camera.settings})
-    return replace(
-        job,
-        camera=camera,
-        look=BlockCall(staging.look, {k: _text(v) for k, v in staging.look_settings.items()}),
-        palette=dict(theme.spec.palette),
+    # A picture shot is drawn in the picture's own look, whatever the channel's 3D look is.
+    look = (
+        job.look
+        if job.look.block == PAINTED
+        else BlockCall(staging.look, {k: _text(v) for k, v in staging.look_settings.items()})
     )
+    return replace(job, camera=camera, look=look, palette=dict(theme.spec.palette))
 
 
 def _even(pixels: float) -> int:

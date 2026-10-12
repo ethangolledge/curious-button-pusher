@@ -2,22 +2,26 @@
 """Reading a model file into the scene, the same way when a model joins the library
 (`ingest.py`) and when a shot uses it (`stage.py`)."""
 
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
 import bpy  # type: ignore[import-not-found]
 import numpy as np
 
+from content.blender import lift
 from content.blender.materials import decoded
 
 # Each kind of file, read with the axis its maker took as up ("Y" or "Z"); glTF always says.
-IMPORTERS = {
+IMPORTERS: dict[str, Callable[[str, str], Any]] = {
     ".glb": lambda path, up: bpy.ops.import_scene.gltf(filepath=path),
     ".gltf": lambda path, up: bpy.ops.import_scene.gltf(filepath=path),
     ".obj": lambda path, up: bpy.ops.wm.obj_import(
         filepath=path, up_axis=up, forward_axis="NEGATIVE_Z" if up == "Y" else "Y"
     ),
     ".fbx": lambda path, up: bpy.ops.import_scene.fbx(filepath=path),
+    # A picture lifted into depth (`staging/lift.py`): built, not read.
+    ".npz": lambda path, up: lift.build(path),
     ".stl": lambda path, up: bpy.ops.wm.stl_import(
         filepath=path, up_axis=up, forward_axis="NEGATIVE_Z" if up == "Y" else "Y"
     ),

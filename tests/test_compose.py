@@ -12,7 +12,7 @@ from content.blender.maths import UP, Vec, axis_angle
 from content.blender.rehearsal import RehearsalStage
 from content.schemas.staging import Person, StagePlan, Thing
 from content.staging.catalogue import load_catalogue
-from content.staging.compose import Composition, Resolved, compose
+from content.staging.compose import HUMAN, Composition, Resolved, compose
 from content.staging.resolve import from_library, look_of
 
 CATALOGUE = load_catalogue(None)
@@ -261,3 +261,28 @@ def test_a_long_thing_too_long_for_a_surfaces_depth_is_laid_along_it() -> None:
     assert shot.missing == []
     heading = float(next(a for a in shot.actors if a.actor_id == "rule").settings["heading"])
     assert abs(abs(heading) - 90) < 15  # turned a quarter, give or take its spin
+
+
+def test_a_person_walks_and_turns_at_a_persons_pace_unless_told_otherwise() -> None:
+    shot = _compose(
+        "corridor",
+        [
+            _thing("aide", "man", "at", "start", person={"pose": "walking"}),
+            _thing("trolley", "crate", "at", "end"),
+        ],
+        actions=[
+            {"block": "travel", "who": "aide",
+             "settings": [{"name": "actor", "value": "aide"},
+                          {"name": "path", "value": "corridor"}]},
+            {"block": "turn", "who": "aide",
+             "settings": [{"name": "actor", "value": "aide"}, {"name": "rate", "value": "200"}]},
+            {"block": "travel", "who": "trolley",
+             "settings": [{"name": "actor", "value": "trolley"},
+                          {"name": "path", "value": "corridor"}]},
+        ],
+    )  # fmt: skip
+
+    walk, turn, trolley = shot.actions
+    assert walk.settings["speed"] == HUMAN["speed"]
+    assert turn.settings["rate"] == "200"  # the scene's own word stands
+    assert "speed" not in trolley.settings

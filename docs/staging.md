@@ -1,6 +1,6 @@
 # 3D Shots (Staging)
 
-Last reviewed: 2026-10-11
+Last reviewed: 2026-10-12
 
 Besides keyframes, a scene's pictures can be a 3D shot built and rendered in Blender. The
 Visual Director **describes** what is in the shot (the room, the things in it and where they
@@ -168,6 +168,9 @@ sign-off: a figurine model sheet from the image model, then a multiview image-to
 with a rig (about $1, the only paid step in 3D). The Kushner figure was made this way.
 Without MPFB, people are the engine's simple figurines.
 
+A scene that has a keyframe can instead be moved as the keyframe itself, lifted into depth:
+[picture-shots.md](picture-shots.md).
+
 ## Composing: placing everything
 
 `staging/compose.py` builds the room on a rehearsal stage (so its marks, surfaces, furniture
@@ -187,6 +190,10 @@ turned a few degrees off square (`SWAY`) and starts breathing at a different mom
 `held_by` people decides their activity (a glass: drinking; papers: reading; a pen: writing; a
 phone: on the phone, by the words in `HELD`), and it is placed at their hand, one per holder:
 three glasses held by eight men are three men drinking, not eight hands round eight cups.
+People move at a person's pace: any action given to a person gets `HUMAN`'s limits where its
+block has the setting, unless the scene says otherwise. `travel`'s `speed` (1.4 m/s: a walker
+given too long a path stops short rather than sliding along it) and `turn`'s `rate` (90°/s on
+average: a half turn takes two seconds, not a spin).
 A held thing hangs from its holder (`put`'s `held_by`), so it moves with them and the audit
 counts it as part of them. A person's room is measured round their real middle (`middle`: a
 seated person's knees and arms reach forward of their hips), so nothing is set under their

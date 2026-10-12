@@ -56,6 +56,12 @@ with a change). `AGENTS.md` says which applies when a session starts.
   left open (`--detach`) and answered later, on its own page server or in chat
   ([docs/runs-and-review.md](docs/runs-and-review.md)).
 - **A run is capped** at `production.max_usd`, lowered to the key's remaining credit.
+- **The keyframe is the foundation; Blender moves it.** With `production.pictures: "animated"`
+  each approved keyframe is lifted into depth by published models (MoGe-2, Grounding DINO,
+  SAM 2, ViTPose, LaMa) and moved in Blender as itself: frame one is the picture, the camera
+  glides with real parallax, people breathe. Free and local. Action a still cannot hold is the
+  next step: a video model guided by the same shot, paid, with sign-off
+  ([docs/picture-shots.md](docs/picture-shots.md)).
 - **3D shots are described, then built by a pipeline.** The Visual Director describes what is in
   a shot (things, relations, people, actions, camera); code resolves every thing (library,
   families made from its words, people made from one parametric body, objects made by
@@ -69,7 +75,7 @@ with a change). `AGENTS.md` says which applies when a session starts.
   infrastructure, and integrations not explicitly requested. The bucket is the person's own
   permanent storage, not infrastructure the pipeline needs: without one, everything stays local.
 
-## State (2026-10-11)
+## State (2026-10-12)
 
 - Engine: about 16,000 lines in layered packages (`docs/codebase.md`), about 250 deterministic
   tests in 20 s plus 13 whole-video renders (`pytest -m video`), ruff and strict mypy clean, no
@@ -83,7 +89,8 @@ with a change). `AGENTS.md` says which applies when a session starts.
   them; each staged still looked at by the vision model for physical mistakes and composed
   again once if it fails (about 1p); 41 blocks, 35 props;
   `production.pictures: "staged"` and `production.joins: "rendered"` make a video one moving
-  picture ([docs/staging.md](docs/staging.md)). Not yet: motion capture, likenesses on made
+  picture ([docs/staging.md](docs/staging.md)); `"animated"` moves each keyframe itself
+  ([docs/picture-shots.md](docs/picture-shots.md)). Not yet: motion capture, likenesses on made
   people, cloud rendering.
 - `content eval` caught all seven failures a director named in a rejected final cut, three runs
   out of three ([docs/narration.md](docs/narration.md#regression-content-eval)); false alarms on an

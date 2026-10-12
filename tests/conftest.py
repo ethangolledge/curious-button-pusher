@@ -3,7 +3,7 @@ from pathlib import Path
 import pytest
 
 import content.config
-import content.production.focus
+import content.providers.vision
 from content.config import ContentConfig, load_config
 from content.theme import Theme, load_theme
 
@@ -40,10 +40,10 @@ def fixed_narrator(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 @pytest.fixture(autouse=True)
-def no_focus_detector(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Tests never load the focal-point model, installed or not: the camera aims at the
-    centre, so results are the same on every machine and nothing is downloaded."""
-    monkeypatch.setattr(content.production.focus, "_detector", lambda: None)
+def no_vision_models(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Tests never load the vision models, installed or not: the camera aims at the centre,
+    so results are the same on every machine and nothing is downloaded."""
+    monkeypatch.setattr(content.providers.vision, "ready", lambda: False)
 
 
 @pytest.fixture

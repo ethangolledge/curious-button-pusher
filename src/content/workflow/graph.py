@@ -94,11 +94,12 @@ def build_graph(
 ) -> CompiledStateGraph[ContentState, None, ContentInput, ContentOutput]:
     theme = config.theme
     guidance = theme_guidance(theme)
-    # A channel that stages scenes in 3D: Blender, and what its shots can be made of.
-    staged = config.production is not None and config.production.pictures == "staged"
-    catalogue = load_catalogue(theme.root) if staged else None
+    # A channel that stages scenes in 3D (or animates its pictures there): Blender, and what
+    # its shots are made of. Only a staging channel's Visual Director describes 3D scenes.
+    pictures = config.production.pictures if config.production else "keyframes"
+    catalogue = load_catalogue(theme.root) if pictures != "keyframes" else None
     renderer = renderer or build_renderer(config)
-    find_model = build_model_finder(config, catalogue)
+    find_model = build_model_finder(config, catalogue if pictures == "staged" else None)
     # A run that makes video keeps every paid answer in its asset cache, text included.
     cache = AssetCache(config.production.cache_directory) if config.production else None
 
@@ -133,7 +134,7 @@ def build_graph(
             guidance=guidance,
             cache=cache,
         )
-        if catalogue is not None
+        if catalogue is not None and pictures == "staged"
         else agent(VisualDirector, "visual_director", themed=True)
     )
     # The Editorial Director's three jobs: the plan, the critic (who holds the work to the
