@@ -80,7 +80,7 @@ going sideways or round reveals the most.
 | What | Number |
 |---|---|
 | lifting a 1152×2048 keyframe (CPU) | about 60 to 90 s, once per picture |
-| rendering a final frame at 1080×1920 (EEVEE on integrated graphics) | several seconds; a 5 s scene takes minutes (a GPU makes it far quicker) |
+| rendering a final frame at 1080×1920 (EEVEE on the laptop's integrated graphics) | 15 s at 32 anti-aliasing samples (2,277 s for a 5 s scene); now 16 samples; a dedicated GPU is far quicker |
 | frame one against the keyframe (the desk portrait) | 23.4 dB PSNR, mean difference 6.7 of 255: resampling, not content |
 | people found | 1 of 1 (portrait), 3 of 3 (three at a table), 5 (a room of figures), 2 of a dozen (a dark hall of silhouettes) |
 
