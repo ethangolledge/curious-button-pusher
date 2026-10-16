@@ -24,7 +24,7 @@ USUAL_HEIGHT = {"man": 1.78, "woman": 1.65}
 TABLE_HEIGHT = 0.75
 # How people are made (`blender/person.py`): raised when that changes, so everyone is made
 # again rather than kept as they were.
-MAKER = 4
+MAKER = 8
 
 
 def person_id(person: Person, height: float) -> str:

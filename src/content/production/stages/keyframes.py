@@ -2,15 +2,13 @@
 animatic and story sheet for the Pictures sign-off."""
 
 import json
-import math
 from collections.abc import Sequence
 from dataclasses import replace
 from pathlib import Path
-from typing import Literal
 
 from langgraph.types import Send
 
-from content.blender.job import Grade, Job
+from content.blender.job import BlockCall, Job
 from content.production import assemble, checks
 from content.production.budget import (
     scene_allowance,
@@ -18,7 +16,6 @@ from content.production.budget import (
 from content.production.media import GenerationRefused
 from content.production.story_sheet import write_story_sheet
 from content.production.studio import (
-    STAGING_LOOK,
     RenderTask,
     ShotWindow,
     Studio,
@@ -37,11 +34,10 @@ from content.schemas.media import (
     RenderedAsset,
 )
 from content.schemas.staging import StagedScene
-from content.schemas.story import Feeling
 from content.schemas.visuals import Scene
 from content.staging.backlog import record_gap
 from content.staging.compose import compose
-from content.staging.plan import StagingError, job_for, picture_job, staged, unstage
+from content.staging.plan import GUIDE, StagingError, job_for, picture_job, staged, unstage
 from content.staging.resolve import with_online
 from content.state import CallRecord, ContentState, merge_warnings
 from content.story.field import (
@@ -50,10 +46,11 @@ from content.story.field import (
     expected_temperature,
     field_slots,
     look,
-    warmth,
 )
 from content.theme import ToneSpec
 
+# Why a staged scene's layout was not rendered (its checks in Blender failed).
+UNBUILT = "its 3D layout was not rendered"
 # Image models accept a limited number of references; the theme's style images come first.
 MAX_STORY_REFERENCES = 6
 
@@ -110,11 +107,6 @@ class Keyframes(Studio):
         tasks = []
         for scene in visuals.scenes:
             feeling = fields.get(scene.scene_id)
-            shot = self._shot_task(state, scene, feeling, existing.get(scene.scene_id))
-            if shot is not None:
-                if shot != "kept":
-                    tasks.append(Send("produce_keyframe", shot))
-                continue
             slots = field_slots(feeling, spec)
             drawn_from = [
                 (reference.request.kind, Path(path))
@@ -123,30 +115,40 @@ class Keyframes(Studio):
                 # The channel's design first: it already has the look and the identity.
                 for path in [*([reference.design] if reference.design else []), *reference.chosen]
             ]
+            guide = self._guide(state, scene, self.config.seed)
             signature = render_signature(
                 self.config.image_model,
                 self.config.image_resolution,
                 self.theme.keyframe_prompt(scene.anchor, field=slots),
                 *(file_digest(path) for path in self.theme.references),
                 *(file_digest(path) for _, path in drawn_from),
+                *([self.theme.spec.visual.repaint_note, guide.dumps()] if guide else []),
             )
             previous = existing.get(scene.scene_id)
             attempt = next_attempt(previous, signature, self.config.keyframe_attempts)
             if attempt is None:
                 continue
             # A retry learns from what went wrong: a refused or garbled portrait becomes a
-            # silhouette (without the person's photographs), and a frame that measured too
-            # bright is asked to be darker.
+            # silhouette (without the person's photographs), a frame that measured too
+            # bright is asked to be darker, and a layout that failed its checks, or was drawn
+            # with something physically wrong in it (a hand short of its glass), is composed
+            # again, differently.
             retry = previous if attempt > 0 else None
+            unbuilt = retry is not None and _layout_unbuilt(retry)
             silhouette = (
                 retry is not None
+                and not unbuilt
                 and scene.anchor.figure is not None
                 and (retry.silhouette or not retry.rendered or _judged_unclean(retry))
             )
+            if guide is not None and retry is not None and (unbuilt or _judged_unclean(retry)):
+                guide = self._guide(state, scene, self.config.seed + attempt)
             photos = [
                 str(path) for kind, path in drawn_from if not (silhouette and kind == "person")
             ][:MAX_STORY_REFERENCES]
             prompt = self.theme.keyframe_prompt(scene.anchor, silhouette=silhouette, field=slots)
+            if guide is not None:
+                prompt = f"{self.theme.spec.visual.repaint_note} {prompt}"
             if photos:
                 prompt = f"{prompt} {self.theme.spec.visual.reference_note}"
             if retry is not None:
@@ -170,7 +172,7 @@ class Keyframes(Studio):
                         expected_temperature=expected_temperature(feeling, spec),
                         field_point=circumplex(feeling, spec),
                         expected_shift=None,
-                        shot=None,
+                        guide=guide.dumps() if guide else None,
                         join=None,
                         animate=self._animation(state, scene),
                     ),
@@ -178,71 +180,30 @@ class Keyframes(Studio):
             )
         return tasks or "keyframe_verdict"
 
-    def _shot_task(
-        self,
-        state: ContentState,
-        scene: Scene,
-        feeling: Feeling | None,
-        previous: RenderedAsset | None,
-    ) -> RenderTask | Literal["kept"] | None:
-        """A staged scene's keyframe task: its 3D shot's first, middle and last frames,
-        graded by its feeling. None when the scene is drawn instead."""
+    def _guide(self, state: ContentState, scene: Scene, seed: int) -> Job | None:
+        """A staged scene's 3D layout as a guide for the image model (`docs/3d-reuse.md`): the
+        scene composed with this seed, seen from where its camera starts, in the guide look.
+        None when the scene is drawn from words alone; what stopped it is noted."""
         staging = self.staging()
         shot = staged(scene) if staging else None
         if staging is None or shot is None:
             if staging is not None and isinstance(scene, StagedScene) and scene.missing:
                 record_gap(self.theme.root, state["topic"], scene.scene_id, scene.missing)
             return None
-        spec = self.theme.spec.visual.field
-        window, frames = self._hold(state, scene.scene_id)
-        grade = Grade(warmth=warmth(feeling, spec))
         assert shot.staging is not None
-        staging_plan = shot.staging
-
-        def composed(seed: int) -> Job:
-            return job_for(
-                shot.scene_id, staging_plan, self.theme, staging[1], seconds=window.seconds,
-                quality="final", frames=frames, grade=grade, seed=seed,
-            )  # fmt: skip
-
+        window, _ = self._hold(state, scene.scene_id)
         try:
-            base = composed(self.config.seed)
-            signature = render_signature("blender", STAGING_LOOK, base.dumps())
-            attempt = next_attempt(previous, signature, self.config.keyframe_attempts)
-            if attempt is None:
-                return "kept"
-            job = base
-            if attempt > 0 and previous is not None:
-                if _judged_unclean(previous):
-                    # Something physically wrong (a hand short of its glass, a chair through
-                    # a wall): the scene composed again, differently, not only regraded.
-                    job = composed(self.config.seed + attempt)
-                job = replace(job, grade=_regraded(grade, previous))
+            job = job_for(
+                shot.scene_id, shot.staging, self.theme, staging[1], seconds=window.seconds,
+                quality="still", frames=(1,), seed=seed,
+            )  # fmt: skip
         except StagingError as exc:
             # Something it needs could not be found or made: drawn, and the gap noted.
             for missing in exc.missing:
                 record_gap(self.theme.root, state["topic"], scene.scene_id, missing)
             return None
-        return RenderTask(
-            scene_id=scene.scene_id,
-            attempt=attempt,
-            prompt=f"3D shot: {_summary(shot)}",
-            signature=signature,
-            anchor=anchor_text(scene.anchor),
-            next_anchor=None,
-            first_frame=None,
-            last_frame=None,
-            clip_seconds=0,
-            silhouette=False,
-            references=[],
-            expected_framing=look(feeling, spec).framing,
-            expected_temperature=expected_temperature(feeling, spec),
-            field_point=circumplex(feeling, spec),
-            expected_shift=None,
-            shot=job.dumps(),
-            join=None,
-            animate=None,
-        )
+        # Composed as the storyboard's check composed it; named apart from the scene's shot.
+        return replace(job, shot_id=f"{shot.scene_id}-layout", look=BlockCall(GUIDE))
 
     def _hold(self, state: ContentState, scene_id: str) -> tuple[ShotWindow, list[int]]:
         """A scene's shot window, and the frames it is judged by and morphed from: where its
@@ -257,9 +218,9 @@ class Keyframes(Studio):
         return window, sorted(frames)
 
     def _animation(self, state: ContentState, scene: Scene) -> str | None:
-        """What animating a scene's drawn keyframe needs (`production.pictures` "animated"):
-        its hold and its camera move."""
-        if self.config.pictures != "animated":
+        """What animating a scene's keyframe needs (`production.pictures` "animated" or
+        "staged"): its hold and its camera move."""
+        if self.config.pictures == "keyframes":
             return None
         window, frames = self._hold(state, scene.scene_id)
         return json.dumps(
@@ -320,13 +281,13 @@ class Keyframes(Studio):
     def produce_keyframe(self, state: RenderTask) -> ContentState:
         task = state
         spec = self.theme.spec
-        if task["shot"]:
-            report = self.render_shot(Job.loads(task["shot"]))
+        references = [*self.theme.references, *map(Path, task["references"])]
+        if task["guide"]:
+            report = self.render_shot(Job.loads(task["guide"]))
             if not report.frames:
                 return {"keyframes": {task["scene_id"]: _unrendered(task, report.issues)}}
-            # The frames, in order: where its hold starts, its middle, and where it morphs out.
-            first, image, last = (Path(report.frames[i]) for i in (0, len(report.frames) // 2, -1))
-            return self._judged(task, image, [], shot=(first, last))
+            # The layout first: the repaint note speaks of "the first image".
+            references = [Path(report.frames[0]), *references]
         try:
             image, calls = self.fetch(
                 "keyframe",
@@ -336,7 +297,7 @@ class Keyframes(Studio):
                 lambda: self.media.image(
                     model=self.config.image_model,
                     prompt=task["prompt"],
-                    references=[*self.theme.references, *map(Path, task["references"])],
+                    references=references,
                     aspect_ratio=spec.format.aspect_ratio,
                     resolution=self.config.image_resolution,
                     seed=self.config.seed + task["attempt"],
@@ -352,11 +313,8 @@ class Keyframes(Studio):
         task: RenderTask,
         image: Path,
         calls: list[CallRecord],
-        *,
-        shot: tuple[Path, Path] | None = None,
     ) -> ContentState:
-        """A keyframe, drawn or rendered, measured against its scene's tone and colour,
-        described, and judged."""
+        """A keyframe measured against its scene's tone and colour, described, and judged."""
         spec = self.theme.spec
         tone = spec.visual.tone
         signal = checks.measure(image)
@@ -383,7 +341,7 @@ class Keyframes(Studio):
                 ),
             ]
         ]
-        observations, perception_calls = self.perceive([image], shot=shot is not None)
+        observations, perception_calls = self.perceive([image], layout=bool(task["guide"]))
         judgements, judge_call = self.judge.evaluate(
             {
                 "stage": "keyframes",
@@ -410,9 +368,7 @@ class Keyframes(Studio):
             issues=issues,
             silhouette=task["silhouette"],
             colour=colour,
-            shot=task["shot"] or "",
-            first_frame=str(shot[0]) if shot else "",
-            last_frame=str(shot[1]) if shot else "",
+            guide=task["guide"] or "",
         )
         return {
             "keyframes": {task["scene_id"]: asset},
@@ -421,11 +377,14 @@ class Keyframes(Studio):
         }
 
     def keyframe_verdict(self, state: ContentState) -> ContentState:
-        """Retry failed keyframes within their allowance; then always show a person. A 3D
-        shot that could not be built, or does not show its scene, is drawn instead: rendering
-        the same shot again would not change it."""
+        """Retry failed keyframes within their allowance; then always show a person. A staged
+        scene whose layout could not be built is drawn from words instead."""
         assets = self.current(state, "keyframes")
-        abandoned = {asset.scene_id: reason for asset in assets if (reason := _abandoned(asset))}
+        abandoned = {
+            asset.scene_id: reason
+            for asset in assets
+            if (reason := _abandoned(asset, self.config.keyframe_attempts))
+        }
         if abandoned:
             visuals = required(state.get("visual_package"), "a storyboard")
             for scene_id, reason in abandoned.items():
@@ -511,19 +470,17 @@ class Keyframes(Studio):
         return animatic, calls
 
 
-# What a staged shot is judged on that a better grade cannot fix.
-SHOWS_THE_SCENE = frozenset({"keyframe_matches_anchor", "keyframe_shows_story"})
-
-
-def _abandoned(asset: RenderedAsset) -> str:
-    """Why a scene's 3D shot gives way to a drawn keyframe, or nothing if it stands."""
-    if not asset.shot:
-        return ""
-    if not asset.rendered:
+def _abandoned(asset: RenderedAsset, attempts: int) -> str:
+    """Why a staged scene gives way to a keyframe drawn from words alone, or nothing if its
+    layout stands: one that failed its checks every time it was composed. A picture drawn over
+    a layout that misses the scene is drawn again, like any keyframe."""
+    if _layout_unbuilt(asset) and asset.attempt + 1 >= attempts:
         return asset.issues[0].removeprefix(f"{asset.scene_id}: ")
-    if any(j.question_id in SHOWS_THE_SCENE and j.outcome == "fail" for j in asset.judgements):
-        return "its 3D shot did not show the scene"
     return ""
+
+
+def _layout_unbuilt(asset: RenderedAsset) -> bool:
+    return bool(asset.guide) and not asset.rendered and UNBUILT in asset.issues[0]
 
 
 def _judged_unclean(asset: RenderedAsset) -> bool:
@@ -559,33 +516,8 @@ def _is_tone_issue(issue: str) -> bool:
     return "too bright" in issue or "too saturated" in issue
 
 
-def _summary(plan: StagedScene) -> str:
-    staging = plan.staging
-    assert staging is not None
-    things = ", ".join(f"{t.count} × {t.what}" for t in staging.things) or "nothing added"
-    actions = ", ".join(action.block for action in staging.actions) or "no action"
-    return f"{staging.layout.block} with {things}; {actions}; camera {staging.camera.block}"
-
-
-def _regraded(grade: Grade, previous: RenderedAsset) -> Grade:
-    """A shot rendered again, corrected by what its last render measured: exposure towards
-    the scene's brightness target (luma is about 2.2 stops per doubling), warmth away from
-    a temperature it missed."""
-    exposure, warmer = grade.exposure, grade.warmth
-    colour = previous.colour
-    if colour is not None and colour.brightness > 0:
-        exposure += max(
-            -3.0, min(3.0, 2.2 * math.log2(colour.target_brightness / colour.brightness))
-        )
-    if any("too cool" in issue for issue in previous.issues):
-        warmer = min(1.0, warmer + 0.4)
-    if any("too warm" in issue for issue in previous.issues):
-        warmer = max(-1.0, warmer - 0.4)
-    return Grade(exposure=round(exposure, 2), warmth=round(warmer, 2))
-
-
 def _unrendered(task: RenderTask, issues: list[str]) -> RenderedAsset:
-    """A shot the checks stopped before rendering: the scene will be drawn instead."""
+    """A layout the checks stopped before rendering: the scene will be drawn from words."""
     return RenderedAsset(
         scene_id=task["scene_id"],
         attempt=task["attempt"],
@@ -594,6 +526,6 @@ def _unrendered(task: RenderTask, issues: list[str]) -> RenderedAsset:
         path="",
         observations=[],
         judgements=[],
-        issues=[f"{task['scene_id']}: its 3D shot was not rendered ({'; '.join(issues)})"],
-        shot=task["shot"] or "",
+        issues=[f"{task['scene_id']}: {UNBUILT} ({'; '.join(issues)})"],
+        guide=task["guide"] or "",
     )

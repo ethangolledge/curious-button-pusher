@@ -64,8 +64,8 @@
 ["shape",{"kind":"box","name":"desk.body.side_2.handle_2","size":{"x":0.12,"y":0.02,"z":0.015},"at":{"x":0.52,"y":0.375,"z":0.604},"role":"metal"}],
 ["shape",{"kind":"box","name":"desk.body.panel","size":{"x":0.66,"y":0.02,"z":0.4},"at":{"x":0,"y":-0.315,"z":0.31},"role":"wood"}],
 ["place",{"name":"desk.body","at":{"x":0.0,"y":0.0,"z":0.0},"facing":null}],
-["place",{"name":"desk","at":{"x":0,"y":0.9,"z":0},"facing":{"x":0,"y":-1,"z":0}}],
-["mark",{"name":"desk_top","at":{"x":0.0,"y":0.905,"z":0.76}}],
+["place",{"name":"desk","at":{"x":0,"y":0.75,"z":0},"facing":{"x":0,"y":-1,"z":0}}],
+["mark",{"name":"desk_top","at":{"x":0.0,"y":0.755,"z":0.76}}],
 ["model",{"model":"chair","name":"chair","height":null}],
 ["group",{"name":"chair.body","at":{"x":0.0,"y":0.0,"z":0.0}}],
 ["shape",{"kind":"box","name":"chair.body.leg_0","size":{"x":0.035,"y":0.035,"z":0.42},"at":{"x":-0.182,"y":-0.182,"z":0},"role":"wood"}],
@@ -77,9 +77,10 @@
 ["shape",{"kind":"box","name":"chair.body.post_2","size":{"x":0.035,"y":0.035,"z":0.43},"at":{"x":0.182,"y":0.182,"z":0.45},"role":"wood"}],
 ["shape",{"kind":"box","name":"chair.body.back","size":{"x":0.4,"y":0.025,"z":0.16},"at":{"x":0,"y":0.185,"z":0.68},"role":"dark_wood"}],
 ["place",{"name":"chair.body","at":{"x":0.0,"y":0.0,"z":0.0},"facing":null}],
-["place",{"name":"chair","at":{"x":0,"y":1.55,"z":0},"facing":{"x":0,"y":-1,"z":0}}],
-["mark",{"name":"chair","at":{"x":0,"y":1.55,"z":0}}],
-["mark",{"name":"desk_front","at":{"x":0,"y":0.1,"z":0}}],
+["place",{"name":"chair","at":{"x":0,"y":1.495,"z":0},"facing":{"x":0,"y":-1,"z":0}}],
+["mark",{"name":"chair","at":{"x":0,"y":1.495,"z":0}}],
+["mark",{"name":"seat_0","at":{"x":0,"y":1.495,"z":0}}],
+["mark",{"name":"desk_front","at":{"x":0,"y":0.015,"z":0}}],
 ["model",{"model":"desk_lamp","name":"desk_lamp","height":null}],
 ["group",{"name":"desk_lamp.body","at":{"x":0.0,"y":0.0,"z":0.0}}],
 ["shape",{"kind":"cylinder","name":"desk_lamp.body.base","size":{"x":0.17,"y":0.17,"z":0.03},"at":{"x":0.0,"y":0.0,"z":0.0},"role":"metal"}],
@@ -89,5 +90,5 @@
 ["shape",{"kind":"funnel","name":"desk_lamp.body.shade","size":{"x":0.17,"y":0.17,"z":0.16},"at":{"x":0,"y":-0.227,"z":0.391},"role":"lamp_shade"}],
 ["shape",{"kind":"sphere","name":"desk_lamp.body.bulb","size":{"x":0.05,"y":0.05,"z":0.05},"at":{"x":0,"y":-0.257,"z":0.401},"role":"bulb"}],
 ["place",{"name":"desk_lamp.body","at":{"x":0.0,"y":0.0,"z":0.0},"facing":null}],
-["place",{"name":"desk_lamp","at":{"x":-0.5,"y":1.005,"z":0.76},"facing":{"x":0.6,"y":-1,"z":0}}]
+["place",{"name":"desk_lamp","at":{"x":-0.5,"y":0.855,"z":0.76},"facing":{"x":0.6,"y":-1,"z":0}}]
 ]

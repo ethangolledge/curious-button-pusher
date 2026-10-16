@@ -22,6 +22,7 @@ import bpy  # type: ignore[import-not-found]
 from mathutils import Matrix, Vector  # type: ignore[import-not-found]
 
 from content.blender.rigging import loop
+from content.blender.sets import SEAT_REACH
 
 EXTENSION = "bl_ext.user_default.mpfb"
 # The MakeHuman sliders (0 to 1) each word sets.
@@ -61,32 +62,33 @@ POSES: dict[str, dict[str, tuple[float, float, float]]] = {
 # Mid-stride the right side does the opposite.
 OPPOSED = {"walking"}
 # What a person does with their hands, by pose: where each wrist that moves goes (metres right,
-# back and up from the hips, or up from the table top or the floor), how its fingers close, and
-# where what they hold goes.
+# back and up from the hips; or on the table, back from its near edge and up from its top, high
+# enough that a hand's palm lies on it; or up from the floor), how its fingers close, and where
+# what they hold goes.
 # Body measures are for a 1.8 m person and scale with height; tables and floors do not.
 Point = tuple[float, float, float, str]
 ACTIVITIES: dict[tuple[str, str], dict[str, Any]] = {
     ("seated", "resting"): {
-        "hands": {"L": (0.17, -0.42, 0.06, "table"), "R": (-0.17, -0.42, 0.06, "table")},
+        "hands": {"L": (0.17, -0.06, 0.1, "table"), "R": (-0.17, -0.06, 0.1, "table")},
         "fingers": {"L": "flat", "R": "flat"},
     },
     ("seated", "drink"): {
-        "hands": {"L": (0.17, -0.42, 0.06, "table"), "R": (-0.12, -0.45, 0.08, "table")},
+        "hands": {"L": (0.17, -0.06, 0.1, "table"), "R": (-0.12, -0.09, 0.12, "table")},
         "fingers": {"L": "flat", "R": "hold"},
-        "holds": {"drink": (-0.15, -0.53, 0.0, "table")},
+        "holds": {"drink": (-0.15, -0.17, 0.0, "table")},
     },
     ("seated", "reading"): {
-        "hands": {"L": (0.13, -0.44, 0.06, "table"), "R": (-0.13, -0.44, 0.06, "table")},
+        "hands": {"L": (0.13, -0.08, 0.1, "table"), "R": (-0.13, -0.08, 0.1, "table")},
         "fingers": {"L": "hold", "R": "hold"},
-        "holds": {"document": (0.0, -0.5, 0.0, "table")},
+        "holds": {"document": (0.0, -0.14, 0.0, "table")},
     },
     ("seated", "writing"): {
-        "hands": {"L": (0.15, -0.44, 0.06, "table"), "R": (-0.06, -0.47, 0.07, "table")},
+        "hands": {"L": (0.15, -0.08, 0.1, "table"), "R": (-0.06, -0.11, 0.11, "table")},
         "fingers": {"L": "flat", "R": "hold"},
-        "holds": {"paper": (0.02, -0.52, 0.0, "table")},
+        "holds": {"paper": (0.02, -0.16, 0.0, "table")},
     },
     ("seated", "pointing"): {
-        "hands": {"L": (0.17, -0.42, 0.06, "table"), "R": (-0.14, -0.78, 0.22, "table")},
+        "hands": {"L": (0.17, -0.06, 0.1, "table"), "R": (-0.14, -0.42, 0.26, "table")},
         "fingers": {"L": "flat", "R": "point"},
     },
     ("seated", "lap"): {
@@ -120,6 +122,8 @@ ACTIVITIES: dict[tuple[str, str], dict[str, Any]] = {
         "fingers": {"R": "point"},
     },
 }
+# Which way a hand on a table points: forward, tipped a little down to the fingertips.
+RESTING_HAND = Vector((0.0, -1.0, -0.12))
 # How far each finger joint closes, by grip (degrees): the thumb, then the four fingers.
 GRIPS = {"flat": (5.0, 5.0), "rest": (15.0, 30.0), "hold": (30.0, 70.0), "point": (40.0, 80.0)}
 # Where an elbow points as an arm reaches: out to the side and back.
@@ -185,6 +189,8 @@ def main(description: dict[str, Any], target: Path, facts: Path) -> int:
         bpy.context.view_layer.update()
     _pose(rig, description["pose"])
     hips = rig.matrix_world @ rig.pose.bones["root"].head
+    if description["pose"] == "seated":
+        _fit_chair(rig, hips, description["chair"], (description["height"] or 1.8) / 1.8)
     activity = ACTIVITIES.get((description["pose"], description.get("activity", "")), {})
     held = _act(rig, activity, hips, description) if activity else {}
     motion = description.get("motion", "")
@@ -229,20 +235,63 @@ def _pose(rig: Any, pose: str) -> None:
     from where its parent now ends."""
     bpy.context.view_layer.objects.active = rig
     bpy.ops.object.mode_set(mode="POSE")
-    world = rig.matrix_world
     for limb, (x, y, z) in POSES[pose].items():
         for side, sign in (("L", 1), ("R", -1)):
             opposed = pose in OPPOSED and side == "R"
-            way = Vector((x * sign, -y if opposed else y, z)).normalized()
-            bone = rig.pose.bones[f"{limb}.{side}"]
-            bpy.context.view_layer.update()
-            # The bone's axis (its Y) turned onto the wanted way, in the rig's own space.
-            current = (bone.matrix.to_3x3() @ Vector((0, 1, 0))).normalized()
-            wanted = (world.to_3x3().inverted() @ way).normalized()
-            turn = current.rotation_difference(wanted).to_matrix().to_4x4()
-            head = bone.matrix.translation.copy()
-            bone.matrix = Matrix.Translation(head) @ turn @ bone.matrix.to_3x3().to_4x4()
+            _aim(rig, f"{limb}.{side}", Vector((x * sign, -y if opposed else y, z)))
     bpy.ops.object.mode_set(mode="OBJECT")
+    bpy.context.view_layer.update()
+
+
+def _aim(rig: Any, name: str, way: Vector) -> None:
+    """A bone turned to point `way` (in the world), about its head; in pose mode."""
+    bone = rig.pose.bones[name]
+    bpy.context.view_layer.update()
+    # The bone's axis (its Y) turned onto the wanted way, in the rig's own space.
+    current = (bone.matrix.to_3x3() @ Vector((0, 1, 0))).normalized()
+    wanted = (rig.matrix_world.to_3x3().inverted() @ way.normalized()).normalized()
+    turn = current.rotation_difference(wanted).to_matrix().to_4x4()
+    head = bone.matrix.translation.copy()
+    bone.matrix = Matrix.Translation(head) @ turn @ bone.matrix.to_3x3().to_4x4()
+
+
+def _fit_chair(rig: Any, hips: Vector, chair: float, scale: float) -> None:
+    """A seated figure's legs fitted to a chair this high: raised to sit on it, their feet
+    would hang; so each leg is bent by inverse kinematics until the foot reaches as far down
+    as the figure will be raised, the thighs sloping down as anyone's do on a high seat. Once
+    raised, the feet stand on the floor and the knees sit lower (clear of a desk)."""
+    meshes = [obj for obj in bpy.data.objects if obj.type == "MESH"]
+    low, _ = _extent(meshes)
+    drop = chair - (_seat(meshes, hips) - low.z)
+    if drop <= 0.01:
+        return
+    bpy.context.view_layer.objects.active = rig
+    bpy.ops.object.mode_set(mode="POSE")
+    made = []
+    for side, sign in (("L", 1), ("R", -1)):
+        shin = rig.pose.bones[f"lowerleg02.{side}"]
+        ankle = rig.matrix_world @ shin.tail
+        target = bpy.data.objects.new(f"foot.{side}", None)
+        pole = bpy.data.objects.new(f"knee.{side}", None)
+        target.location = ankle - Vector((0.0, 0.0, drop))
+        # The knee points forward, a little out.
+        pole.location = hips + Vector((0.1 * sign, -0.8, 0.0)) * scale
+        for empty in (target, pole):
+            bpy.context.scene.collection.objects.link(empty)
+            made.append(empty)
+        reach = shin.constraints.new("IK")
+        reach.target, reach.pole_target, reach.chain_count = target, pole, 4
+        reach.pole_angle = math.radians(-90)
+    bpy.context.view_layer.update()
+    bpy.ops.pose.select_all(action="SELECT")
+    bpy.ops.pose.visual_transform_apply()
+    for side in ("L", "R"):
+        shin = rig.pose.bones[f"lowerleg02.{side}"]
+        for constraint in list(shin.constraints):
+            shin.constraints.remove(constraint)
+    bpy.ops.object.mode_set(mode="OBJECT")
+    for empty in made:
+        bpy.data.objects.remove(empty)
     bpy.context.view_layer.update()
 
 
@@ -267,7 +316,9 @@ def _act(
         x, y, z, ref = point
         base = {"table": table, "floor": low.z, "hips": hips.z}[ref]
         body = scale if ref == "hips" else 1.0
-        return Vector((hips.x + x * scale, hips.y + y * scale, base + z * body))
+        # The table's near edge stands a seat's reach in front of the hips, whoever sits.
+        ahead = y - SEAT_REACH if ref == "table" else y * scale
+        return Vector((hips.x + x * scale, hips.y + ahead, base + z * body))
 
     bpy.context.view_layer.objects.active = rig
     bpy.ops.object.mode_set(mode="POSE")
@@ -287,10 +338,13 @@ def _act(
     bpy.context.view_layer.update()
     bpy.ops.pose.select_all(action="SELECT")
     bpy.ops.pose.visual_transform_apply()
-    for side in activity["hands"]:
+    for side, point in activity["hands"].items():
         bone = rig.pose.bones[f"lowerarm02.{side}"]
         for constraint in list(bone.constraints):
             bone.constraints.remove(constraint)
+        if point[3] == "table":
+            # A hand on a table lies along it, the wrist bent, not carrying on down the arm.
+            _aim(rig, f"wrist.{side}", RESTING_HAND)
         _close(rig, side, activity["fingers"][side])
     bpy.ops.object.mode_set(mode="OBJECT")
     for empty in made:

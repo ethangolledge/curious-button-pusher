@@ -27,6 +27,9 @@ Package = TypeVar("Package", bound=VisualPackage)
 
 # The look a picture shot is drawn in: the picture's own (`blocks/looks/painted.py`).
 PAINTED = "painted"
+# The look a staged scene's layout is rendered in for the image model to draw over
+# (`blocks/looks/guide.py`); never shown.
+GUIDE = "guide"
 # How long a scene is taken to be when its staging is checked before the narration is timed.
 CHECK_SECONDS = 6.0
 

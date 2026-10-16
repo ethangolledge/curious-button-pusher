@@ -197,15 +197,17 @@ than `themes/starter`.
 
 ### Staged pictures (3D)
 
-A channel with `production.pictures: "staged"` in its `config.json` renders the scenes the
-toolkit can show in Blender (`docs/staging.md`, "In a run"). For the person, what changes:
+A channel with `production.pictures: "staged"` in its `config.json` lays out the scenes the
+toolkit can show in Blender and has each keyframe drawn over its layout (`docs/3d-reuse.md`);
+then every keyframe moves as a picture shot (`docs/picture-shots.md`). For the person, what
+changes:
 
-- **Cost**: a staged scene's picture is free; morphs are still paid. The same cap affords more
-  scenes. **Time**: rendering takes seconds a frame on a laptop, so say so before the final
-  cut of a long video, and keep the run detached.
-- **At the Pictures sign-off**, say which scenes are staged and which are drawn, and why any
-  were drawn (each unstaged scene's `missing`). The animatic shows a quick draft of each shot;
-  the cut renders them in full.
+- **Cost**: the same as keyframes: every picture is drawn once (a staged one over its free 3D
+  layout); morphs are still paid. **Time**: moving pictures render on this laptop (seconds a
+  frame), so say so before the final cut of a long video, and keep the run detached.
+- **At the Pictures sign-off**, say which scenes are staged and which are drawn from words, and
+  why (each unstaged scene's `missing`). The animatic shows a quick draft of each shot; the cut
+  renders them in full.
 - **Designs** (docs/3d-reuse.md#designs): anyone or anything in two or more scenes is drawn
   once in the channel's look and every keyframe is drawn from it. At the Pictures sign-off,
   show the director any design drawn for this run (`content staging designs`); one they dislike
@@ -216,7 +218,7 @@ toolkit can show in Blender (`docs/staging.md`, "In a run"). For the person, wha
   `staging` skill.
 - After the run, `content staging backlog --config <channel>` lists what the toolkit lacked,
   most wanted first; offer to build the top one.
-- `content check` must show Blender ready before a staged run.
+- `content check` must show Blender and the `vision` extra ready before a staged run.
 - **Rendered joins** (`production.joins: "rendered"`, with keyframes or staged pictures): the
   morphs are drawn in Blender, free; say so when estimating (no morph cost), and that each
   join takes a minute or two to render on this laptop.

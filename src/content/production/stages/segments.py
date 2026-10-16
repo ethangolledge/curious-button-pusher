@@ -112,7 +112,7 @@ class Segments(Studio):
                             expected_temperature=None,
                             field_point=None,
                             expected_shift=shifted,
-                            shot=None,
+                            guide=None,
                             join=join,
                             animate=None,
                         ),

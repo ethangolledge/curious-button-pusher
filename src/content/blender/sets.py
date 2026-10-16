@@ -10,6 +10,9 @@ from content.blender.api import Box, Mark, Role, Stage, Thing
 from content.blender.maths import FRONT, UP, Vec, axis_angle
 
 WALL = 0.12  # wall thickness
+# How far a seat's middle stands from the edge of the table or desk it faces: room for whoever
+# sits there, their hips over the seat and their lap and hands clear of the edge.
+SEAT_REACH = 0.36
 
 
 @dataclass(frozen=True, slots=True)

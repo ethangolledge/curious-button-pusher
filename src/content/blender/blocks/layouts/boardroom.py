@@ -8,7 +8,7 @@ from typing import Annotated
 from content.blender.api import Mark, Stage
 from content.blender.blocks.base import Layout, Range
 from content.blender.maths import Vec
-from content.blender.sets import room, surface_mark
+from content.blender.sets import SEAT_REACH, room, surface_mark
 
 # Facing the table from the near side, and from the far side.
 FRONT_ON, BACK_ON = Vec(0, 1, 0), Vec(0, -1, 0)
@@ -38,8 +38,8 @@ class Boardroom(Layout):
         for index in range(p.chairs):
             x = (index - (p.chairs - 1) / 2) * spacing
             seats += [
-                (Vec(x, top.low.y - 0.3, 0), FRONT_ON),
-                (Vec(x, top.high.y + 0.3, 0), BACK_ON),
+                (Vec(x, top.low.y - SEAT_REACH, 0), FRONT_ON),
+                (Vec(x, top.high.y + SEAT_REACH, 0), BACK_ON),
             ]
         seats.append((Vec(top.low.x - 0.6, top.centre.y, 0), Vec(1, 0, 0)))
         for index, (at, facing) in enumerate(seats):

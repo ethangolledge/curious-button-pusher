@@ -60,65 +60,9 @@ def video_config(project_root: Path, tmp_path: Path) -> ContentConfig:
     )
 
 
-@pytest.mark.video
-def test_a_staged_channel_renders_the_scenes_it_can_stage_and_draws_the_rest(
-    video_config: ContentConfig, tmp_path: Path
-) -> None:
-    """S2, S4 and S6 are staged; S6's shot fails its checks in Blender, so it is drawn."""
-    assert video_config.production is not None
-    # A copy of the channel: what it could not stage is noted in its folder.
-    root = tmp_path / "channel"
-    shutil.copytree(video_config.theme.root, root)
-    theme = Theme(root, video_config.theme.spec, video_config.theme.skill)
-    config = replace(
-        video_config,
-        theme=theme,
-        production=replace(video_config.production, pictures="staged"),
-    )
-    media, blender = FakeMediaProvider(), FakeBlender(refuse=frozenset({"S6"}))
-
-    result, reviews = _run(config, media, renderer=blender)
-
-    package = result["final_package"]
-    assert package is not None and package.production is not None
-    keyframes = result["keyframes"]
-    staged = sorted(scene for scene, asset in keyframes.items() if asset.shot)
-    assert staged == ["S2", "S4"]
-    # Their pictures cost nothing: only the four drawn scenes asked the image model.
-    assert media.calls.count("image") == 4
-    # Stills to judge, then a draft for the animatic, then the final shot for the cut.
-    qualities = [(job.shot_id, job.quality) for job in blender.jobs if isinstance(job, Job)]
-    assert qualities.count(("S2", "final")) == 2 and ("S2", "draft") in qualities
-    # The morphs into and out of a staged scene start and end on its shot's own frames.
-    morph_into = next(t for t in result["segments"].values() if t.scene_id == "S1")
-    assert morph_into.rendered
-    # Its shot starts with the morph into it; its own picture holds from a later frame.
-    assert int(Path(keyframes["S2"].first_frame).stem) > 1
-    info = ffmpeg.probe(Path(package.production.video_path))
-    assert info.duration == pytest.approx(package.production.scenes[-1].end, abs=0.2)
-    assert [review.stage for review in reviews] == ["storyboard", "final_cut"]
-    assert staged_scene(package.visual_plan.scenes[5]) is None
-    assert sorted(most_wanted(root)) == [
-        ("its 3d shot was not rendered (frame 1: desk and safe pass into each other)", 1),
-        ("layout: a reading room", 1),
-    ]
-
-
-@pytest.mark.video
-def test_an_animated_channel_moves_each_drawn_keyframe_as_itself(
-    video_config: ContentConfig, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """Each keyframe is drawn and judged as before, then lifted into depth and moved in
-    Blender as itself (docs/picture-shots.md): nothing is paid for twice, and the cut plays
-    every scene's shot in full. The lifting is stood in for."""
-    assert video_config.production is not None
-    root = tmp_path / "channel"
-    shutil.copytree(video_config.theme.root, root)
-    config = replace(
-        video_config,
-        theme=Theme(root, video_config.theme.spec, video_config.theme.skill),
-        production=replace(video_config.production, pictures="animated"),
-    )
+@pytest.fixture
+def lifting(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Lifting a picture into depth, stood in for: a set with a camera mark."""
 
     def lifted(library: Library, picture: Path, *, make: bool) -> Model:
         model = Model(
@@ -136,6 +80,69 @@ def test_an_animated_channel_moves_each_drawn_keyframe_as_itself(
         return model
 
     monkeypatch.setattr(content.staging.plan, "lifted", lifted)
+
+
+@pytest.mark.video
+@pytest.mark.usefixtures("lifting")
+def test_a_staged_channel_renders_the_scenes_it_can_stage_and_draws_the_rest(
+    video_config: ContentConfig, tmp_path: Path
+) -> None:
+    """S2, S4 and S6 are staged: each is laid out in 3D and its picture drawn over that layout
+    (docs/3d-reuse.md); S6's layout fails its checks in Blender, so it is drawn from words.
+    Every picture then moves as a picture shot."""
+    assert video_config.production is not None
+    # A copy of the channel: what it could not stage is noted in its folder.
+    root = tmp_path / "channel"
+    shutil.copytree(video_config.theme.root, root)
+    theme = Theme(root, video_config.theme.spec, video_config.theme.skill)
+    config = replace(
+        video_config,
+        theme=theme,
+        production=replace(video_config.production, pictures="staged"),
+    )
+    media, blender = FakeMediaProvider(), FakeBlender(refuse=frozenset({"S6-layout"}))
+
+    result, reviews = _run(config, media, renderer=blender)
+
+    package = result["final_package"]
+    assert package is not None and package.production is not None
+    keyframes = result["keyframes"]
+    assert sorted(scene for scene, asset in keyframes.items() if asset.guide) == ["S2", "S4"]
+    # Every picture is drawn once, a staged one over its layout's single still in the guide
+    # look; the raw 3D render is never a picture.
+    assert media.calls.count("image") == len(keyframes)
+    guides = [job for job in blender.jobs if isinstance(job, Job) and job.look.block == "guide"]
+    assert {job.shot_id for job in guides} == {"S2-layout", "S4-layout", "S6-layout"}
+    assert {(job.quality, job.frames) for job in guides} == {("still", (1,))}
+    # Then every picture moves, as itself.
+    assert all(Job.loads(asset.shot).look.block == "painted" for asset in keyframes.values())
+    info = ffmpeg.probe(Path(package.production.video_path))
+    assert info.duration == pytest.approx(package.production.scenes[-1].end, abs=0.2)
+    assert [review.stage for review in reviews] == ["storyboard", "final_cut"]
+    assert staged_scene(package.visual_plan.scenes[5]) is None
+    assert sorted(most_wanted(root)) == [
+        ("its 3d layout was not rendered (frame 1: desk and safe pass into each other)", 1),
+        ("layout: a reading room", 1),
+    ]
+
+
+@pytest.mark.video
+@pytest.mark.usefixtures("lifting")
+def test_an_animated_channel_moves_each_drawn_keyframe_as_itself(
+    video_config: ContentConfig, tmp_path: Path
+) -> None:
+    """Each keyframe is drawn and judged as before, then lifted into depth and moved in
+    Blender as itself (docs/picture-shots.md): nothing is paid for twice, and the cut plays
+    every scene's shot in full. The lifting is stood in for."""
+    assert video_config.production is not None
+    root = tmp_path / "channel"
+    shutil.copytree(video_config.theme.root, root)
+    config = replace(
+        video_config,
+        theme=Theme(root, video_config.theme.spec, video_config.theme.skill),
+        production=replace(video_config.production, pictures="animated"),
+    )
+
     media, blender = FakeMediaProvider(), FakeBlender()
 
     result, _ = _run(config, media, renderer=blender)
@@ -171,6 +178,7 @@ def test_rendered_joins_replace_every_paid_morph(video_config: ContentConfig) ->
 
 
 @pytest.mark.video
+@pytest.mark.usefixtures("lifting")
 def test_a_fully_rendered_run_keeps_staged_shots_moving_through_their_joins(
     video_config: ContentConfig, tmp_path: Path
 ) -> None:
@@ -189,10 +197,9 @@ def test_a_fully_rendered_run_keeps_staged_shots_moving_through_their_joins(
     assert result["final_package"] is not None
     assert "video" not in media.calls
     joins = {job.join_id: job for job in blender.jobs if isinstance(job, Join)}
-    # S2 is staged: the join into it arrives on its moving shot, the join out leaves from it.
-    assert joins["S1"].last_frames and joins["S1"].last_from == 1
-    assert joins["S2"].first_frames and joins["S2"].first_from > 1
-    assert not joins["S2"].last_frames  # S3 is drawn
+    # Every picture moves: each join leaves one moving shot and arrives on the next.
+    assert all(join.first_frames and join.last_frames for join in joins.values())
+    assert joins["S1"].last_from == 1 and joins["S2"].first_from > 1
 
 
 @pytest.mark.video
@@ -531,11 +538,12 @@ def test_failed_keyframe_is_rerendered_before_the_storyboard(
 
 
 @pytest.mark.video
-def test_a_3d_shot_with_something_physically_wrong_is_composed_again(
+def test_a_layout_drawn_with_something_physically_wrong_is_composed_again(
     video_config: ContentConfig, tmp_path: Path
 ) -> None:
-    """A shot's still is looked at for what is physically wrong (a hand short of its
-    glass); one that fails is composed afresh, not only regraded, and the cut keeps it."""
+    """A picture drawn over a staged layout is looked at for what is physically wrong (a
+    hand short of its glass); one that fails has its layout composed afresh and is drawn
+    again over the new one."""
     assert video_config.production is not None
     # A copy of the channel: what it could not stage is noted in its folder.
     root = tmp_path / "channel"
@@ -548,23 +556,23 @@ def test_a_3d_shot_with_something_physically_wrong_is_composed_again(
     scenes = 6
     spent: list[bool] = []
 
-    def every_still_unclean_once(question_id: str, state: Mapping[str, Any]) -> dict[str, Any]:
+    def every_picture_unclean_once(question_id: str, state: Mapping[str, Any]) -> dict[str, Any]:
         if question_id == "keyframe_clean" and len(spent) < scenes:
             spent.append(True)
             return {"kind": "noul", "noul": 0.02}
         return demo_answer(question_id, state)
 
     media, blender = FakeMediaProvider(), FakeBlender()
-    decisions = FakeDecisionProvider(every_still_unclean_once)
+    decisions = FakeDecisionProvider(every_picture_unclean_once)
     result, _ = _run(config, media, renderer=blender, decisions=decisions)
 
-    stills = [job for job in blender.jobs if isinstance(job, Job) and job.quality == "final"]
-    for shot_id in ("S2", "S4"):
-        first, again = (job for job in stills if job.shot_id == shot_id and job.frames)
+    guides = [job for job in blender.jobs if isinstance(job, Job) and job.look.block == "guide"]
+    for scene in ("S2", "S4"):
+        first, again = (job for job in guides if job.shot_id == f"{scene}-layout")
         assert again.seed == first.seed + 1
-        assert Job.loads(result["keyframes"][shot_id].shot).seed == again.seed
+        assert Job.loads(result["keyframes"][scene].guide).seed == again.seed
         # S2's room of things falls out differently; S4's one card stands where it stood.
-        assert (again.actors != first.actors) == (shot_id == "S2")
+        assert (again.actors != first.actors) == (scene == "S2")
 
 
 @pytest.mark.video

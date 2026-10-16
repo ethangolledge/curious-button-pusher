@@ -1,9 +1,32 @@
 # 3D That Is Cheap, Reused and Good: the Plan
 
 Last reviewed: 2026-10-16. Status: being built. Done: the SAM 3D cloud job
-([../cloud/sam3d/README.md](../cloud/sam3d/README.md), not yet run on a GPU) and
-[designs](#designs), with their free checks and their 3D models in one GPU batch. Next: the
-first GPU run, then 3D models in shots.
+([../cloud/sam3d/README.md](../cloud/sam3d/README.md), not yet run on a GPU);
+[designs](#designs), kept as catalogue models, with their free checks and their 3D models in
+one GPU batch; and [drawing over a layout](#drawing-over-a-layout), in every staged run. Next:
+one compiler for every shot and the ladder chosen by code; then the first GPU run.
+
+## Drawing over a layout
+
+*Built.* The decision the rest stands on: **3D is the structure, the image model is the
+look.** A staged scene ([staging.md](staging.md)) is composed in Blender as before, then
+rendered once, from where its camera starts, in the `guide` look (`blender/blocks/looks/guide.py`:
+grey clay, a shade per kind of surface, ink outlines, soft light; free). The image model draws
+the keyframe over it: the guide is the first image, told by the theme's `visual.repaint_note`
+to keep its camera, framing and placing and never its grey 3D look, with the scene's designs
+and photos after it. The picture is judged like any keyframe, and also looked at for what is
+physically wrong; a layout that fails its checks, or a picture with something physically
+wrong, is composed again with the next seed; a layout that never builds is drawn from words.
+Then the picture moves as a [picture shot](picture-shots.md).
+
+Why: a raw 3D render was turned down twice (code-built people and props; stock models under a
+projected picture), and image models repaint a layout faithfully. Tested on a real scene from
+an angle its keyframe never showed: boxes round the man, the desk and the lamp overlapped the
+layout's by 0.84 to 1.0 in all three pictures, in the channel's look and the keyframe's
+likeness, for 4.8 cents each. Because the layout fixes where everything is, a room and its
+people stay the same from scene to scene; a mesh's flaws stop mattering, since only its shape
+and place are used. This is the gray-box-then-reskin pattern of AI previsualisation tools, and
+of rendering depth from 3D to guide diffusion (Generative Rendering, arXiv 2312.01409).
 
 How the channel should use Blender and the SAM 3D models so that each thing is made once,
 reused wherever it recurs, checked cheaply before money is spent, and still looks as good as

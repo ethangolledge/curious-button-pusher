@@ -21,13 +21,11 @@ from content.blender.job import ActorCall, BlockCall, ModelFile
 from content.blender.maths import FRONT, UP, Vec, axis_angle, degrees_round
 from content.blender.registry import Registry, RegistryError
 from content.blender.rehearsal import RehearsalStage
-from content.blender.sets import resting_on
+from content.blender.sets import SEAT_REACH, resting_on
 from content.schemas.staging import Action, Setting, StagePlan, Thing
 
 # Room to leave between things that stand side by side, and round a thing's edge.
 GAP = 0.08
-# Where a chair's centre stands from the edge of the table it is drawn up to.
-CHAIR_REACH = 0.3
 # How far beyond a thing's front something set before it may go to land on a table.
 REACH = 0.6
 # Random spots tried for each copy before settling for the best one found.
@@ -431,7 +429,7 @@ class Composer:
             if seat is not None:
                 return seat.at + lift, degrees_round(seat.facing), seat.name
         depth = max(resolved.size.x, resolved.size.y)
-        margin = CHAIR_REACH if seated else depth / 2 + 0.25
+        margin = SEAT_REACH if seated else depth / 2 + 0.25
         point, facing = _round_edge(anchor, margin, (index + 0.5) / count)
         heading = degrees_round(facing)
         if seated:

@@ -43,6 +43,8 @@ ROLES: dict[str, tuple[float, float, float]] = {
     "hair": (0.7, 0.0, 0.0),
 }
 ENGINE = "BLENDER_EEVEE"
+# Light passes through glass and out of bulbs: neither is outlined, nor casts a shadow.
+SEE_THROUGH = frozenset({"glass", "bulb"})
 
 
 @dataclass(frozen=True)
@@ -50,6 +52,7 @@ class Settings:
     exposure: Annotated[float, Range(-4, 4, "stops brighter or darker")] = 0.0
     sky: Annotated[str, About("the world's colour, hex")] = "#3a4452"
     ambience: Annotated[float, Range(0, 3, "how much the world lights the scene")] = 0.6
+    ink: Annotated[float, Range(0, 0.03, "an ink outline's width round every solid, metres")] = 0.0
 
 
 class Plain(Look):
@@ -76,6 +79,10 @@ class Plain(Look):
     def tone(self) -> tuple[str, float]:
         """The tone curve's look ("None" or an AgX look) and the exposure in stops."""
         return "None", self.values.exposure
+
+    def ink(self) -> tuple[float, float, float]:
+        """The outline's colour, in linear light."""
+        return linear("#111111")
 
     def material(self, role: str) -> Any:
         if role not in self._made:
@@ -104,6 +111,47 @@ class Plain(Look):
             shader.inputs["Roughness"].default_value = 0.8
             self._made[path] = material
         return self._made[path]
+
+    def dress(self, obj: Any) -> None:
+        """An ink outline, when the look's `ink` is set: a shell a little larger than the
+        solid, seen only from inside (the inverted hull, as cel-shaded films draw lines)."""
+        # A look built on this one may bring settings with no outline at all.
+        width = getattr(self.values, "ink", 0.0)
+        if width <= 0:
+            return
+        roles = {slot.material.name.split(".")[0] for slot in obj.material_slots if slot.material}
+        if roles & SEE_THROUGH:
+            obj.visible_shadow = False
+            return
+        if "outline" not in self._made:
+            self._made["outline"] = self._outline()
+        obj.data.materials.append(self._made["outline"])
+        shell = obj.modifiers.new("ink", "SOLIDIFY")
+        shell.thickness = -width
+        shell.offset = 1.0
+        shell.use_flip_normals = True
+        shell.use_rim = False
+        shell.material_offset = len(obj.data.materials) - 1
+
+    def _outline(self) -> Any:
+        """Ink, seen only from inside the shell (its back faces are culled), and invisible to
+        light: a shell that cast shadows would shade the solid it outlines."""
+        material = bpy.data.materials.new("outline")
+        tree = material.node_tree
+        tree.nodes.clear()
+        ink = tree.nodes.new("ShaderNodeEmission")
+        ink.inputs["Color"].default_value = (*self.ink(), 1.0)
+        path = tree.nodes.new("ShaderNodeLightPath")
+        clear = tree.nodes.new("ShaderNodeBsdfTransparent")
+        choose = tree.nodes.new("ShaderNodeMixShader")
+        output = tree.nodes.new("ShaderNodeOutputMaterial")
+        tree.links.new(path.outputs["Is Shadow Ray"], choose.inputs["Fac"])
+        tree.links.new(ink.outputs[0], choose.inputs[1])
+        tree.links.new(clear.outputs[0], choose.inputs[2])
+        tree.links.new(choose.outputs[0], output.inputs["Surface"])
+        material.use_backface_culling = True
+        material.use_transparent_shadow = True
+        return material
 
     def world(self, scene: Any) -> None:
         colour, strength = self.sky()

@@ -128,8 +128,11 @@ class RenderedAsset(ImmutableModel):
     silhouette: bool = False
     # Keyframes only: measured colour against the scene's target.
     colour: ColourCheck | None = None
-    # A staged scene: its 3D shot (the render job, as JSON), whose middle frame is `path`;
-    # and its first and last frames, which the morphs into and out of it start and end on.
+    # A staged scene: the 3D layout its picture was drawn over (the guide's render job, as
+    # JSON; `docs/3d-reuse.md`).
+    guide: str = ""
+    # A moving picture: its shot (the render job, as JSON); and its first and last frames,
+    # which the morphs into and out of it start and end on.
     shot: str = ""
     first_frame: str = ""
     last_frame: str = ""

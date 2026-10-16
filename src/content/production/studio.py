@@ -68,7 +68,7 @@ DRAFT_FPS = 12
 # What the vision model is told when it describes rendered frames for Jev.
 PERCEPTION_PROMPT = Path(__file__).with_name("perception_prompt.md")
 # Added when the frames are 3D shots: what is physically wrong is what goes wrong there.
-SHOT_PERCEPTION = Path(__file__).with_name("shot_perception.md")
+LAYOUT_PERCEPTION = Path(__file__).with_name("layout_perception.md")
 
 
 class NarrationTask(TypedDict):
@@ -105,8 +105,9 @@ class RenderTask(TypedDict):
     # Keyframes only: the field's (pleasure, arousal), which sets its colour targets.
     field_point: tuple[float, float] | None
     expected_shift: str | None
-    # A staged scene's keyframe: the render job (JSON) instead of a prompt to an image model.
-    shot: str | None
+    # A staged scene's keyframe: its 3D layout's guide (the render job, JSON), which the image
+    # model draws over (`docs/3d-reuse.md`).
+    guide: str | None
     # A rendered join: the transition job (JSON) instead of a prompt to the video model.
     join: str | None
     # A keyframe to animate once drawn and passed (`production.pictures` "animated"): its
@@ -164,14 +165,14 @@ class Studio:
         self.find_model = find_model
 
     def perceive(
-        self, images: Sequence[Path], *, shot: bool = False
+        self, images: Sequence[Path], *, layout: bool = False
     ) -> tuple[list[Observation], list[CallRecord]]:
-        """Describe rendered frames (cached by their content) so Jev can judge them; a 3D
-        shot's (`shot`) also for what is physically wrong in it."""
+        """Describe pictures (cached by their content) so Jev can judge them; one drawn over a
+        3D layout (`layout`) also for what is physically wrong in it."""
         model = self.config.vision_model
         instructions = self.perception_instructions
-        if shot:
-            instructions = f"{instructions}\n\n{load_prompt(SHOT_PERCEPTION)}"
+        if layout:
+            instructions = f"{instructions}\n\n{load_prompt(LAYOUT_PERCEPTION)}"
 
         def describe() -> tuple[bytes, Usage]:
             observations, usage = self.media.perceive(
@@ -184,7 +185,7 @@ class Studio:
             {
                 "model": model,
                 "images": [file_digest(path) for path in images],
-                **({"shot": True} if shot else {}),
+                **({"layout": True} if layout else {}),
             },
             ".json",
             "perception",
@@ -584,8 +585,9 @@ class Studio:
     def pricing(self) -> Pricing:
         return Pricing(
             cap=self.config.max_usd,
-            # A staged scene's picture, and a rendered join, are rendered, not bought.
-            image_usd=0.0 if self.staging() else self.config.image_usd,
+            # Every picture is drawn (a staged scene's over its 3D layout); a rendered join is
+            # rendered, not bought.
+            image_usd=self.config.image_usd,
             video_usd_per_second=0.0 if self.rendered_joins() else self.config.video_usd_per_second,
             morph_seconds=self.config.transition_seconds,
         )

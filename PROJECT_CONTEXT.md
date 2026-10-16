@@ -67,8 +67,11 @@ with a change). `AGENTS.md` says which applies when a session starts.
   families made from its words, people made from one parametric body, objects made by
   Infinigen or found in free collections and scored by eye on this computer), keeps it in a
   catalogue with its lineage, places every copy clear of everything, and renders it through the
-  foundation (`content/blender/stage.py`, the only shot code that touches Blender). Nothing in
-  3D costs money; what nothing can stage falls back to a keyframe and goes in the backlog. A
+  foundation (`content/blender/stage.py`, the only shot code that touches Blender). **3D is the
+  structure, never the look** (2026-10-16): a staged scene is rendered once as a grey guide
+  (`looks/guide.py`) and the image model draws its keyframe over it, with the channel's designs;
+  a raw 3D render is never shown (rejected twice). The guide is free; the picture costs what
+  any keyframe does. What nothing can stage is drawn from words and goes in the backlog. A
   missing ability is built as a block by people and the assistant. A channel's look and models
   are its own, in its private folder ([docs/staging.md](docs/staging.md)).
 - **One paid GPU service, kept apart: SAM 3D** (Meta's SAM 3D Objects and SAM 3D Body). The
@@ -94,10 +97,11 @@ with a change). `AGENTS.md` says which applies when a session starts.
   people made with MakeHuman, Infinigen, an Objaverse index, Sketchfab, Poly Pizza, Gazebo
   Fuel, the Smithsonian; CLIP scoring, automatic taking with keep/veto); people posed by
   inverse kinematics to touch what they use, varied across a group, holding what is `held_by`
-  them; each staged still looked at by the vision model for physical mistakes and composed
-  again once if it fails (about 1p); 41 blocks, 35 props;
-  `production.pictures: "staged"` and `production.joins: "rendered"` make a video one moving
-  picture ([docs/staging.md](docs/staging.md)); `"animated"` moves each keyframe itself
+  them; 42 blocks (the `guide` look among them), 35 props. `production.pictures: "staged"`
+  draws each staged scene's keyframe over its 3D layout (proved 2026-10-16 on a Kushner scene
+  from a new angle: the layout held, boxes overlapping 0.84–1.0, in the channel's look and the
+  keyframe's likeness, 14 cents for three) and its vision check looks for physical mistakes;
+  then every keyframe moves; `"animated"` moves each keyframe itself
   ([docs/picture-shots.md](docs/picture-shots.md)). Not yet: motion capture, likenesses on made
   people, cloud rendering.
 - Designs (2026-10-16): a person, place or object in two or more scenes is drawn once in the

@@ -253,6 +253,8 @@ class VisualSpec(ImmutableModel):
     field: FieldSpec
     # Added to a keyframe prompt when real reference images are attached.
     reference_note: str
+    # Put before a keyframe prompt drawn over a staged scene's 3D layout (the first image).
+    repaint_note: str
     keyframe_template: str
     # A recurring person, place or object drawn once, alone, as the channel's own reference
     # for it ({view}, {query}, {style}, {texture}, {lighting}, {avoid}); `design_views` says

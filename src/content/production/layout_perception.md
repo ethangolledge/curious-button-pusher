@@ -1,6 +1,6 @@
-# These frames are 3D shots
+# These pictures are drawn over a staged 3D layout
 
-The frames are rendered from a staged 3D scene, so faces and hands are simple by design: do not report them as deformed. Report instead, in `artefacts`, anything physically wrong:
+The picture was drawn over a 3D layout of the scene, so where things stand and how people are posed come from that layout. Report, in `artefacts`, anything physically wrong:
 
 - a hand near something it seems to hold or use, but not touching it;
 - a thing floating above the surface it should rest on, or sunk into it;

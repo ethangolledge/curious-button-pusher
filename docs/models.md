@@ -155,8 +155,8 @@ Detailed in [narration.md](narration.md). In short:
 
 - Describes each keyframe, sampled morph frames, and reference photos as structured
   `Observation`s (subject, setting, composition, rendering style, colours, text, artefacts,
-  framing, focus). Jev judges these descriptions. For a 3D shot it is also given
-  `production/shot_perception.md`, and reports physical mistakes (a hand not touching what it
+  framing, focus). Jev judges these descriptions. For a keyframe drawn over a staged scene's
+  3D layout it is also given `production/layout_perception.md`, and reports physical mistakes (a hand not touching what it
   holds, things floating or passing through each other) as artefacts.
 - Cheap and fast. Its descriptions are the weak link in visual judging: Jev can only be as right
   as the description.

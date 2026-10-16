@@ -1,14 +1,18 @@
 # 3D Shots (Staging)
 
-Last reviewed: 2026-10-12
+Last reviewed: 2026-10-16
 
-Besides keyframes, a scene's pictures can be a 3D shot built and rendered in Blender. The
-Visual Director **describes** what is in the shot (the room, the things in it and where they
-go, what happens, the camera); a pipeline finds or makes every thing, fits it to the scene,
-places it, and renders it in the channel's look. It is free to render (render time, not
-money), repeatable, and everything found or made is kept for every later video. A channel
-chooses it with `production.pictures: "staged"` in its `config.json` (the starter stays on
-`keyframes`); scenes the toolkit cannot show are drawn as keyframes, as before.
+A scene can be laid out in 3D in Blender. The Visual Director **describes** what is in the
+shot (the room, the things in it and where they go, what happens, the camera); a pipeline
+finds or makes every thing, fits it to the scene, places it, and renders it. The render is
+the scene's **structure, never its look**: rendered in the `guide` look (grey clay, inked
+outlines, soft light), it is the first image the image model draws the keyframe over, with the
+channel's designs, so places, people and the camera hold together from scene to scene while
+the picture keeps the channel's look ([3d-reuse.md](3d-reuse.md)). A raw 3D render is never
+shown: it was turned down twice. The layout is free and repeatable, and everything found or
+made is kept for every later video. A channel chooses it with `production.pictures: "staged"`
+in its `config.json` (the starter stays on `keyframes`); scenes the toolkit cannot show are
+drawn from words, as before.
 
 ## From a description to a shot
 
@@ -45,11 +49,12 @@ and goes in the channel's backlog.
 | storyboard | anchor, focus, camera, motion, bridge | the same, plus `staging`: the description (`agents/visual_director/staging_prompt.md`); or `missing`, saying what the toolkit lacks |
 | storyboard gate | structure | also the free check: the room, the blocks and their settings, every relation's target, and the shot composed (`staging.plan.staging_issues`). A thing the library lacks is not a problem yet when the run can find models: it is looked for before rendering. A shot that still fails after the Visual Director's revisions is drawn instead |
 | before rendering | — | what the staged scenes lack is found or made, and taken automatically (`Keyframes._prepare_models`); each model taken without a person is named in the run's warnings for review |
-| keyframe | drawn by the image model | the shot's first, middle and last frames rendered; then the same measures and judging: brightness and colour against the feeling, the vision model's description, Jev. The vision model is also told the frame is a 3D shot (`production/shot_perception.md`), so it reports what is physically wrong (a hand short of its glass, a thing floating or passing through another, a person sat in the furniture) as an artefact, and `keyframe_clean` fails on it: the shot is then composed again with the next seed, not only regraded (about 1p a look). Too dark or cool: rendered again with a corrected grade. A shot that cannot be built (it fails the audit) or that Jev finds does not show its scene is drawn instead, at once, its reason in the scene's `missing` and the backlog |
-| the feeling | colour words in the prompt, the ripples' tint | a grade on the render (`job.Grade`: exposure, and warmth by white balance), and the same ripples' tint |
-| Pictures sign-off | the animatic moves the stills | the animatic plays a quick draft of the shot |
+| keyframe | drawn by the image model | the layout rendered once, from where its camera starts, in the `guide` look (`<scene>-layout`, free; `Keyframes._guide`); the image model draws the keyframe over it, told by the theme's `visual.repaint_note` to keep its camera, framing and placing and never its grey 3D look, with the scene's designs and photos after it. Then the same measures and judging as any keyframe. The vision model is also told the picture was drawn over a layout (`production/layout_perception.md`), so it reports what is physically wrong (a hand short of its glass, a thing floating or passing through another, a person sat in the furniture) as an artefact, and `keyframe_clean` fails on it: the scene is then composed again with the next seed and drawn again. A layout that cannot be built (it fails the audit) is drawn from words instead, at once, its reason in the scene's `missing` and the backlog |
+| the feeling | colour words in the prompt, the ripples' tint | the same: it is a drawn keyframe |
+| moving | ffmpeg, breathing (or a picture shot with `"animated"`) | a picture shot, like every keyframe of a staged channel ([picture-shots.md](picture-shots.md)) |
+| Pictures sign-off | the animatic moves the stills | the same |
 | morphs | from keyframe to keyframe | AI morphs (`production.joins: "ai"`) or rendered joins (`"rendered"`) that play over both shots' moving frames |
-| the cut | the still, moved by ffmpeg, breathing | the shot rendered over its window (from the start of the morph into it to the end of the morph out), with the same breathing ripples and tint (`assemble.shot_clip`) |
+| the cut | the still, moved by ffmpeg, breathing | the picture shot rendered over its window (from the start of the morph into it to the end of the morph out), with the same breathing ripples and tint (`assemble.shot_clip`) |
 | credits | — | the makers of CC BY models used are listed with the finished video, for its description |
 
 ## The scene, as the Visual Director describes it
@@ -153,8 +158,13 @@ body (`blender/person.py`): shaped by sex, age and build, made the height asked,
 (suit, casual, work, uniform) with shoes and hair, and posed by code so the pose fits any body
 (standing, seated at a table, mid-stride). What their hands do (`ACTIVITIES` in
 `person.py`) is reached for, not set joint by joint: each hand is given a point (on the table,
-by the hips, at the chest) and inverse kinematics bends the arm to it, an elbow target keeping
-it natural, then the fingers close by how much the grip needs (flat, rest, hold, point). A
+measured from its near edge; by the hips; at the chest) and inverse kinematics bends the arm to
+it, an elbow target keeping it natural; a hand on a table is laid along it (the wrist bent, the
+palm on the top), then the fingers close by how much the grip needs (flat, rest, hold, point).
+A seated person's legs are fitted to the engine's chair the same way: bent until the feet
+reach the floor once they sit on it, so the knees stay clear under a desk. Every seat stands
+`sets.SEAT_REACH` (0.36 m) from the table edge it faces, in every layout and every chair the
+composer draws up. A
 person holding something reports where it sits in their hand (`holds`), so the composer puts
 the glass there. Still people are baked to plain meshes; moving ones
 keep their skeleton and a looping motion written in code for every body alike (breathing,
