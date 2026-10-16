@@ -116,9 +116,9 @@ with a change). `AGENTS.md` says which applies when a session starts.
 
 ## Next Work
 
-1. The 3D plan ([docs/3d-reuse.md](docs/3d-reuse.md)): the first SAM 3D GPU run, then reuse
-   (cast, props, sets made once from reference pictures), the shot ladder, and cheap checks
-   (code, then Jev) before the GPU. The channel's own look.
+1. 3D ([docs/3d-reuse.md](docs/3d-reuse.md#still-to-come)): the first staged run with the
+   director (layouts drawn over); the first SAM 3D GPU run (needs the director's cloud steps),
+   then SAM 3D models as layout stand-ins; action shots on a Wan control job of our own.
 2. Measure `eval`'s false alarms once a channel has a `positive.json`.
 3. Tune thresholds and the critic from recorded judgements.
 4. The code improvements listed in [docs/codebase.md](docs/codebase.md#where-to-optimise).

@@ -1,37 +1,10 @@
-# 3D That Is Cheap, Reused and Good: the Plan
+# 3D That Comes Together: Layouts, Designs and Moving Pictures
 
-Last reviewed: 2026-10-16. Status: being built. Done: the SAM 3D cloud job
-([../cloud/sam3d/README.md](../cloud/sam3d/README.md), not yet run on a GPU);
-[designs](#designs), kept as catalogue models, with their free checks and their 3D models in
-one GPU batch; and [drawing over a layout](#drawing-over-a-layout), in every staged run. Next:
-one compiler for every shot and the ladder chosen by code; then the first GPU run.
-
-## Drawing over a layout
-
-*Built.* The decision the rest stands on: **3D is the structure, the image model is the
-look.** A staged scene ([staging.md](staging.md)) is composed in Blender as before, then
-rendered once, from where its camera starts, in the `guide` look (`blender/blocks/looks/guide.py`:
-grey clay, a shade per kind of surface, ink outlines, soft light; free). The image model draws
-the keyframe over it: the guide is the first image, told by the theme's `visual.repaint_note`
-to keep its camera, framing and placing and never its grey 3D look, with the scene's designs
-and photos after it. The picture is judged like any keyframe, and also looked at for what is
-physically wrong; a layout that fails its checks, or a picture with something physically
-wrong, is composed again with the next seed; a layout that never builds is drawn from words.
-Then the picture moves as a [picture shot](picture-shots.md).
-
-Why: a raw 3D render was turned down twice (code-built people and props; stock models under a
-projected picture), and image models repaint a layout faithfully. Tested on a real scene from
-an angle its keyframe never showed: boxes round the man, the desk and the lamp overlapped the
-layout's by 0.84 to 1.0 in all three pictures, in the channel's look and the keyframe's
-likeness, for 4.8 cents each. Because the layout fixes where everything is, a room and its
-people stay the same from scene to scene; a mesh's flaws stop mattering, since only its shape
-and place are used. This is the gray-box-then-reskin pattern of AI previsualisation tools, and
-of rendering depth from 3D to guide diffusion (Generative Rendering, arXiv 2312.01409).
-
-How the channel should use Blender and the SAM 3D models so that each thing is made once,
-reused wherever it recurs, checked cheaply before money is spent, and still looks as good as
-the keyframes. Being cheap must never mean paying twice: a poor result that has to be redone,
-or a review wasted on it, costs more than doing it right once.
+Last reviewed: 2026-10-16. How a channel uses Blender, its catalogue and the image and video
+models so that a story's places and people stay the same from scene to scene, everything is
+made once and reused, money is spent only where it shows, and every frame looks as good as the
+keyframes. Built: [drawing over a layout](#drawing-over-a-layout), [designs](#designs),
+backdrops, the SAM 3D cloud job (not yet run on a GPU). Still to come: [below](#still-to-come).
 
 ## What we learned
 
@@ -40,25 +13,62 @@ or a review wasted on it, costs more than doing it right once.
 | code-built grey scenes and people (2026-10-11) | "looks like a 3 year old made it" | none of the keyframe's look or character |
 | stock library models placed by a survey, the keyframe projected onto them (2026-10-12) | "horrendous", "a blob lizard" | a stock model never has the drawn shape, so the picture smears across it |
 | flat cut-outs from the picture | "not much of an improvement" | no depth to the things themselves |
-| the keyframe lifted into depth and moved (picture shots) | the current way | frame one *is* the picture |
+| the keyframe lifted into depth and moved (picture shots) | kept: how every picture moves | frame one *is* the picture |
+| a 3D layout drawn over by the image model (2026-10-16) | the way 3D is used | the layout holds (box overlap 0.84–1.0), the look and likeness are the drawing's |
 
-**The rule that follows:** whatever the viewer sees must be either the picture itself, or made
-from the same source the picture was made from. Reuse the *identity* of a thing (what it looks
-like), never someone else's pixels or a stock shape.
+**The rule that follows:** whatever the viewer sees is a drawing by the image model, made from
+the channel's own references. 3D decides where things are, never how they look. Reuse the
+*identity* of a thing (its design) and the *geography* of a place (its layout), never someone
+else's pixels or a stock shape on screen.
 
-## The idea in one paragraph
+## Drawing over a layout
 
-Each thing that recurs in a story (a person, an object, a place) is designed once: a reference
-picture, approved by the director. Every keyframe it appears in is drawn *with that reference*
-(the keyframe step already passes reference pictures to the image model). When a shot needs it
-in real 3D, its model is made once, from the same reference, with SAM 3D, and kept in the
-channel's catalogue. Because the pictures and the model come from one source, they agree, and
-putting one with the other works. Everything that does not need 3D stays a lifted picture,
-which is free.
+*Built.* **3D is the structure, the image model is the look.** A staged scene
+([staging.md](staging.md)) is described by the Visual Director as data (`StagePlan`: the room,
+the things and where they go, people and their poses, lights, the camera); code composes it
+from the catalogue's blocks and models, clear of everything; and Blender renders it once, from
+where its camera starts, in the `guide` look (`blender/blocks/looks/guide.py`: grey clay, a
+shade per kind of surface, ink outlines, soft light; free). The image model draws the keyframe
+over it: the guide first, told by the theme's `visual.repaint_note` to keep its camera, framing
+and placing and never its grey 3D look, then the scene's designs and photos. The picture is
+judged like any keyframe and also looked at for what is physically wrong; a layout that fails
+its checks, or a picture with something physically wrong, is composed again with the next seed;
+a layout that never builds is drawn from words. Then the picture moves as a
+[picture shot](picture-shots.md).
+
+```
+storyboard scene ── StagePlan (the Visual Director writes data, never Blender code)
+      │  free check: blocks, settings, names, the shot composed (staging.plan.staging_issues)
+      ▼
+compose (staging/compose.py): every thing from the catalogue (designs, the library, families,
+      made people, free sources), placed by its relation; backdrops beyond the space
+      ▼
+the guide (Keyframes._guide): one still in the guide look; the audit (overlaps, camera)
+      ▼
+the keyframe: the image model draws over the guide, with designs and photos (~5 cents)
+      │  measured (tone, colour), described (Gemini), judged (Jev), physically checked
+      ▼
+the picture shot: the keyframe lifted into depth, the camera glides, people breathe (free)
+      ▼
+joins (AI morphs or rendered transitions) and the cut, as for any scene
+```
+
+Why it works: a mesh's flaws stop mattering, since only its shape and place are used; plain
+blocks are enough (a 150 m tower behind a street of grey boxes came out as a lit glass tower
+over stone fronts, the layout kept); and because the layout fixes where everything is, the
+same room drawn from two cameras stays the same room. Tested on a real scene from an angle its
+keyframe never showed: boxes round the man, the desk and the lamp overlapped the layout's by
+0.84 to 1.0 in all three pictures, in the channel's look and the keyframe's likeness, for 4.8
+cents each.
+
+**Consistency, scene to scene.** Three things are shared: the *layout* (the Visual Director is
+asked to stage every scene in a recurring place with the same layout and things, changing only
+the camera and what moved), the *designs* (the same reference picture for a person or object in
+every picture), and the *theme* (the same style prompt and checks).
 
 ## Designs
 
-*Built.* The first piece of reuse, and the one everything else stands on.
+*Built.*
 
 **In a run, by itself.** When the reference photos are chosen (`production/stages/references.py`),
 every person, place or object the storyboard names in `design_min_scenes` scenes or more
@@ -96,115 +106,93 @@ SAM 3D Objects with its outline; each model comes back, is brought into the libr
 any model taken in, and becomes its design's file. Places stay
 pictures: they are lifted, not modelled.
 
-## The shot ladder: the cheapest shot that does the job
+## How a scene is made to move
 
-| Rung | Shot | Cost per scene | When |
-|---|---|---|---|
-| 0 | the keyframe, with a slow move | free | nothing needs depth |
-| 1 | **picture shot**: the keyframe lifted into depth, camera glides, people breathe ([picture-shots.md](picture-shots.md)) | free (laptop) | the default: push in, pull out, drift, a small arc |
-| 2 | picture shot **plus one or two SAM 3D things** in front of the lifted backdrop | about 3–15 cents of GPU, once | the camera goes round a foreground thing, or a thing must move or be picked up |
-| 3 | **a reused set**: a recurring place built once, filmed from many cameras | GPU once per place; later shots free | a place in three or more scenes |
-| 4 | action painted by a video model, guided by Blender's passes | $0.05–0.17 a second | someone must act (walk in, turn, hand over); the director signs off |
-
-Code chooses the rung from the storyboard, not a model: how far the camera goes against what a
-lifted picture can hold (`glide.AMOUNTS`), whether the scene's description has a thing moving
-or being handled, and how many scenes share a person, thing or place. It is deterministic,
-free, and the director can see why.
-
-## What is kept, and how it is reused
-
-Three kinds of thing, in the channel's own catalogue (`staging/catalogue.py`, with lineage:
-every model knows what it was made from):
-
-| Kind | Made once | Reused as |
+| Shot | Cost | Status |
 |---|---|---|
-| **cast** (a recurring person) | a reference sheet (front, side, back on a plain background), one image-model call, about 5–10 cents; a SAM 3D Body model only if a rung 2 or 4 shot needs it | a reference for every keyframe they appear in; their model in every 3D shot |
-| **prop** (a recurring object) | a reference picture; a SAM 3D Objects model when needed | the same |
-| **set** (a recurring place) | a wide reference picture, lifted; SAM 3D for its main furniture; saved as a named scene (a `StagePlan`: data, not a `.blend` file) | each later scene there: Blender renders the set from the new camera (free) as a *layout guide* for the image model, with the cast and prop references, so the new keyframe keeps the room's geography and the channel's look; that keyframe is then lifted (free) |
+| the keyframe moved by ffmpeg (`pictures: "keyframes"`) | free | built |
+| **picture shot**: the keyframe lifted into depth, the camera glides, people breathe | free (laptop) | built: every keyframe of an `animated` or `staged` channel |
+| picture shot plus one or two SAM 3D things before the lifted backdrop (the camera goes round a thing, a thing is picked up) | 3–15 cents of GPU, once per thing | to come: needs the first GPU run |
+| **action**: Blender plays the action on the layout's stand-ins and renders depth and pose; a control-video model (Wan 2.2, on our own Cloud Run GPU job, like SAM 3D) draws it from the keyframe | to measure; the director signs off each | to come |
 
-The set row is "3D for consistency, picture for look": the gray-box-then-reskin pattern AI
-previsualisation tools use (see *Research* below). The raw render is never shown; the image
-model repaints it.
-
-**Never pay twice**, extended: every SAM 3D result is cached under the hash of what made it
-(picture, mask, model revision, seed), like every other paid asset. A cast member made for one
-video costs nothing in the next: the catalogue belongs to the channel, not the run.
-
-**Is this the same thing we already have?** A local image embedding (free) finds the
-candidates in the catalogue; one cheap check (below) confirms; when unsure, the director
-decides. Nothing is reused on a guess.
+Which shot a scene gets will be chosen by code from the storyboard (how far the camera goes
+against what a lifted picture can hold, whether something is handled or someone acts) once
+there is more than one to choose from; it is not built before then.
 
 ## Checks: code first, Jev second, the director last
 
 **Jev reads text, not pictures.** Gemini Flash describes a picture (about half a cent), then
-Jev answers fixed questions about that description (a fraction of a cent each). One description
-answers many questions, so a picture's checks cost about a cent in all. Ask Jev only questions
-with a right answer; taste belongs to the director.
+Jev answers fixed questions about that description (a fraction of a cent each). Ask Jev only
+questions with a right answer; taste belongs to the director.
 
-| When | Code (free, exact) | Jev (cheap, objective questions) |
-|---|---|---|
-| **before the GPU** (is this worth sending?) | the mask's size; whether it touches the frame's edge; how much another mask covers it; whether it is one piece | "Is the [thing] shown whole, not cut off by the frame?" "Is it partly hidden behind something?" "Is there exactly one [thing]?" For a reference sheet: "Is it on a plain background?" "Are the front, side and back all shown?" |
-| **after the GPU** (is the model right?) | render the model from the picture's own camera and compare its outline with the mask (the strongest test: it must overlap closely); the mesh is one piece with no large holes; its size agrees with the picture's measured depth | on a four-view turntable render: "Is the object complete from every side?" "Is it the same kind of object as the reference?" "Are there floating fragments?" |
-| **reuse** | embedding similarity | "Is the [thing] in this picture the same one as in the reference?" |
-| **once per new cast member or prop** | | the director sees its turntable: taste is theirs |
+| When | Code (free, exact) | Jev and the vision model (cheap) | Status |
+|---|---|---|---|
+| a layout, before Blender | blocks, settings, names, the shot composed | | built |
+| a layout, in Blender | things passing through each other, the camera inside something | | built |
+| a picture drawn over a layout | tone and colour against the feeling | what is physically wrong; does it show the scene | built |
+| a design | | alone and whole as asked; the thing asked for | built |
+| before the GPU | the mask's size, the frame's edge, one piece | | built |
+| after the GPU | the model's outline from the design's camera against its mask; one piece, no large holes | a four-view turntable: complete, the same kind of thing, no fragments | to come, validated on known cases before it blocks |
 
-A gate costs under a cent, a wasted GPU run 3–15 cents, a wasted review the director's time;
-each check sits before the next more expensive step. New Jev questions are measured on known
-good and bad cases before they may block anything.
+## Still to come
 
-## Keeping the GPU off
+1. **First GPU run** (the director's steps in [the SAM 3D README](../cloud/sam3d/README.md)):
+   `content staging model --go` on one person and one object design; measure memory, time and
+   cost. About 25 cents.
+2. **SAM 3D models as stand-ins**: a design's mesh in the layout in place of a made person or
+   stock prop, so the guide carries its true shape; the after-GPU checks.
+3. **Action**: the Wan control job on Cloud Run (the SAM 3D job's pattern, its shared parts
+   moved into one provider), Blender's depth and pose passes, motion clips on one shared
+   skeleton (free sources only, licences checked), the director's sign-off per shot.
+4. **Places kept across videos**: a recurring place's layout saved in the catalogue, so a later
+   video's scene there starts from it.
+5. **The starter kit**: the guide look and `repaint_note` are already theme data; anything new
+   follows them.
 
-- **One job per video, not per scene.** After the storyboard is signed off, every rung 2 and 3
-  thing in the whole video is gated and sent together: one cold start (about a minute).
-- **Never twice:** the hash cache, and the catalogue across videos.
-- **Only what moves goes 3D.** The backdrop stays the lifted picture.
-- **Previews on the laptop**, at low resolution and few samples; the final render once, after
-  sign-off.
+## What it costs (measured 2026-10-16)
 
-## Where each piece lives (the layers already enforced)
-
-| Part | Job | Change |
-|---|---|---|
-| `providers/sam3d.py` | the GPU job | built; another generator (TRELLIS.2, Hunyuan3D, MIDI-3D) would be another model behind the same request format |
-| `staging/resolve.py` | finding or making each thing | a new first source, "made from its reference", and stock sources no longer used for anything that appears in a picture |
-| `judging/questions.py` | Jev's fixed questions | the gate, accept and reuse questions above |
-| `blender/` | the foundation | unchanged: a `.glb` is a model file like any other |
-| the channel's catalogue | cast, props and sets with lineage | the three kinds above |
-
-## Build order: each step shown working on one scene before the next
-
-1. **First GPU run** (needs the steps in the SAM 3D README): `content staging model --go` on the
-   first designs a run makes, one object and one person. Shows a turntable; measures memory,
-   time and cost. Go or no-go for everything below. About 25 cents.
-2. **The outline check against the picture's camera** (code, free). *The checks before the GPU
-   are built (designs); a design is modelled once, so it needs no cache key of its own.*
-3. **The gate and accept questions**, validated on ten known cases before they block.
-4. **Rung 2 in a real run**: a picture shot with one SAM 3D thing in front of the lifted
-   backdrop. A clip shown to the director early.
-5. **Designs** *(built)*: recurring people, places and objects drawn once and every keyframe
-   drawn from them. Still to measure: consistency across scenes ("the same person?").
-6. **Sets (rung 3)**, once a story has a recurring place.
-7. **Rung 4 last**, for action only, with sign-off.
-
-## What it should cost (estimates until step 1 measures them)
-
-For a 20-scene video, on top of today's keyframes and morphs: most scenes on rungs 0–1 ($0);
-four on rung 2 (about 40 cents); one set (about 15 cents); two cast sheets (about 20 cents, the
-first time only); checks (about 10 cents). **About 85 cents the first video, less after**,
-plus about $2–4 a month for storing the image and the models.
+| Thing | Paid |
+|---|---|
+| a layout, its guide, the checks, lifting and moving the picture | free (laptop) |
+| a picture drawn over a layout | 4.8 cents, the same as any keyframe |
+| a design | about 5 cents, once per channel |
+| a SAM 3D model | estimated 3–15 cents, once per thing |
 
 ## Not doing, and why
 
 | Not | Why |
 |---|---|
-| stock models fitted to pictures | rejected on screen (above) |
-| a whole 3D scene for every scene | dear, and the picture looks better |
-| Gaussian splats in final renders | Blender has no native splat renderer (add-ons approximate one); SAM 3D gives a mesh too, which renders in the channel's look |
-| MIDI-3D first | whole scenes from one image (Apache-2.0) but about 30 GB of GPU memory when textured; a candidate to compare for sets later |
+| a raw 3D render on screen | turned down twice; the drawing looks better and keeps the look |
+| stock models fitted to pictures | rejected on screen |
+| an agent writing Blender code (an MCP bridge to Blender) | the agent describes, code builds from tested blocks: repeatable and checkable |
+| city models from map data | blocks drawn over are enough |
+| Gaussian splats in final renders | Blender has no native splat renderer; SAM 3D gives a mesh too |
+| MIDI-3D first | whole scenes from one image but about 30 GB of GPU memory; a candidate for places later |
 | our own generator or training | published models do it |
+| non-commercial motion data | the channel publishes |
 
 ## Research
 
+- Rendering depth (and other passes) from a 3D scene to guide an image or video diffusion
+  model, so the look comes from the model and the structure from 3D:
+  [Generative Rendering](https://arxiv.org/pdf/2312.01409); scene graphs written as Blender
+  code from a library of functions, checked by a vision model:
+  [SceneCraft](https://arxiv.org/pdf/2403.01248) (our blocks and `StagePlan` are that library,
+  with the agent writing data, not code).
+- Wan 2.2 (Apache-2.0) animates or replaces a character from a reference picture and a pose
+  video, and its Fun Control models take depth and pose control
+  ([Wan2.2](https://github.com/Wan-Video/Wan2.2)); the 5B fits a 24 GB L4 with offloading,
+  the 14B needs about 80 GB. Hosted VACE depth control costs $0.04–0.08 a second
+  ([fal](https://fal.ai/models/fal-ai/wan-vace-14b/depth)); OpenRouter's video API takes first
+  and last frames and reference pictures, not a control video
+  ([docs](https://openrouter.ai/docs/features/multimodal/video-generation)).
+- Motion for people: HY-Motion (text to motion, SMPL-X, retargeted in Blender:
+  [OpenBlender-HyMotion](https://github.com/PGCRT/OpenBlender-HyMotion-CRT); its licence is to be
+  checked for commercial use); scene-aware motion such as
+  [TeSMo](https://github.com/nv-tlabs/tesmo); Bandai Namco's mocap set is non-commercial.
+- Cities: Buildify and blender-osm build streets from map data, with primitive buildings
+  ([CG Channel](https://www.cgchannel.com/2022/07/download-free-blender-3d-building-generator-buildify/));
+  drawn over, plain blocks were enough (below), so neither is used.
 - SAM 3D Objects composes several objects from one picture into a scene with their layout
   (its multi-object notebook); [MIDI-3D](https://github.com/VAST-AI-Research/MIDI-3D) and
   [SceneGen](https://arxiv.org/pdf/2508.15769) do the same in one pass; none keeps a thing's
