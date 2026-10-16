@@ -52,18 +52,6 @@ class ModelFile:
 
 
 @dataclass(frozen=True, slots=True)
-class Grade:
-    """How a scene's feeling shifts the look: stops of exposure, and warmth from −1 (cold) to
-    1 (warm). Applied after the look, so every look takes it the same way."""
-
-    exposure: float = 0.0
-    warmth: float = 0.0
-
-
-NEUTRAL = Grade()
-
-
-@dataclass(frozen=True, slots=True)
 class Job:
     shot_id: str
     seconds: float
@@ -78,7 +66,6 @@ class Job:
     groups: dict[str, tuple[str, ...]] = field(default_factory=dict)
     models: tuple[ModelFile, ...] = ()
     palette: dict[str, str] = field(default_factory=dict)
-    grade: Grade = field(default_factory=Grade)
     # A channel's own blocks and looks (`themes/<name>/blender`), beside the engine's.
     channel_blocks: tuple[str, ...] = ()
     width: int = 1080
@@ -104,7 +91,8 @@ class Job:
         data["layout"] = BlockCall(**data["layout"])
         data["camera"] = BlockCall(**data["camera"])
         data["look"] = BlockCall(**data.get("look", {"block": "plain"}))
-        data["grade"] = Grade(**data.get("grade", {}))
+        # Jobs written before 2026-10-16 carry a grade; nothing is graded since.
+        data.pop("grade", None)
         data["actors"] = tuple(ActorCall(**actor) for actor in data.get("actors", ()))
         data["actions"] = tuple(BlockCall(**action) for action in data.get("actions", ()))
         data["lights"] = tuple(BlockCall(**light) for light in data.get("lights", ()))

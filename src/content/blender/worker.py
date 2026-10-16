@@ -22,12 +22,10 @@ from content.blender.blocks.looks.plain import ENGINE
 from content.blender.camera import SUBJECT
 from content.blender.canvas import BlenderCanvas
 from content.blender.direct import build
-from content.blender.job import Grade, Job, Join, Report
+from content.blender.job import Job, Join, Report
 from content.blender.registry import KINDS, LOOKS, discover
 from content.blender.stage import BlenderStage
 
-# How far full warmth (or cold) moves the white balance from daylight.
-WARMTH_KELVIN = 2500
 # Samples for a transition: enough to smooth the edges its programs draw.
 JOIN_SAMPLES = 8
 
@@ -45,7 +43,6 @@ def main(job_path: Path, out: Path, *, force: bool) -> int:
     look = look_block(read(look_block, job.look.settings), job.palette)
     look.world(scene)
     look.render(scene, job.quality)
-    _grade(scene, job.grade)
     stage = BlenderStage(
         frames=job.frame_count,
         fps=job.fps,
@@ -129,15 +126,6 @@ def _join(join: Join, out: Path) -> int:
     out.mkdir(parents=True, exist_ok=True)
     (out / "report.json").write_text(report.dumps())
     return 0
-
-
-def _grade(scene: Any, grade: Grade) -> None:
-    """The scene's feeling on top of the look: exposure, and warmth through the white
-    balance (a warmer scene is balanced for bluer light, so it renders warmer)."""
-    scene.view_settings.exposure += grade.exposure
-    if grade.warmth:
-        scene.view_settings.use_white_balance = True
-        scene.view_settings.white_balance_temperature = 6500 + WARMTH_KELVIN * grade.warmth
 
 
 def _subject(stage: BlenderStage) -> tuple[Vector, float] | None:

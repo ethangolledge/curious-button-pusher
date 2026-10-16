@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Any, TypeVar
 
 from content.blender.blocks.base import SettingError, read
-from content.blender.job import NEUTRAL, BlockCall, Grade, Job, Join, Quality
+from content.blender.job import BlockCall, Job, Join, Quality
 from content.blender.registry import RegistryError
 from content.schemas.staging import (
     BlockChoice,
@@ -73,13 +73,11 @@ def job_for(
     frames: Sequence[int] = (),
     fps: int | None = None,
     scale: float = 1.0,
-    grade: Grade = NEUTRAL,
     seed: int = 1,
     resolve: Resolve | None = None,
 ) -> Job:
     """The render job for a staged scene's plan, in the channel's look and frame: its things
-    resolved (from the library unless `resolve` says otherwise) and placed. `scale` shrinks
-    the frame (drafts); `fps` slows it (drafts are stretched back to the cut's rate)."""
+    resolved (from the library unless `resolve` says otherwise) and placed."""
     shot = compose(
         plan,
         catalogue.registry,
@@ -88,11 +86,10 @@ def job_for(
     )
     if shot.missing:
         raise StagingError(shot.missing)
-    spec = theme.spec
-    staging = spec.staging
-    job = Job(
-        shot_id=shot_id,
-        seconds=seconds,
+    staging = theme.spec.staging
+    return _framed(
+        shot_id, theme, catalogue, seconds=seconds, quality=quality, frames=frames, fps=fps,
+        scale=scale, seed=seed,
         layout=_call(plan.layout),
         camera=_call(plan.camera, staging.moves),
         look=BlockCall(staging.look, {k: _text(v) for k, v in staging.look_settings.items()}),
@@ -101,16 +98,7 @@ def job_for(
         models=tuple(shot.models),
         actions=tuple(shot.actions),
         lights=tuple(_call(choice) for choice in plan.lights),
-        palette=dict(spec.palette),
-        grade=grade,
-        width=_even(spec.format.width * scale),
-        height=_even(spec.format.height * scale),
-        fps=fps or spec.format.fps,
-        quality=quality,
-        frames=tuple(frames),
-        seed=seed,
-    )
-    return with_models(job, catalogue)
+    )  # fmt: skip
 
 
 def picture_job(
@@ -136,33 +124,51 @@ def picture_job(
         raise StagingError(["lift: the vision models are not installed (the `vision` extra)"])
     camera = next(part for part in lifted_set.parts if part["name"] == "mark_camera")
     people = [p["name"] for p in lifted_set.parts if p["name"].startswith("actor_person")]
-    spec = theme.spec
-    job = Job(
-        shot_id=shot_id,
-        seconds=seconds,
+    return _framed(
+        shot_id, theme, catalogue, seconds=seconds, quality=quality, frames=frames, fps=fps,
+        scale=scale, seed=seed,
         layout=BlockCall("set", {"model": lifted_set.model_id, "motion": motion}),
         camera=BlockCall(
             "glide",
             {
-                **_glide(spec.staging.moves.get(move)),
+                **_glide(theme.spec.staging.moves.get(move)),
                 "lens": str(camera["lens"]),
                 "subject": people[0].removeprefix("actor_") if people else "ahead",
             },
         ),
         look=BlockCall(PAINTED, {}),
-        actors=(),
-        groups={},
-        models=(),
-        actions=(),
-        lights=(),
+    )  # fmt: skip
+
+
+def _framed(
+    shot_id: str,
+    theme: Theme,
+    catalogue: Catalogue,
+    *,
+    seconds: float,
+    quality: Quality,
+    frames: Sequence[int],
+    fps: int | None,
+    scale: float,
+    seed: int,
+    **parts: Any,
+) -> Job:
+    """A shot's job from its parts (layout, camera, look, and any actors, actions, lights),
+    in the channel's frame and palette: `scale` shrinks the frame (drafts), `fps` slows it
+    (drafts are stretched back to the cut's rate). Every shot is made here, so every shot is
+    framed the same way."""
+    spec = theme.spec
+    job = Job(
+        shot_id=shot_id,
+        seconds=seconds,
         palette=dict(spec.palette),
-        grade=NEUTRAL,
         width=_even(spec.format.width * scale),
         height=_even(spec.format.height * scale),
         fps=fps or spec.format.fps,
         quality=quality,
         frames=tuple(frames),
         seed=seed,
+        **parts,
     )
     return with_models(job, catalogue)
 
