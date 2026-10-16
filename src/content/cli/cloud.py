@@ -8,6 +8,7 @@ gcloud runs through `Gcloud`, so the steps can be tested without Google."""
 import argparse
 import json
 import os
+import re
 import shutil
 import subprocess
 from collections.abc import Callable
@@ -20,6 +21,9 @@ from content.errors import ConfigurationError
 
 # The free tier covers Standard storage in a few US regions only (docs/google-cloud.md).
 FREE_LOCATIONS = ("us-east1", "us-west1", "us-central1")
+SAM3D_UNSET = (
+    "set SAM3D_PROJECT, SAM3D_REGION and SAM3D_BUCKET in .env (cloud/sam3d/setup.sh prints them)"
+)
 # A gcloud command that takes longer than this is waiting on the network quirk.
 GCLOUD_SECONDS = 90
 
@@ -231,15 +235,28 @@ def _hint(error: str) -> str:
 def _cloud(arguments: list[str]) -> int:
     parser = argparse.ArgumentParser(
         prog="content cloud",
-        description="Set up Google Cloud to keep the channel and its videos (docs/google-cloud.md)",
+        description="Google Cloud: keeping the channel and its videos (docs/google-cloud.md), "
+        "and the SAM 3D GPU job (cloud/sam3d/README.md)",
     )
     actions = parser.add_subparsers(dest="action", required=True)
+    sam3d = actions.add_parser("sam3d", help="Make 3D from one picture on the cloud GPU (paid)")
+    sam3d.add_argument("model", choices=("objects", "body"))
+    sam3d.add_argument("image", type=Path)
+    sam3d.add_argument(
+        "--mask", type=Path, action="append", default=[], help="objects: one per thing"
+    )
+    sam3d.add_argument("--box", type=float, nargs=4, action="append", default=[],
+                       metavar=("X0", "Y0", "X1", "Y1"), help="body: one per person")  # fmt: skip
+    sam3d.add_argument("--focal", type=float, help="body: the focal length in pixels")
+    sam3d.add_argument("--out", type=Path, required=True)
     make = actions.add_parser("setup", help="Everything after the sign-ins, safe to run again")
     make.add_argument("--bucket", required=True, help="A unique name, e.g. my-channel-videos-2026")
     make.add_argument("--project", help="The project ID (default: gcloud's current project)")
     make.add_argument("--location", default=FREE_LOCATIONS[0], choices=FREE_LOCATIONS)
     make.add_argument("--config", type=Path, required=True, help="The channel's config.json")
     args = parser.parse_args(arguments)
+    if args.action == "sam3d":
+        return _sam3d(args, parser)
     try:
         load_config(args.config)
     except ConfigurationError as exc:
@@ -254,6 +271,33 @@ def _cloud(arguments: list[str]) -> int:
         return 1
     print(f"Google Cloud is set up: the channel is kept in {args.bucket}.")
     return 0
+
+
+def _sam3d(args: argparse.Namespace, parser: argparse.ArgumentParser) -> int:
+    from content.providers import sam3d
+    from content.storage import GcsStore
+
+    target = sam3d.from_environment()
+    if target is None:
+        parser.error(SAM3D_UNSET)
+    if args.model == "objects" and not args.mask:
+        parser.error("objects needs a --mask for each thing to make")
+    picture = sam3d.Picture(
+        name=re.sub(r"[^A-Za-z0-9_-]", "-", args.image.stem)[:64] or "picture",
+        image=args.image,
+        masks=tuple(args.mask),
+        boxes=tuple(tuple(box) for box in args.box),
+        focal=args.focal,
+    )
+    result = sam3d.make(
+        args.model,
+        [picture],
+        args.out,
+        bucket=GcsStore(target[1]),
+        place=target[0],
+    )
+    print(json.dumps(result, indent=2))
+    return 1 if "error" in result else 0
 
 
 COMMANDS = {"cloud": _cloud}

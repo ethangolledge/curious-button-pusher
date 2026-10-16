@@ -1,0 +1,22 @@
+{
+  "facebook/sam-3d-objects": {
+    "revision": "2e73555018d2741ccd486e56c24fac41155a1dc6",
+    "include": [
+      "checkpoints/*"
+    ]
+  },
+  "facebook/sam-3d-body-dinov3": {
+    "revision": "11aaa346c7204874a1cbafe3d39a979080b2c55a",
+    "include": [
+      "model.ckpt",
+      "model_config.yaml",
+      "assets/*"
+    ]
+  },
+  "Ruicheng/moge-vitl": {
+    "revision": "ad326bfb61facd6c52b5a825bc1e34d7c97d9672",
+    "include": [
+      "model.pt"
+    ]
+  }
+}

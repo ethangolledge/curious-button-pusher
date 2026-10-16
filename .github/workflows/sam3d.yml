@@ -1,0 +1,86 @@
+# Build the SAM 3D container and point the two Cloud Run jobs at it (cloud/sam3d/README.md).
+#
+# Runs only for a push to main that changes the container, or by hand from main. Pull requests,
+# forks and other branches never run it, and could not sign in to Google if they did: the
+# Workload Identity provider accepts only this repository, this file, the main branch and the
+# `sam3d` environment. There are no keys: GitHub's short-lived OIDC token is exchanged for a
+# Google token that lasts the job, for a service account that can push this one image and
+# update these two jobs, and nothing else.
+#
+# The `sam3d` environment's secrets (Settings → Environments → sam3d), set by setup.sh:
+#   GCP_PROJECT, GCP_REGION, GCP_WIF_PROVIDER, GCP_DEPLOY_SA, GCP_IMAGE (registry path, no tag)
+name: sam3d image
+
+on:
+  push:
+    branches: [main]
+    paths: ["cloud/sam3d/**", ".github/workflows/sam3d.yml"]
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: sam3d-image
+  cancel-in-progress: false
+
+jobs:
+  build-and-deploy:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    environment: sam3d
+    timeout-minutes: 300
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # The image is over 10 GB; the free runner starts with about 14 GB free.
+      - name: Make room
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL /usr/local/share/boost
+          sudo docker image prune --all --force
+          df -h /
+
+      # Before signing in to Google: the build (third-party code compiling) never runs
+      # alongside a credential, and the hour-long token below is not spent waiting on it.
+      - name: Build
+        env:
+          IMAGE: ${{ secrets.GCP_IMAGE }}
+          # The registry's tags cannot be overwritten; the run ID makes a re-run's tag new.
+          TAG: ${{ github.sha }}-${{ github.run_id }}
+        run: docker build --tag "$IMAGE:$TAG" cloud/sam3d
+
+      - id: auth
+        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WIF_PROVIDER }}
+          service_account: ${{ secrets.GCP_DEPLOY_SA }}
+          token_format: access_token
+          access_token_lifetime: 3600s
+
+      - uses: google-github-actions/setup-gcloud@aa5489c8933f4cc7a4f7d45035b3b1440c9c10db # v3.0.1
+
+      - name: Push
+        env:
+          IMAGE: ${{ secrets.GCP_IMAGE }}
+          REGION: ${{ secrets.GCP_REGION }}
+          TOKEN: ${{ steps.auth.outputs.access_token }}
+          TAG: ${{ github.sha }}-${{ github.run_id }}
+        run: |
+          echo "$TOKEN" | docker login -u oauth2accesstoken --password-stdin "https://$REGION-docker.pkg.dev"
+          docker push "$IMAGE:$TAG"
+          docker inspect --format '{{index .RepoDigests 0}}' "$IMAGE:$TAG" > digest
+          docker logout "https://$REGION-docker.pkg.dev"
+
+      # The jobs run the image by its digest, so what runs is exactly what was built here.
+      - name: Point the jobs at it
+        env:
+          PROJECT: ${{ secrets.GCP_PROJECT }}
+          REGION: ${{ secrets.GCP_REGION }}
+        run: |
+          for job in sam3d-run sam3d-fetch; do
+            gcloud run jobs update "$job" --image "$(cat digest)" --region "$REGION" --project "$PROJECT" --quiet
+          done
