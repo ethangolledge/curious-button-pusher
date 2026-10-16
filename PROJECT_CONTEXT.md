@@ -102,7 +102,8 @@ with a change). `AGENTS.md` says which applies when a session starts.
   people, cloud rendering.
 - Designs (2026-10-16): a person, place or object in two or more scenes is drawn once in the
   channel's look, checked by Gemini and Jev, kept with the channel, and every keyframe showing
-  it is drawn from it, in later videos too; `content designs model` makes their 3D models in
+  it is drawn from it, in later videos too; a design is a model in the channel's catalogue,
+  usable in a shot once `content staging model` has made its 3D model in
   one GPU job after free checks ([docs/3d-reuse.md](docs/3d-reuse.md#designs)). Not yet tried
   in a real run.
 - `content eval` caught all seven failures a director named in a rejected final cut, three runs

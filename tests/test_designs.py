@@ -18,13 +18,10 @@ from content.providers import sam3d
 from content.providers.fake import FakeDecisionProvider
 from content.schemas.references import ReferenceRequest, ReferenceSet
 from content.schemas.visuals import Scene, SceneAnchor, VisualPackage
-from content.staging.designs import (
-    Designs,
-    design_id,
-    make_models,
-    mask_problems,
-    waiting_for_models,
-)
+from content.staging import designs
+from content.staging.designs import design_id, make_models, mask_problems, waiting_for_models
+from content.staging.library import Library, load_library
+from content.staging.store import Store
 from content.storage import LocalStore
 from content.theme import load_theme
 from content.workflow.demo import demo_answer
@@ -82,6 +79,10 @@ def _found(request: ReferenceRequest = LAMP) -> dict[str, ReferenceSet]:
     return {request.ref_id: ReferenceSet(request=request, relevant=True, candidates=[], chosen=[])}
 
 
+def _library(tmp_path: Path) -> Library:
+    return load_library(tmp_path / "theme/assets")
+
+
 def _storyboard(*scenes: Scene) -> VisualPackage:
     return VisualPackage(overall_visual_direction="", scenes=list(scenes), continuity_notes=[])
 
@@ -96,7 +97,13 @@ def test_a_thing_in_two_scenes_is_designed_once_and_reused_by_the_next_video(
 
     design = references["lamp"].design
     assert design is not None and Path(design).is_file()
-    assert Path(design).parent == tmp_path / "theme/designs"
+    assert Path(design).parent == tmp_path / "theme/assets/files"
+    # It is a model in the channel's library, traced like any other, but no shot can use it
+    # until its 3D model is made.
+    library = _library(tmp_path)
+    lamp = library.get("object_brass_lamp")
+    assert lamp.identity is not None and not lamp.placeable
+    assert "object_brass_lamp" not in [f.model.model_id for f in library.search("brass lamp")]
     assert media.calls.count("image") == 1
     assert {j.question_id for j in judgements} == {"design_view", "design_matches"}
 
@@ -121,20 +128,20 @@ def test_a_design_jev_finds_wrong_is_drawn_again_differently(tmp_path: Path) -> 
     references, _, _ = studio._designs(board, _found(), "v")
 
     assert media.calls.count("image") == 2
-    kept = Designs(tmp_path / "theme").get(design_id("object", "The brass lamp"))
-    assert kept is not None and kept.attempt == 1 and references["lamp"].design is not None
+    kept = _library(tmp_path).get(design_id("object", "The brass lamp"))
+    assert kept.identity is not None and kept.identity.attempt == 1
+    assert references["lamp"].design is not None
 
 
 def test_a_vetoed_design_is_drawn_again_and_a_changed_look_redraws(tmp_path: Path) -> None:
     studio, media = _studio(tmp_path)
     board = _storyboard(_scene("s1", "lamp"), _scene("s2", "lamp"))
     studio._designs(board, _found(), "v")
-    designs = Designs(tmp_path / "theme")
-    designs.veto(design_id("object", "brass lamp"))
+    _library(tmp_path).veto(design_id("object", "brass lamp"), "too shiny")
 
     studio._designs(board, _found(), "v")
     assert media.calls.count("image") == 2
-    assert designs.get("object-brass-lamp").status == "kept"  # type: ignore[union-attr]
+    assert _library(tmp_path).get("object_brass_lamp").status == "kept"
 
     # Any other look (here a different image model) is not the design's: drawn again.
     restyled = replace(studio.config, image_model="another/model")
@@ -145,7 +152,7 @@ def test_a_vetoed_design_is_drawn_again_and_a_changed_look_redraws(tmp_path: Pat
 
 @pytest.mark.parametrize(
     ("query", "key"),
-    [("The brass lamp", "object-brass-lamp"), ("brass  LAMP!", "object-brass-lamp")],
+    [("The brass lamp", "object_brass_lamp"), ("brass  LAMP!", "object_brass_lamp")],
 )
 def test_a_design_is_known_by_what_it_is_not_its_wording(query: str, key: str) -> None:
     assert design_id("object", query) == key
@@ -169,25 +176,43 @@ def test_what_would_waste_a_gpu_run_is_caught_for_free() -> None:
 
 
 def test_a_model_made_on_the_gpu_is_kept_with_its_design(tmp_path: Path) -> None:
-    designs = Designs(tmp_path / "theme")
+    library = _library(tmp_path)
     picture_file = tmp_path / "lamp.png"
     Image.new("RGB", (8, 8)).save(picture_file)
-    lamp = designs.keep("object", "brass lamp", picture_file, look="x", attempt=0, video="v")
+    lamp = designs.keep(
+        library, "object", "brass lamp", picture_file, look="x", attempt=0, video="v"
+    )
     mask = tmp_path / "mask.png"
     Image.new("L", (8, 8), 255).save(mask)
     bucket = LocalStore(tmp_path / "bucket")
 
     def gpu(place: sam3d.Place, job_id: str) -> None:
         out = bucket.root / "jobs" / job_id / "out"
-        (out / lamp.design_id).mkdir(parents=True)
-        (out / lamp.design_id / "0.glb").write_bytes(b"glTF")
+        (out / lamp.model_id).mkdir(parents=True)
+        (out / lamp.model_id / "0.glb").write_bytes(b"glTF")
         (out / "result.json").write_text('{"model": "objects", "items": {}}')
 
-    ready = [(lamp, sam3d.Picture(lamp.design_id, designs.path(lamp), masks=(mask,)))]
-    report = make_models(
-        designs, ready, tmp_path / "made", bucket=bucket, place=sam3d.Place("p", "r"), run=gpu
-    )
+    def ingest(made: Path, prepared: Path) -> dict[str, Any]:
+        # Blender's import, standing in: the file as it is, measured.
+        shutil.copyfile(made, prepared)
+        return {"width": 0.3, "depth": 0.3, "height": 0.5}
 
-    assert report == ["object-brass-lamp: 3D model kept (objects)"]
-    assert (tmp_path / "theme/designs/object-brass-lamp.glb").read_bytes() == b"glTF"
-    assert waiting_for_models(designs) == []
+    ready = [(lamp, sam3d.Picture(lamp.model_id, designs.picture(library, lamp), masks=(mask,)))]
+    report = make_models(
+        library, ready, tmp_path / "made", bucket=bucket, place=sam3d.Place("p", "r"),
+        ingest=ingest, run=gpu,
+    )  # fmt: skip
+
+    assert report == ["object_brass_lamp: 3D model kept (objects)"]
+    assert waiting_for_models(library) == []
+    # Kept as the design's file: now a shot can find and use it, and its making is traced.
+    again = _library(tmp_path)
+    made = again.get("object_brass_lamp")
+    assert made.placeable and made.size == (0.3, 0.3, 0.5)
+    path = again.path(made)
+    assert path is not None and path.read_bytes() == b"glTF"
+    assert again.search("brass lamp")[0].model.model_id == "object_brass_lamp"
+    assert [step for _, step, _ in Store(again.folder).lineage("object_brass_lamp")] == [  # type: ignore[arg-type]
+        "drawn",
+        "made",
+    ]

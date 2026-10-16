@@ -5,12 +5,15 @@ import argparse
 import hashlib
 import json
 import re
+import tempfile
 from dataclasses import replace
 from pathlib import Path
+from typing import Any
 
 from content.blender.job import Job
 from content.blender.materials import ROLES
 from content.blender.registry import ENGINE
+from content.cli.cloud import SAM3D_UNSET
 from content.config import load_config
 from content.production.assemble import contact_sheet
 from content.providers import ffmpeg
@@ -21,7 +24,7 @@ from content.providers.infinigen import install as install_infinigen
 from content.providers.objaverse import build_index
 from content.providers.sources import SOURCES, ready_sources
 from content.schemas.staging import StagePlan
-from content.staging import sourcing
+from content.staging import designs, sourcing
 from content.staging.backlog import most_wanted
 from content.staging.catalogue import Catalogue, check, describe, load_catalogue, with_models
 from content.staging.plan import StagingError, job_for, themed
@@ -95,6 +98,15 @@ def _staging(arguments: list[str]) -> int:
         command.add_argument("model_id")
         if verb == "veto":
             command.add_argument("--why", default="", help="What is wrong with it")
+    actions.add_parser(
+        "designs", parents=[common], help="The channel's designs, and which have a 3D model"
+    )
+    model = actions.add_parser(
+        "model",
+        parents=[common],
+        help="3D models of the designs without one, on the cloud GPU (a free dry run unless --go)",
+    )
+    model.add_argument("--go", action="store_true", help="Send them to the GPU (paid)")
     name = actions.add_parser("name", parents=[common], help="Another word for a library model")
     name.add_argument("model_id")
     name.add_argument("words")
@@ -164,9 +176,13 @@ def _staging(arguments: list[str]) -> int:
             return 0
         install_people(LocalBlender(), print)
         print("✓ People can be made: describe them in a scene, and they are made to fit.")
-    elif args.action in ("keep", "veto", "history"):
+    elif args.action in ("keep", "veto", "history", "designs", "model"):
         if theme is None:
             parser.error("models are a channel's: pass --config themes/<name>/config.json")
+        if args.action == "designs":
+            return _designs(catalogue)
+        if args.action == "model":
+            return _model(catalogue, go=args.go, parser=parser)
         return _review(catalogue, args)
     elif args.action in ("find", "add", "vary"):
         if theme is None:
@@ -242,6 +258,54 @@ def _review(catalogue: Catalogue, args: argparse.Namespace) -> int:
             print(f"{at}  {step:9} {json.dumps(detail)}")
         used = store.usage(args.model_id)
         print(f"Used in: {', '.join(used) if used else 'no video yet'}")
+    return 0
+
+
+def _designs(catalogue: Catalogue) -> int:
+    for model in sorted(catalogue.library.models.values(), key=lambda m: m.model_id):
+        if model.identity is not None:
+            made = "3D model made" if model.file else "no 3D model yet"
+            print(f"{model.model_id:40} {model.status:7} {made}  {model.identity.query}")
+    return 0
+
+
+def _model(catalogue: Catalogue, *, go: bool, parser: argparse.ArgumentParser) -> int:
+    """Each design without a 3D model checked for free on this computer; with `go`, those
+    that pass sent to SAM 3D in one GPU job per model kind."""
+    from content.providers import sam3d
+    from content.storage import GcsStore
+
+    library = catalogue.library
+    waiting = designs.waiting_for_models(library)
+    if not waiting:
+        print("No person or object design is waiting for a 3D model.")
+        return 0
+    with tempfile.TemporaryDirectory() as scratch:
+        ready = []
+        for design in waiting:
+            picture, problems = designs.prepare(library, design, Path(scratch))
+            if problems:
+                print(f"{design.model_id}: not sent: {'; '.join(problems)}")
+            else:
+                print(f"{design.model_id}: ready")
+                ready.append((design, picture))
+        if not ready or not go:
+            if ready:
+                print(f"{len(ready)} ready. Add --go to make them: one GPU job per model kind.")
+            return 0
+        target = sam3d.from_environment()
+        if target is None:
+            parser.error(SAM3D_UNSET)
+        place, bucket = target
+
+        def ingest(made: Path, prepared: Path) -> dict[str, Any]:
+            return LocalBlender().ingest(made, prepared, height=None, max_faces=sourcing.MAX_FACES)
+
+        report = designs.make_models(
+            library, ready, Path(scratch) / "made",
+            bucket=GcsStore(bucket), place=place, ingest=ingest,
+        )  # fmt: skip
+        print("\n".join(report))
     return 0
 
 

@@ -10,7 +10,6 @@ from content.cli import (
     channel,
     check,
     cloud,
-    designs,
     learning,
     review,
     run,
@@ -27,7 +26,6 @@ COMMANDS: dict[str, Callable[[list[str]], int]] = {
     **check.COMMANDS,
     **spend.COMMANDS,
     **cloud.COMMANDS,
-    **designs.COMMANDS,
     **staging.COMMANDS,
 }
 

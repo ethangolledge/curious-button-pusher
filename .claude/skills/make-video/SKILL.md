@@ -208,8 +208,8 @@ toolkit can show in Blender (`docs/staging.md`, "In a run"). For the person, wha
   the cut renders them in full.
 - **Designs** (docs/3d-reuse.md#designs): anyone or anything in two or more scenes is drawn
   once in the channel's look and every keyframe is drawn from it. At the Pictures sign-off,
-  show the director any design drawn for this run (`content designs list`); one they dislike
-  is turned down with `content designs veto <id>`, and the next run draws it again. They are
+  show the director any design drawn for this run (`content staging designs`); one they dislike
+  is turned down with `content staging veto <id> --why "…"`, and the next run draws it again. They are
   kept for later videos, so a good one pays for itself.
 - **Notes on a staged scene** go back to the Visual Director as usual (`S3: …`); a note about
   how a block moves or looks is a change to the toolkit, not the run: build it with the

@@ -9,7 +9,7 @@ library never holds the same thing twice under different names."""
 
 import re
 from collections.abc import Callable, Mapping, Sequence
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass, field, replace
 from pathlib import Path
 from typing import Any
 
@@ -25,6 +25,8 @@ from content.providers.assets import CREDITED
 from content.staging.store import Store
 
 MADE_IN_CODE = "made in code"
+# A thing the channel drew itself (`staging/designs.py`): its identity, and its 3D model once made.
+DESIGNED = "the channel's design"
 # A picture in the library (a map, a painting) is kept as it is and drawn on a card.
 PICTURES = (".png", ".jpg", ".jpeg", ".webp")
 # Words that say nothing about what a thing is.
@@ -69,6 +71,18 @@ Size = tuple[float, float, float]
 
 
 @dataclass(frozen=True)
+class Identity:
+    """What a design is: one person, place or object drawn once, alone, in the channel's look,
+    and reused by every keyframe that shows it and by its 3D model."""
+
+    kind: str  # person, place or object (`schemas.references.ReferenceKind`)
+    query: str  # the words it was asked for by
+    picture: str  # the drawing, relative to the library folder
+    look: str  # the channel's look it was drawn in (`Theme.look_signature`)
+    attempt: int  # how many times it was drawn before: each attempt is drawn differently
+
+
+@dataclass(frozen=True)
 class Model:
     model_id: str
     names: tuple[str, ...]
@@ -104,6 +118,14 @@ class Model:
     # (`paint`), and its own size. It has no file of its own.
     base: str = ""
     paint: dict[str, str] = field(default_factory=dict)
+    # A design: the drawing it is known by. Its `file` is empty until its 3D model is made.
+    identity: Identity | None = None
+
+    @property
+    def placeable(self) -> bool:
+        """Whether a shot can use it: a design needs its 3D model first (a flat drawing in a
+        3D shot was turned down)."""
+        return self.identity is None or bool(self.file)
 
     @property
     def words(self) -> list[str]:
@@ -131,7 +153,7 @@ class Library:
 
     def search(self, words: str, embed: Embed | None = None, limit: int = 5) -> list[Found]:
         query = _terms(words)
-        usable = [m for m in self.models.values() if m.status != "vetoed"]
+        usable = [m for m in self.models.values() if m.status != "vetoed" and m.placeable]
         scores = {m.model_id: max(_lexical(query, _terms(w)) for w in m.words) for m in usable}
         if embed is not None and usable:
             texts = [f"{m.words[0]}: {m.describe}" for m in usable]
@@ -165,10 +187,8 @@ class Library:
                     f'{close[0].model.model_id} "{words}"), or pass --alongside if it is '
                     "really a different thing."
                 )
-        self.models[model.model_id] = model
-        self._store().write(asdict(model))
-        self._store().note(
-            model.model_id,
+        self.save(
+            model,
             "added",
             {
                 "source": model.source,
@@ -178,14 +198,20 @@ class Library:
             },
         )
 
+    def save(self, model: Model, step: str = "", detail: Mapping[str, Any] | None = None) -> None:
+        """Keep a model's record as it now is, and the step that made it so in its lineage."""
+        self.models[model.model_id] = model
+        self._store().write(asdict(model))
+        if step:
+            self._store().note(model.model_id, step, detail or {})
+
     def name(self, model_id: str, words: str) -> None:
         """Another word for a model, so searches find it."""
         model = self.get(model_id)
         if model.source == MADE_IN_CODE:
             raise ValueError(f"'{model_id}' is made in code: add the words to its file's `names`")
         if words not in model.names:
-            self.models[model_id] = _replace(model, names=(*model.names, words))
-            self._store().write(asdict(self.models[model_id]))
+            self.save(replace(model, names=(*model.names, words)))
 
     def vary(
         self,
@@ -297,15 +323,11 @@ class Library:
         model = self.get(model_id)
         if model.source == MADE_IN_CODE:
             raise ValueError(f"'{model_id}' is made in code: change or delete its file instead")
-        self.models[model_id] = _replace(model, status="vetoed")
-        self._store().write(asdict(self.models[model_id]))
-        self._store().note(model_id, "vetoed", {"reason": reason})
+        self.save(replace(model, status="vetoed"), "vetoed", {"reason": reason})
 
     def keep(self, model_id: str) -> None:
         """A person has looked at a model taken automatically, and keeps it."""
-        self.models[model_id] = _replace(self.get(model_id), status="kept")
-        self._store().write(asdict(self.models[model_id]))
-        self._store().note(model_id, "kept", {})
+        self.save(replace(self.get(model_id), status="kept"), "kept")
 
     def path(self, model: Model) -> Path | None:
         return self.folder / model.file if self.folder is not None and model.file else None
@@ -334,6 +356,8 @@ def load_library(folder: Path | None, channel_blocks: Sequence[Path] = ()) -> Li
         data["paint"] = dict(data.get("paint", {}))
         data["holds"] = {name: tuple(at) for name, at in data.get("holds", {}).items()}
         data["middle"] = tuple(data.get("middle", (0.0, 0.0)))
+        identity = data.get("identity")
+        data["identity"] = Identity(**identity) if identity else None
         model = Model(**data)
         if model.model_id in library.models:
             raise ValueError(f"{folder}: '{model.model_id}' is already a prop made in code")
@@ -352,10 +376,6 @@ def fitted_size(size: Size, fit: tuple[float, float, float]) -> Size:
     """A thing's size once stretched to `fit`, as Blender stretches it."""
     x, y, z = fit_scale(size, fit)
     return (round(size[0] * x, 3), round(size[1] * y, 3), round(size[2] * z, 3))
-
-
-def _replace(model: Model, **changes: object) -> Model:
-    return Model(**{**asdict(model), **changes})
 
 
 def match(words: str, name: str) -> float:

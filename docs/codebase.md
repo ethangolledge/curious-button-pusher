@@ -82,7 +82,7 @@ imports nothing from the rest of `content`; only the files marked † use Blende
 | `staging/catalogue.py` | the blocks and models, described; the shot check |
 | `staging/library.py` | the model library: search by meaning, no duplicates, versions of a model, a model as Blender needs it, credits, keep and veto |
 | `staging/store.py` | where the library is kept: SQLite (models, lineage, usage) and files by their hash |
-| `staging/designs.py` | the channel's designs: each recurring person, place or object drawn once and reused ([3d-reuse.md](3d-reuse.md#designs)); the free checks before the GPU; their 3D models in one SAM 3D job per kind |
+| `staging/designs.py` | the channel's designs, kept as catalogue models with an `Identity`: each recurring person, place or object drawn once and reused ([3d-reuse.md](3d-reuse.md#designs)); the free checks before the GPU; their 3D models in one SAM 3D job per kind |
 | `staging/compose.py` | a scene's description to a shot: the room built, every copy placed by its relation clear of everything, background detail, actions for every copy |
 | `staging/resolve.py` | what each thing is drawn with: the library, families from its words, people made, then found online; its looks as paint, its size as a fit |
 | `staging/people.py` | people made to a description, once, and kept |
@@ -213,10 +213,9 @@ Each folder: `agent.py` (the code), `prompt.md` (what its model is told, theme-n
 | `review.py` | `review`, `estimate` |
 | `storage.py` | `storage`, and keeping the channel after any command that changes it (`keep_theme`) |
 | `spend.py` | `spend`, `spend budget`; recording every run's and tool's calls (`record_spend`), reading OpenRouter and the bucket |
-| `designs.py` | `designs list`, `veto`, and `model` (a free dry run of the checks; `--go` makes the 3D models on the cloud GPU) |
-| `cloud.py` | `cloud setup`: the Google Cloud steps after the sign-ins, checked and done in order, safe to run again (gcloud runs through a replaceable function, so it is tested without Google) |
+| `cloud.py` | `cloud sam3d` (one picture on the GPU, by hand); `cloud setup`: the Google Cloud steps after the sign-ins, checked and done in order, safe to run again (gcloud runs through a replaceable function, so it is tested without Google) |
 | `check.py` | `check`: is this machine ready (Python, ffmpeg, extras, the key and its balance, the channel, the bucket, Blender), with the fix for anything missing |
-| `staging.py` | `staging`: the catalogue, models (search, find, add, vary, name), check, preview, backlog, new |
+| `staging.py` | `staging`: the catalogue, models (search, find, add, vary, name, keep, veto, history), designs and their 3D models (`model`: a free dry run of the checks; `--go` makes them on the cloud GPU), check, preview, backlog, new |
 
 ## Tunable Constants
 

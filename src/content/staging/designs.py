@@ -1,31 +1,34 @@
 """A channel's designs: each recurring person, place or object drawn once, alone, in the
-channel's look ([docs/3d-reuse.md](../../../docs/3d-reuse.md#designs)). Every keyframe that shows
-it is drawn from its design, so it looks the same in every scene; a design made for one video is
-reused by every later one; and its plain background makes it ready to become a 3D model.
+channel's look ([docs/3d-reuse.md](../../../docs/3d-reuse.md#designs)). Every keyframe that
+shows it is drawn from its design, so it looks the same in every scene; a design made for one
+video is reused by every later one; and its plain background makes it ready to become a 3D
+model.
 
-Kept in `themes/<name>/designs/` and saved with the channel: `index.json` holds a record per
-design, the pictures and any 3D models sit beside it. A design is known by what it is (its kind
-and query), and by the look it was drawn in: when the channel's look changes, it is drawn again."""
+A design is a model in the channel's library (`library.Identity`): kept, turned down and traced
+like any other (`content staging keep | veto | history`), its drawing stored with the library's
+files. It is known by what it is (its kind and query) and by the look it was drawn in: when the
+channel's look changes, it is drawn again. Its 3D model, once made, becomes its file, and only
+then can a shot use it."""
 
-import json
 import re
-import shutil
 from collections.abc import Callable
-from dataclasses import asdict, dataclass, replace
+from dataclasses import replace
 from pathlib import Path
-from typing import Literal
+from typing import Any
 
 import numpy as np
 
 from content.providers import sam3d
 from content.schemas.references import ReferenceKind
+from content.staging.library import DESIGNED, Identity, Library, Model
+from content.staging.store import Store
 
-FOLDER = "designs"
-INDEX = "index.json"
 # Words that do not change what a thing is.
 FILLER = re.compile(r"^(the|a|an) ")
 # Which SAM 3D model makes each kind of design (a place stays a picture: it is lifted).
 MAKERS: dict[str, sam3d.Model] = {"object": "objects", "person": "body"}
+# The file each SAM 3D model makes for the first thing in a picture.
+MADE = {"objects": "0.glb", "body": "person_0.glb"}
 # Checked for free before a design is sent to the GPU: the thing found in it with at least this
 # confidence (on real keyframes a person scored 0.84 and a lamp that was not there 0.40),
 # filling this share of the picture, clear of the frame's edge by this many pixels,
@@ -35,87 +38,73 @@ AREA = (0.02, 0.9)
 EDGE = 2
 ONE_PIECE = 0.9
 
-
-@dataclass(frozen=True)
-class Design:
-    design_id: str
-    kind: ReferenceKind
-    query: str
-    picture: str  # relative to the designs folder
-    # The channel's look when it was drawn (`Theme.look_signature`): another look draws it again.
-    look: str
-    attempt: int
-    # The video it was first drawn for.
-    made_for: str
-    # "vetoed": a person turned it down; it is drawn again, differently, when next needed.
-    status: Literal["kept", "vetoed"] = "kept"
-    # Its 3D model (`content designs model`), relative to the designs folder, once made.
-    model: str = ""
+# A 3D model brought into the library's form (upright, in metres, facing −Y): its facts
+# (`LocalBlender.ingest`), written to the second path.
+Ingest = Callable[[Path, Path], dict[str, Any]]
 
 
 def design_id(kind: ReferenceKind, query: str) -> str:
-    """The same thing asked for in other words or capitals is the same design."""
+    """The same thing asked for in other words or capitals is the same design. Short enough
+    to name a SAM 3D job's item (64 characters)."""
     words = FILLER.sub("", re.sub(r"[^a-z0-9]+", " ", query.lower()).strip())
-    # Short enough to name a job item (64 characters).
-    return f"{kind}-{words.replace(' ', '-')}"[:64]
+    return f"{kind}_{words.replace(' ', '_')}"[:64]
 
 
-class Designs:
-    def __init__(self, theme_root: Path) -> None:
-        self.folder = theme_root / FOLDER
+def usable(library: Library, kind: ReferenceKind, query: str, look: str) -> Model | None:
+    """The design to draw keyframes from, if the channel keeps one in the current look."""
+    model = library.models.get(design_id(kind, query))
+    if model is None or model.identity is None or model.status == "vetoed":
+        return None
+    return model if model.identity.look == look else None
 
-    def all(self) -> list[Design]:
-        path = self.folder / INDEX
-        if not path.is_file():
-            return []
-        return [Design(**record) for record in json.loads(path.read_text(encoding="utf-8"))]
 
-    def get(self, key: str) -> Design | None:
-        return next((design for design in self.all() if design.design_id == key), None)
+def next_attempt(library: Library, kind: ReferenceKind, query: str) -> int:
+    """A design drawn again (turned down, or its look changed) is drawn differently."""
+    previous = library.models.get(design_id(kind, query))
+    return 0 if previous is None or previous.identity is None else previous.identity.attempt + 1
 
-    def usable(self, kind: ReferenceKind, query: str, look: str) -> Design | None:
-        """The design to draw keyframes from, if there is a kept one in the current look."""
-        design = self.get(design_id(kind, query))
-        if design is None or design.status != "kept" or design.look != look:
-            return None
-        return design
 
-    def next_attempt(self, kind: ReferenceKind, query: str) -> int:
-        """A design drawn again (turned down, or its look changed) is drawn differently."""
-        previous = self.get(design_id(kind, query))
-        return 0 if previous is None else previous.attempt + 1
+def keep(
+    library: Library,
+    kind: ReferenceKind,
+    query: str,
+    drawing: Path,
+    *,
+    look: str,
+    attempt: int,
+    video: str,
+) -> Model:
+    """A design that passed its checks, kept in the library (replacing any earlier drawing)."""
+    assert library.folder is not None
+    picture = Store(library.folder).keep_file(drawing)
+    model = Model(
+        model_id=design_id(kind, query),
+        names=(query,),
+        describe=f"the channel's design of {query} ({kind})",
+        size=(0.0, 0.0, 0.0),
+        source=DESIGNED,
+        licence="own",
+        identity=Identity(kind, query, picture, look, attempt),
+    )
+    library.save(model, "drawn", {"video": video, "attempt": attempt, "picture": picture})
+    return model
 
-    def keep(
-        self, kind: ReferenceKind, query: str, picture: Path, *, look: str, attempt: int, video: str
-    ) -> Design:
-        key = design_id(kind, query)
-        self.folder.mkdir(parents=True, exist_ok=True)
-        shutil.copyfile(picture, self.folder / f"{key}.png")
-        design = Design(key, kind, query, f"{key}.png", look, attempt, video)
-        self._write([*(d for d in self.all() if d.design_id != key), design])
-        return design
 
-    def veto(self, key: str) -> Design:
-        return self._update(key, status="vetoed")
+def picture(library: Library, model: Model) -> Path:
+    assert library.folder is not None and model.identity is not None
+    return library.folder / model.identity.picture
 
-    def add_model(self, key: str, model: Path) -> Design:
-        shutil.copyfile(model, self.folder / f"{key}{model.suffix}")
-        return self._update(key, model=f"{key}{model.suffix}")
 
-    def path(self, design: Design) -> Path:
-        return self.folder / design.picture
-
-    def _update(self, key: str, **changes: str) -> Design:
-        found = self.get(key)
-        if found is None:
-            raise KeyError(f"no design '{key}' (content designs list)")
-        changed = replace(found, **changes)  # type: ignore[arg-type]
-        self._write([changed if d.design_id == key else d for d in self.all()])
-        return changed
-
-    def _write(self, designs: list[Design]) -> None:
-        records = [asdict(design) for design in sorted(designs, key=lambda d: d.design_id)]
-        (self.folder / INDEX).write_text(json.dumps(records, indent=2) + "\n", encoding="utf-8")
+def waiting_for_models(library: Library) -> list[Model]:
+    """Kept people and objects without a 3D model yet."""
+    return [
+        model
+        for model in sorted(library.models.values(), key=lambda m: m.model_id)
+        if model.identity is not None
+        and model.status != "vetoed"
+        and not model.file
+        and model.identity.kind in MAKERS
+    ]
 
 
 def mask_problems(mask: np.ndarray) -> list[str]:
@@ -135,63 +124,67 @@ def mask_problems(mask: np.ndarray) -> list[str]:
     return problems
 
 
-def prepare(designs: Designs, design: Design, scratch: Path) -> tuple[sam3d.Picture, list[str]]:
+def prepare(library: Library, model: Model, scratch: Path) -> tuple[sam3d.Picture, list[str]]:
     """A design as a SAM 3D picture (an object's outline, a person's box), found on this
     computer with the vision models, and what the free checks found wrong with it."""
     from PIL import Image
 
     from content.providers import vision
 
-    image = designs.path(design)
-    phrase = "a person." if design.kind == "person" else f"{design.query}."
+    assert model.identity is not None
+    image = picture(library, model)
+    phrase = "a person." if model.identity.kind == "person" else f"{model.identity.query}."
     found = vision.find(image, phrase, threshold=FIND_THRESHOLD)
-    picture = sam3d.Picture(design.design_id, image)
+    sent = sam3d.Picture(model.model_id, image)
     if not found:
-        return picture, [f"no {design.kind} clearly found in it"]
+        return sent, [f"no {model.identity.kind} clearly found in it"]
     box = found[0].box
     mask = vision.outline(image, [box])[0]
-    if design.kind == "person":
-        return replace(picture, boxes=(box,)), mask_problems(mask)
-    mask_path = scratch / f"{design.design_id}-mask.png"
+    if model.identity.kind == "person":
+        return replace(sent, boxes=(box,)), mask_problems(mask)
+    mask_path = scratch / f"{model.model_id}-mask.png"
     Image.fromarray(mask.astype(np.uint8) * 255).save(mask_path)
-    return replace(picture, masks=(mask_path,)), mask_problems(mask)
-
-
-def waiting_for_models(designs: Designs) -> list[Design]:
-    """Kept people and objects without a 3D model yet."""
-    return [
-        design
-        for design in designs.all()
-        if design.status == "kept" and not design.model and design.kind in MAKERS
-    ]
+    return replace(sent, masks=(mask_path,)), mask_problems(mask)
 
 
 def make_models(
-    designs: Designs,
-    ready: list[tuple[Design, sam3d.Picture]],
+    library: Library,
+    ready: list[tuple[Model, sam3d.Picture]],
     out: Path,
     *,
     bucket: sam3d.Bucket,
     place: sam3d.Place,
+    ingest: Ingest,
     run: Callable[[sam3d.Place, str], None] = sam3d.run_job,
 ) -> list[str]:
-    """One GPU job per SAM 3D model for every design ready, each model kept with its design."""
+    """One GPU job per SAM 3D model for every design ready; each model brought into the
+    library's form and kept as its design's file, its making in the design's lineage."""
+    assert library.folder is not None
+    store = Store(library.folder)
     report = []
     for kind, maker in MAKERS.items():
-        batch = [(design, picture) for design, picture in ready if design.kind == kind]
+        batch = [
+            (m, sent) for m, sent in ready if m.identity is not None and m.identity.kind == kind
+        ]
         if not batch:
             continue
         result = sam3d.make(
-            maker, [p for _, p in batch], out / maker, bucket=bucket, place=place, run=run
+            maker, [sent for _, sent in batch], out / maker, bucket=bucket, place=place, run=run
         )
         items = result.get("items", {})
-        made = "0.glb" if maker == "objects" else "person_0.glb"
-        for design, picture in batch:
-            model = out / maker / picture.name / made
-            if model.is_file():
-                designs.add_model(design.design_id, model)
-                report.append(f"{design.design_id}: 3D model kept ({maker})")
-            else:
-                why = items.get(picture.name, {}).get("error", result.get("error", "no model"))
-                report.append(f"{design.design_id}: not made: {why}")
+        for model, sent in batch:
+            made = out / maker / sent.name / MADE[maker]
+            if not made.is_file():
+                why = items.get(sent.name, {}).get("error", result.get("error", "no model"))
+                report.append(f"{model.model_id}: not made: {why}")
+                continue
+            prepared = out / maker / sent.name / "prepared.glb"
+            facts = ingest(made, prepared)
+            file = store.keep_file(prepared)
+            library.save(
+                replace(model, file=file, size=(facts["width"], facts["depth"], facts["height"])),
+                "made",
+                {"by": f"sam3d {maker}", "job": result["job"], "file": file},
+            )
+            report.append(f"{model.model_id}: 3D model kept ({maker})")
     return report

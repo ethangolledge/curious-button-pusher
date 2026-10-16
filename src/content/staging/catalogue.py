@@ -16,6 +16,9 @@ from content.blender.rehearsal import RehearsalStage
 from content.staging.library import Library, load_library
 from content.theme import BlockPreset
 
+# Where a channel keeps its models and designs, inside its theme folder.
+ASSETS = "assets"
+
 
 @dataclass
 class Catalogue:
@@ -28,7 +31,7 @@ def load_catalogue(theme_root: Path | None) -> Catalogue:
     """The engine's blocks and props, and a channel's own blocks (`<theme>/blender/`) and
     models (`<theme>/assets/`) when a theme is given."""
     blocks = tuple(p for p in [theme_root / "blender"] if p.is_dir()) if theme_root else ()
-    library = load_library(theme_root / "assets" if theme_root else None, blocks)
+    library = load_library(theme_root / ASSETS if theme_root else None, blocks)
     return Catalogue(discover(blocks), library, blocks)
 
 
@@ -74,7 +77,8 @@ def describe(
             lines.append(f"- the theme's usual joins, when a scene names none: {usual}")
         lines.append("")
     lines.append("## things on hand (anything else is found or made when the shot is built)")
-    for model in sorted(catalogue.library.models.values(), key=lambda m: m.model_id):
+    placeable = [m for m in catalogue.library.models.values() if m.placeable]
+    for model in sorted(placeable, key=lambda m: m.model_id):
         able = f" [{', '.join(model.capabilities)}]" if model.capabilities else ""
         offers = (
             f" (a set for the set layout; parts: {', '.join(p['name'] for p in model.parts)})"

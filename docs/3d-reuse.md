@@ -47,17 +47,21 @@ the thing asked for (`design_matches`). A design that fails is drawn once more, 
 if that fails too, keyframes are drawn from the photos as before. Every keyframe showing it is
 then drawn with the design first among its references, so it looks the same in every scene.
 
-**Kept with the channel** (`themes/<name>/designs/`, saved to the bucket with everything else):
-a later video that names the same thing reuses its design for nothing. A design is known by
-what it is (`object-brass-lamp`: capitals, punctuation and "the" do not matter) and by the look
-it was drawn in; when the channel's look changes, it is drawn again in the new one.
+**Kept in the channel's catalogue** (`themes/<name>/assets/`, saved to the bucket with everything
+else): a design is a model like any other (`library.Identity` says what it is and holds its
+drawing), so it is kept, turned down and traced the same way, and a later video that names the
+same thing reuses it for nothing. It is known by what it is (`object_brass_lamp`: capitals,
+punctuation and "the" do not matter) and by the look it was drawn in; when the channel's look
+changes, it is drawn again in the new one. No shot can use a design until its 3D model is made:
+a flat drawing in a 3D shot was turned down.
 
 | You want to | Run |
 |---|---|
-| see the designs | `content designs list --config themes/<name>/config.json` |
-| turn one down (drawn again, differently, when next needed) | `content designs veto <design-id> --config …` |
-| see which are ready to become 3D, for free | `content designs model --config …` |
-| make their 3D models (paid: one GPU job per model kind, every design in it) | `content designs model --go --config …` |
+| see the designs | `content staging designs --config themes/<name>/config.json` |
+| turn one down (drawn again, differently, when next needed) | `content staging veto <design-id> --why "…" --config …` |
+| see how one was made | `content staging history <design-id> --config …` |
+| see which are ready to become 3D, for free | `content staging model --config …` |
+| make their 3D models (paid: one GPU job per model kind, every design in it) | `content staging model --go --config …` |
 
 **Before the GPU, for free** (`staging/designs.py`): each design's subject is found and outlined
 on this computer (Grounding DINO, SAM 2). It is sent only if it was found clearly (confidence
@@ -65,7 +69,8 @@ on this computer (Grounding DINO, SAM 2). It is sent only if it was found clearl
 2% and 90% of the picture, is clear of the frame's edge, and is in one piece. On three real
 keyframes all three were held back (things in a full scene run off the edge): exactly why
 designs are drawn alone on plain grey. A person goes to SAM 3D Body with their box, an object to
-SAM 3D Objects with its outline; each model comes back as `designs/<design-id>.glb`. Places stay
+SAM 3D Objects with its outline; each model comes back, is brought into the library's form (upright, in metres, facing −Y) like
+any model taken in, and becomes its design's file. Places stay
 pictures: they are lifted, not modelled.
 
 ## The shot ladder: the cheapest shot that does the job
@@ -145,7 +150,7 @@ good and bad cases before they may block anything.
 
 ## Build order: each step shown working on one scene before the next
 
-1. **First GPU run** (needs the steps in the SAM 3D README): `content designs model --go` on the
+1. **First GPU run** (needs the steps in the SAM 3D README): `content staging model --go` on the
    first designs a run makes, one object and one person. Shows a turntable; measures memory,
    time and cost. Go or no-go for everything below. About 25 cents.
 2. **The outline check against the picture's camera** (code, free). *The checks before the GPU

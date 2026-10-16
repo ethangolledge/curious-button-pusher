@@ -42,7 +42,8 @@ from content.schemas.media import (
 from content.schemas.perception import Observation
 from content.schemas.story import Feeling
 from content.schemas.visuals import Scene, SceneAnchor
-from content.staging.catalogue import Catalogue
+from content.staging.catalogue import ASSETS, Catalogue
+from content.staging.library import Library, load_library
 from content.staging.resolve import FindModel
 from content.state import CallRecord, ContentState, call_record
 from content.story.field import (
@@ -534,6 +535,10 @@ class Studio:
         if self.config.pictures == "keyframes" or self.renderer is None or self.catalogue is None:
             return None
         return self.renderer, self.catalogue
+
+    def library(self) -> Library:
+        """The channel's models and designs: the catalogue's, when it is loaded."""
+        return self.catalogue.library if self.catalogue else load_library(self.theme.root / ASSETS)
 
     def rendered_joins(self) -> Renderer | None:
         """Blender, when this channel renders its joins instead of buying AI morphs."""
