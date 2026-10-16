@@ -86,6 +86,9 @@ class ProductionConfig:
     # Reference images: candidates judged per request, and how many a keyframe uses.
     reference_candidates: int = 4
     references_per_request: int = 2
+    # A person, place or object in this many scenes or more is designed once, in the
+    # channel's look, and every keyframe that shows it is drawn from that design (0: never).
+    design_min_scenes: int = 2
     # Shorter side, in pixels, below which a reference image is too small to draw from.
     min_reference_side: int = 480
     # How scenes are pictured: "keyframes" (an image model's still, moved by ffmpeg),
@@ -429,6 +432,7 @@ def _production_config(root: Path, data: Mapping[str, Any]) -> ProductionConfig:
         hard_cut_threshold=float(_required(data, "hard_cut_threshold", section)),
         reference_candidates=int(data.get("reference_candidates", 4)),
         references_per_request=int(data.get("references_per_request", 2)),
+        design_min_scenes=int(data.get("design_min_scenes", 2)),
         min_reference_side=int(data.get("min_reference_side", 480)),
         pictures=_choice(data, "pictures", ("keyframes", "staged", "animated")),
         joins=_choice(data, "joins", ("ai", "rendered")),

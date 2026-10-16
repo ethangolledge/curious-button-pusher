@@ -51,3 +51,6 @@ class ReferenceSet(ImmutableModel):
     chosen: list[str]
     # Image URLs a person rejected; they are never offered again.
     rejected: list[str] = []
+    # The channel's drawing of it, made once and reused by every keyframe that shows it, in
+    # this video and later ones (`staging/designs.py`). None: drawn from the photos only.
+    design: str | None = None

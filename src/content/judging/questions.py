@@ -32,6 +32,7 @@ Target = Literal[
     "segment",
     "reference",
     "reference_image",
+    "design",
 ]
 
 _QUALITY_LEVELS = (
@@ -518,6 +519,34 @@ _QUESTIONS = (
             ),
         },
         correction="{target}: find a clearer image of the query.",
+    ),
+    Question(
+        question_id="design_view",
+        target="design",
+        kind="noul",
+        instructions=(
+            "Does `observation` show what `view` asks for: the subject alone, whole, on the "
+            "background `view` names, with nothing cut off by the frame?"
+        ),
+        criteria={
+            "true": "One subject, shown whole as `view` describes, with nothing else in frame.",
+            "false": (
+                "Part of it is cut off, other things or people share the frame, the background "
+                "is busy, or it is a different kind of view."
+            ),
+        },
+        correction="{target}: draw the subject alone and whole, as the view describes.",
+    ),
+    Question(
+        question_id="design_matches",
+        target="design",
+        kind="noul",
+        instructions="Going by `observation`, is the subject `query` (the `kind` asked for)?",
+        criteria={
+            "true": "It is recognisably the person, place or object named by `query`.",
+            "false": "It shows something else, or something too generic to be `query`.",
+        },
+        correction="{target}: draw the subject named by the query.",
     ),
     Question(
         question_id="keyframe_matches_anchor",

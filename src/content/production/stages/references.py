@@ -1,20 +1,29 @@
 """Pictures of the story's real people, places and objects: found, judged for relevance and
-match, and kept with the run."""
+match, and kept with the run. Those in several scenes are also designed once, in the channel's
+look, and reused by every keyframe that shows them, in this video and later ones."""
 
+from collections import Counter
 from functools import partial
 from pathlib import Path
 
-from content.production.media import as_png
+from content.production.media import GenerationRefused, as_png
 from content.production.studio import (
     Studio,
+    render_signature,
     required,
 )
 from content.providers.base import Usage
+from content.providers.cache import file_digest
 from content.providers.images import ImageSource
 from content.schemas.judgement import Judgement
 from content.schemas.references import FoundImage, ReferenceImage, ReferenceRequest, ReferenceSet
+from content.schemas.visuals import VisualPackage
+from content.staging.designs import Design, Designs, design_id
 from content.state import CallRecord, ContentState
 from content.story.notes import rejected_reference_ids
+
+# A design's shape: a person stands, an object sits square; a place takes the video's own.
+DESIGN_ASPECT = {"person": "9:16", "object": "1:1"}
 
 
 class References(Studio):
@@ -60,6 +69,11 @@ class References(Studio):
             references[request.ref_id] = found
             judgements += found_judgements
             calls += found_calls
+        references, design_judgements, design_calls = self._designs(
+            visuals, references, state["topic"]
+        )
+        judgements += design_judgements
+        calls += design_calls
         return {
             "references": references,
             "director_notes": [note for note in waiting if not note.startswith("R")],
@@ -176,6 +190,109 @@ class References(Studio):
             if found:
                 break
         return found, paths, calls
+
+    def _designs(
+        self, visuals: VisualPackage, references: dict[str, ReferenceSet], video: str
+    ) -> tuple[dict[str, ReferenceSet], list[Judgement], list[CallRecord]]:
+        """Each reference with a design: the channel's own when it has one in the current
+        look (free), or drawn now when it appears in `design_min_scenes` scenes or more."""
+        if self.config.design_min_scenes <= 0:
+            return references, [], []
+        designs = Designs(self.theme.root)
+        scenes = Counter(ref for scene in visuals.scenes for ref in set(scene.reference_ids))
+        judgements: list[Judgement] = []
+        calls: list[CallRecord] = []
+        updated = {}
+        for ref_id, reference in references.items():
+            request = reference.request
+            look = self._design_look(request)
+            design = designs.usable(request.kind, request.query, look)
+            if (
+                design is None
+                and reference.relevant
+                and (scenes[ref_id] >= self.config.design_min_scenes)
+            ):
+                design, drawn_judgements, drawn_calls = self._draw_design(
+                    reference, look, designs, video
+                )
+                judgements += drawn_judgements
+                calls += drawn_calls
+            path = None if design is None else str(designs.path(design))
+            updated[ref_id] = reference.model_copy(update={"design": path})
+        return updated, judgements, calls
+
+    def _design_look(self, request: ReferenceRequest) -> str:
+        """Everything that decides how a design looks, apart from its photos and attempt."""
+        return render_signature(
+            self.config.image_model,
+            self.theme_look(),
+            self.theme.design_prompt(request.kind, request.query),
+            *(file_digest(path) for path in self.theme.references),
+        )
+
+    def _draw_design(
+        self, reference: ReferenceSet, look: str, designs: Designs, video: str
+    ) -> tuple[Design | None, list[Judgement], list[CallRecord]]:
+        """Drawn, described and judged; one that Jev finds wrong is drawn again, differently.
+        None when every attempt failed or the image model refused: keyframes are then drawn
+        from the photos alone, as before."""
+        request = reference.request
+        photos = [Path(path) for path in reference.chosen[: self.config.references_per_request]]
+        prompt = self.theme.design_prompt(request.kind, request.query)
+        if photos:
+            prompt = f"{prompt} {self.theme.spec.visual.reference_note}"
+        aspect = DESIGN_ASPECT.get(request.kind, self.theme.spec.format.aspect_ratio)
+        judgements: list[Judgement] = []
+        calls: list[CallRecord] = []
+        first = designs.next_attempt(request.kind, request.query)
+        for attempt in range(first, first + self.config.keyframe_attempts):
+            try:
+                image, drawn = self.fetch(
+                    "design",
+                    {
+                        "look": look,
+                        "photos": [file_digest(path) for path in photos],
+                        "attempt": attempt,
+                    },
+                    ".png",
+                    "design",
+                    partial(
+                        self.media.image,
+                        model=self.config.image_model,
+                        prompt=prompt,
+                        references=[*self.theme.references, *photos],
+                        aspect_ratio=aspect,
+                        resolution=self.config.image_resolution,
+                        seed=self.config.seed + attempt,
+                    ),
+                    about=f"design of {request.query} ({request.kind}), attempt {attempt}",
+                )
+            except GenerationRefused:
+                break
+            (observation,), described = self.perceive([image])
+            verdicts, judged = self.judge.evaluate(
+                {
+                    "stage": "references",
+                    "revision": attempt,
+                    "target": "design",
+                    "target_id": design_id(request.kind, request.query),
+                    "state": {
+                        "view": self.theme.spec.visual.design_views[request.kind],
+                        "query": request.query,
+                        "kind": request.kind,
+                        "observation": observation.model_dump(),
+                    },
+                    "expected": None,
+                }
+            )
+            calls += [*drawn, *described, judged]
+            judgements += verdicts
+            if not any(verdict.outcome == "fail" for verdict in verdicts):
+                kept = designs.keep(
+                    request.kind, request.query, image, look=look, attempt=attempt, video=video
+                )
+                return kept, judgements, calls
+        return None, judgements, calls
 
 
 def _download(source: ImageSource, url: str) -> tuple[bytes, Usage]:

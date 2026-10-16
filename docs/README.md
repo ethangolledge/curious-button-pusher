@@ -27,6 +27,8 @@ Otherwise, start with the one you need:
 | find my way around the code, its trade-offs and quirks, and where to optimise | [codebase.md](codebase.md) |
 | build 3D shots in Blender: sets, models, movement, looks, and how to add to them | [staging.md](staging.md) |
 | move a scene's own keyframe in Blender: lifting it into depth, the camera's glide, its people's life | [picture-shots.md](picture-shots.md) |
+| understand the plan for 3D: what is made once and reused, which shots need 3D, the cheap checks before the GPU | [3d-reuse.md](3d-reuse.md) |
+| make 3D objects and people from a picture with SAM 3D on a rented cloud GPU, and how it is deployed and secured | [../cloud/sam3d/README.md](../cloud/sam3d/README.md) |
 
 Also:
 

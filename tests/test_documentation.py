@@ -13,6 +13,7 @@ NAMED = {
     "formats": "<format>",
     "palette": "<colour>",
     "visual.camera_moves": "<move>",
+    "visual.design_views": "<kind>",
     "visual.field.reactions": "<reaction>",
     "voice.lexicon": None,  # word → how it is spoken: documented as a whole
     "staging.look_settings": None,  # the look's own settings: its file explains them

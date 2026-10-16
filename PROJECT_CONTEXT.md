@@ -1,6 +1,6 @@
 # Project Context
 
-Last updated: 2026-10-10
+Last updated: 2026-10-16
 
 Read this first in a new session. It holds the current state of the engine and the decisions that
 are not obvious from the code; everything else has one home in `docs/` ([docs/README.md](docs/README.md)).
@@ -71,8 +71,16 @@ with a change). `AGENTS.md` says which applies when a session starts.
   3D costs money; what nothing can stage falls back to a keyframe and goes in the backlog. A
   missing ability is built as a block by people and the assistant. A channel's look and models
   are its own, in its private folder ([docs/staging.md](docs/staging.md)).
+- **One paid GPU service, kept apart: SAM 3D** (Meta's SAM 3D Objects and SAM 3D Body). The
+  container lives in `cloud/sam3d/`, outside the engine; GitHub Actions builds it on a push to
+  `main` that changes it and points two Cloud Run jobs at its digest. A job runs only while it
+  works (billed by the second, every picture of a request in one start), has no address and no
+  route to the internet; the weights stay in the person's private bucket. Signing in uses
+  Workload Identity Federation (no keys), every setting is a GitHub environment secret, and
+  everything fetched is pinned by hash. The engine reaches it only through
+  `providers/sam3d.py` ([cloud/sam3d/README.md](cloud/sam3d/README.md)). Not yet run on a GPU.
 - **Out of scope:** publishing, caption and hashtag copy, thumbnails, sound effects, production
-  infrastructure, and integrations not explicitly requested. The bucket is the person's own
+  infrastructure beyond the SAM 3D job, and integrations not explicitly requested. The bucket is the person's own
   permanent storage, not infrastructure the pipeline needs: without one, everything stays local.
 
 ## State (2026-10-12)
@@ -92,13 +100,20 @@ with a change). `AGENTS.md` says which applies when a session starts.
   picture ([docs/staging.md](docs/staging.md)); `"animated"` moves each keyframe itself
   ([docs/picture-shots.md](docs/picture-shots.md)). Not yet: motion capture, likenesses on made
   people, cloud rendering.
+- Designs (2026-10-16): a person, place or object in two or more scenes is drawn once in the
+  channel's look, checked by Gemini and Jev, kept with the channel, and every keyframe showing
+  it is drawn from it, in later videos too; `content designs model` makes their 3D models in
+  one GPU job after free checks ([docs/3d-reuse.md](docs/3d-reuse.md#designs)). Not yet tried
+  in a real run.
 - `content eval` caught all seven failures a director named in a rejected final cut, three runs
   out of three ([docs/narration.md](docs/narration.md#regression-content-eval)); false alarms on an
   approved script are not measured yet.
 
 ## Next Work
 
-1. A first staged video, and the toolkit's backlog after it; the channel's own look.
+1. The 3D plan ([docs/3d-reuse.md](docs/3d-reuse.md)): the first SAM 3D GPU run, then reuse
+   (cast, props, sets made once from reference pictures), the shot ladder, and cheap checks
+   (code, then Jev) before the GPU. The channel's own look.
 2. Measure `eval`'s false alarms once a channel has a `positive.json`.
 3. Tune thresholds and the critic from recorded judgements.
 4. The code improvements listed in [docs/codebase.md](docs/codebase.md#where-to-optimise).

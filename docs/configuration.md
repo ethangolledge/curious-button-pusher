@@ -94,6 +94,7 @@ different model family from the writer), `listener` (the cold viewer, a third fa
 | `keyframe_attempts`, `segment_attempts` | renders allowed per keyframe or morph, the first included |
 | `hard_cut_threshold` | ffmpeg scene-change score above which a morph frame counts as a jump |
 | `reference_candidates`, `references_per_request`, `min_reference_side` | reference photos judged per request, used per keyframe, and the smallest usable side in pixels |
+| `design_min_scenes` | a person, place or object in this many scenes is designed once in the channel's look and reused ([3d-reuse.md](3d-reuse.md#designs)); 0: never (default 2) |
 
 ## `learning` (omit it to send every judgement to Jev)
 

@@ -72,7 +72,7 @@ OpenRouter's alpha Decisions API (`POST /alpha/decisions`). Each answer is one o
 - **measurements** (`claim_worth`, `claim_connection`, `unit_reaction`, `unit_intensity`,
   `script_voice`) never pass or fail; code reads them.
 
-**The 39 questions** (`judging/questions.py`), by stage:
+**The 41 questions** (`judging/questions.py`), by stage:
 
 | Stage | Questions |
 |---|---|
@@ -81,6 +81,7 @@ OpenRouter's alpha Decisions API (`POST /alpha/decisions`). Each answer is one o
 | Listener test | `beat_heard` (per beat: did the listener come away knowing `audience_knows_after`?), `story_heard` (could they retell the story chain?) |
 | Storyboard | `scene_duplication`, `scene_meaning`, `scene_concrete`, `bridge_shared`, `visual_flow` |
 | References | `reference_relevant`, `reference_matches` |
+| Designs | `design_view` (alone, whole, as the view asks), `design_matches` (it is the query) |
 | Keyframes | `keyframe_matches_anchor`, `keyframe_on_theme`, `keyframe_shows_story`, `keyframe_framing`, `keyframe_clean` |
 | Morphs | `segment_keeps_style`, `segment_shift`, `segment_holds_anchor`, `segment_morph` |
 

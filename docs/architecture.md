@@ -198,7 +198,7 @@ a take is far off pace), draws one keyframe per scene and makes one morph per jo
 
 `judging/outcomes.py` turns answers into outcomes; `workflow/routing.py` turns outcomes into edges.
 
-- Jev's 39 questions live in `judging/questions.py`. Each asks one thing about
+- Jev's 41 questions live in `judging/questions.py`. Each asks one thing about
   one target and names the state fields it relies on. Taste comes from the theme: pictures are
   judged against the theme's look, the script's voice against `writing.voice`.
 - Each answer becomes `pass`, `fail` or `unsure` using the thresholds in `decisions` (yes ≥ 0.6,

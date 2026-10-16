@@ -14,6 +14,7 @@ from typing import Any, Literal, Self
 from pydantic import Field, ValidationError, field_validator, model_validator
 
 from content.schemas.base import ImmutableModel
+from content.schemas.references import ReferenceKind
 from content.schemas.script import VoiceDirection
 from content.schemas.story import Reaction, StoryRole, Transition
 from content.schemas.visuals import SceneAnchor
@@ -41,6 +42,7 @@ KEYFRAME_SLOTS = frozenset(
     }
 )
 FIGURE_SLOTS = frozenset({"subject", "name", "likeness"})
+DESIGN_SLOTS = frozenset({"view", "query", "style", "texture", "lighting", "avoid"})
 SILHOUETTE_SLOTS = frozenset({"subject", "silhouette"})
 SEGMENT_SLOTS = frozenset(
     {
@@ -252,6 +254,11 @@ class VisualSpec(ImmutableModel):
     # Added to a keyframe prompt when real reference images are attached.
     reference_note: str
     keyframe_template: str
+    # A recurring person, place or object drawn once, alone, as the channel's own reference
+    # for it ({view}, {query}, {style}, {texture}, {lighting}, {avoid}); `design_views` says
+    # what each kind of design shows.
+    design_template: str
+    design_views: dict[ReferenceKind, str]
     segment_template: str
     final_segment_template: str
 
@@ -259,6 +266,7 @@ class VisualSpec(ImmutableModel):
     def _templates_use_known_slots(self) -> Self:
         for name, template, allowed in (
             ("keyframe_template", self.keyframe_template, KEYFRAME_SLOTS),
+            ("design_template", self.design_template, DESIGN_SLOTS),
             ("segment_template", self.segment_template, SEGMENT_SLOTS),
             ("final_segment_template", self.final_segment_template, SEGMENT_SLOTS),
             ("figure", self.figure, FIGURE_SLOTS),
@@ -615,6 +623,20 @@ class Theme:
                 **(field or self.neutral_field()),
                 "frame": self.spec.format.frame,
                 "orientation": self.spec.format.orientation,
+            },
+        )
+
+    def design_prompt(self, kind: ReferenceKind, query: str) -> str:
+        visual = self.spec.visual
+        return _render(
+            visual.design_template,
+            {
+                "view": visual.design_views[kind],
+                "query": query,
+                "style": visual.style,
+                "texture": visual.texture,
+                "lighting": visual.lighting,
+                "avoid": visual.avoid,
             },
         )
 

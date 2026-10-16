@@ -120,7 +120,8 @@ class Keyframes(Studio):
                 (reference.request.kind, Path(path))
                 for ref_id in scene.reference_ids
                 if (reference := references.get(ref_id)) is not None
-                for path in reference.chosen
+                # The channel's design first: it already has the look and the identity.
+                for path in [*([reference.design] if reference.design else []), *reference.chosen]
             ]
             signature = render_signature(
                 self.config.image_model,
