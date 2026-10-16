@@ -35,6 +35,8 @@ TRIES = 60
 STEP = 0.3
 # An open place without walls is used out to this far from its centre.
 OPEN_REACH = 12.0
+# A backdrop (taller than the place's own space) is tried this far out, step by step.
+BEYOND_STEP, BEYOND_STEPS = 2.0, 100
 
 
 @dataclass(frozen=True)
@@ -329,6 +331,8 @@ class Composer:
             relation = "in_front_of"  # a figure not posed to hold it: set before them
         if anchor is None:
             return None
+        if size.z > self._room.high.z:
+            return self._beyond(anchor, size)
         if relation == "at":
             mark = self._stage.find_mark(target)
             heading = degrees_round(mark.facing)
@@ -378,6 +382,25 @@ class Composer:
         heading = degrees_round(facing)
         z, support = self._support_under(point, below=anchor.top + 0.05)
         return self._nudged(Vec(point.x, point.y, z), size, heading, support, ignore=group)
+
+    def _beyond(self, anchor: Box, size: Vec) -> tuple[Vec, float, str] | None:
+        """A backdrop, a thing taller than the place's own space (a tower across the street,
+        a skyline through the window, a ship off the quay): stood wholly beyond that space,
+        the way its target lies from the space's middle (straight back from the camera when
+        the target is the middle), facing in, on the ground, clear of everything built."""
+        room = self._room
+        way = (anchor.centre - room.centre).flat()
+        way = way.normalised() if way.length() > 0.01 else -FRONT
+        heading = degrees_round(-way)
+        start = _half_across(room, way) + _half_across(_box(Vec(), size, heading), way) + GAP
+        others = [*self._stage.solids(), *(placed.box for placed in self._placed)]
+        middle = room.centre.flat()
+        for step in range(BEYOND_STEPS):
+            at = middle + way * (start + step * BEYOND_STEP)
+            box = _shrink(_box(at, size, heading), 0.01)
+            if not box.overlaps(room) and not any(box.overlaps(other) for other in others):
+                return at, heading, "floor"
+        return None
 
     def _in_hand(self, group: Sequence[Placed]) -> tuple[Vec, float, str] | None:
         """Where a person posed to hold something has it: in their hand, or set down where

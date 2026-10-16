@@ -286,3 +286,40 @@ def test_a_person_walks_and_turns_at_a_persons_pace_unless_told_otherwise() -> N
     assert walk.settings["speed"] == HUMAN["speed"]
     assert turn.settings["rate"] == "200"  # the scene's own word stands
     assert "speed" not in trolley.settings
+
+
+def _room_box(layout: str) -> Box:
+    stage = RehearsalStage(frames=1, props=CATALOGUE.registry.props())
+    block = CATALOGUE.registry.get("layouts", layout)
+    assert issubclass(block, Layout)
+    block().build(stage, block.example)
+    surface = stage.find_mark("interior").surface
+    assert surface is not None
+    return surface
+
+
+def test_a_backdrop_taller_than_the_place_stands_wholly_beyond_it_the_way_its_target_lies() -> None:
+    """A tower across the street, a skyline through the window: too tall for the place's own
+    space, so stood beyond it, never across its edge, facing in."""
+    across = _compose(
+        "street",
+        [_thing("tower", "office tower", "behind", "far_side", height=150)],
+        camera={"block": "hold", "settings": [{"name": "subject", "value": "far_side"}]},
+    )
+    street = _room_box("street")
+    tower = _where(across, "tower")
+    made = RESOLVE(Thing.model_validate(_thing("t", "office tower", "at", "floor", height=150)))
+    assert across.missing == [] and made is not None
+    # Beyond the far pavement, its near face clear of the street's space.
+    assert tower.y - made.size.y / 2 > street.high.y
+
+    skyline = _compose("office", [_thing("tower", "office tower", "at", "window", height=60)])
+    office = _room_box("office")
+    assert skyline.missing == []
+    assert _where(skyline, "tower").y > office.high.y  # through the window, beyond the back wall
+
+
+def test_a_small_thing_is_never_put_beyond_the_room() -> None:
+    shot = _compose("office", [_thing("cup", "cup", "behind", "desk")])
+    office = _room_box("office")
+    assert office.low.y <= _where(shot, "cup").y <= office.high.y

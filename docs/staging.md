@@ -189,7 +189,13 @@ in dependency order (a glass after the man it stands before): on a surface insid
 stacked, in a row, beside, in front of (reaching a nearby table: a glass before a seated man
 lands on the table), round a table, in the room's seats then in chairs drawn up, against a
 wall facing into the room, or at a mark. Every copy is kept clear of every piece of the set
-and of everything placed before; one with no room is left out and said. Copies are a named
+and of everything placed before; one with no room is left out and said. A **backdrop**, a thing
+taller than the place's own space (a tower across the street, a skyline through the office
+window, a ship off the quay), is stood wholly beyond that space, the way its target lies,
+pushed out until clear of everything built, never across the edge (`Composer._beyond`). Plain
+blocks are enough: the picture drawn over the layout turns them into architecture (a 150 m
+tower behind a street of buildings came out as a lit glass tower over stone fronts and street
+lamps, the layout kept). Copies are a named
 group, so a camera move frames them all and an action is given to each in turn. The result
 is an ordinary job of `put` actors.
 
