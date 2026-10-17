@@ -83,6 +83,28 @@ class Identity:
 
 
 @dataclass(frozen=True)
+class Posture:
+    """The room a person takes in one pose: their size (width, depth, height), where its middle
+    is from where they stand (a seated person's knees and arms reach forward of their hips),
+    how high the seat they fit is, and where each thing they hold goes (its base: metres
+    right and back from where they stand, and up from the floor), by name."""
+
+    size: Size
+    middle: tuple[float, float] = (0.0, 0.0)
+    seat: float = 0.0
+    holds: dict[str, tuple[float, float, float]] = field(default_factory=dict)
+
+    @classmethod
+    def read(cls, data: Mapping[str, Any]) -> "Posture":
+        return cls(
+            size=tuple(data["size"]),
+            middle=tuple(data.get("middle", (0.0, 0.0))),
+            seat=data.get("seat", 0.0),
+            holds={name: tuple(at) for name, at in data.get("holds", {}).items()},
+        )
+
+
+@dataclass(frozen=True)
 class Model:
     model_id: str
     names: tuple[str, ...]
@@ -101,14 +123,9 @@ class Model:
     status: str = "kept"
     # How sure the automatic choice was, from 0 to 1 (`sourcing.score`).
     score: float = 0.0
-    # A seated figure: how high the seat it fits is (metres), so it is sat on any chair.
-    seat: float = 0.0
-    # A figure posed to hold something: where each held thing's base goes (metres right, back
-    # and up from where the figure stands), by name ("drink", "document", "phone").
-    holds: dict[str, tuple[float, float, float]] = field(default_factory=dict)
-    # Where the middle of the room it takes up is, from where it stands (metres right and
-    # back), when that is not its base's centre (a seated figure reaches forward).
-    middle: tuple[float, float] = (0.0, 0.0)
+    # A person: the room each of their poses takes, by `pose:doing` ("seated:drink"), as
+    # measured when they were made (`blender/person.py`).
+    postures: dict[str, "Posture"] = field(default_factory=dict)
     # A set's named parts (marks, surfaces, paths, actors, interior), each with where it is,
     # which way it faces and its size: what a shot using the set can refer to.
     parts: tuple[dict[str, Any], ...] = ()
@@ -354,8 +371,7 @@ def load_library(folder: Path | None, channel_blocks: Sequence[Path] = ()) -> Li
         for listed in ("names", "size", "capabilities", "parts", "motions"):
             data[listed] = tuple(data.get(listed, ()))
         data["paint"] = dict(data.get("paint", {}))
-        data["holds"] = {name: tuple(at) for name, at in data.get("holds", {}).items()}
-        data["middle"] = tuple(data.get("middle", (0.0, 0.0)))
+        data["postures"] = {k: Posture.read(v) for k, v in data.get("postures", {}).items()}
         identity = data.get("identity")
         data["identity"] = Identity(**identity) if identity else None
         model = Model(**data)

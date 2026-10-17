@@ -19,6 +19,7 @@ from content.blender.api import (
     standing_in,
 )
 from content.blender.blocks.base import Prop, read
+from content.blender.body import STANDARD_HEIGHT, Frame, holds, table_before
 from content.blender.bookkeeping import Bookkeeping
 from content.blender.maths import ORIGIN, Quat, Vec, axis_angle, heading_rotation
 
@@ -48,6 +49,10 @@ class Piece:
         for child in self.children:
             box = box.union(child.extent())
         return box
+
+
+# How high a standing person's hips are, as a share of their height.
+HIPS = 0.53
 
 
 class RehearsalStage(Bookkeeping):
@@ -244,6 +249,30 @@ class RehearsalStage(Bookkeeping):
 
     def spin(self, thing: Thing, axis: Vec, degrees: Sequence[tuple[int, float]]) -> None:
         self._record("spin", name=thing.name, axis=axis, last=degrees[-1])
+
+    def perform(
+        self,
+        thing: Thing,
+        pose: str,
+        doing: str = "",
+        *,
+        seat: float = 0.0,
+        table: Thing | None = None,
+    ) -> dict[str, Vec]:
+        """Where they hold things, from where their hips would roughly be (a rehearsal does
+        not bend bones)."""
+        piece = self._piece(thing)
+        self._record("perform", name=piece.name, pose=pose, doing=doing, seat=seat)
+        standing = piece.extent()
+        up = seat if pose == "seated" else standing.size.z * HIPS
+        frame = Frame(
+            Vec(standing.centre.x, standing.centre.y, standing.low.z + up),
+            standing.low.z,
+            piece.turn,
+            standing.size.z / STANDARD_HEIGHT,
+        )
+        near = table_before(self.bounds(table), frame) if table is not None else None
+        return holds(pose, doing, frame, near)
 
     def play(self, thing: Thing, motion: str, *, start_frame: int = 1, speed: float = 1.0) -> None:
         self._record("play", name=thing.name, motion=motion, start=start_frame, speed=speed)

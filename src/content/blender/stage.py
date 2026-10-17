@@ -14,6 +14,7 @@ import bmesh  # type: ignore[import-not-found]
 import bpy  # type: ignore[import-not-found]
 from mathutils import Matrix, Vector  # type: ignore[import-not-found]
 
+from content.blender import rigging
 from content.blender.api import (
     Box,
     Channel,
@@ -24,6 +25,7 @@ from content.blender.api import (
     standing_in,
 )
 from content.blender.blocks.base import Look, Prop, read
+from content.blender.body import STANDARD_HEIGHT, Frame
 from content.blender.bookkeeping import Bookkeeping
 from content.blender.imports import import_model, surface
 from content.blender.job import ModelFile
@@ -352,6 +354,28 @@ class BlenderStage(Bookkeeping):
             turn = Vector(axis.tuple()) * math.radians(angle)
             thing.rotation_euler = tuple(rest + turn)
             thing.keyframe_insert("rotation_euler", frame=frame)
+
+    def perform(
+        self,
+        thing: BlenderObject,
+        pose: str,
+        doing: str = "",
+        *,
+        seat: float = 0.0,
+        table: BlenderObject | None = None,
+    ) -> dict[str, Vec]:
+        rig = rigging.rig_of(thing)
+        if rig is None:
+            raise ValueError(f"{thing.name} has no skeleton to pose")
+        standing = self.bounds(thing)
+        frame = Frame(
+            rigging.hips(rig),
+            standing.low.z,
+            Quat(*thing.matrix_world.to_quaternion()),
+            standing.size.z / STANDARD_HEIGHT,
+        )
+        on = self.bounds(table) if table is not None else None
+        return rigging.perform(rig, frame, pose, doing, seat=seat, table=on)
 
     def play(
         self, thing: BlenderObject, motion: str, *, start_frame: int = 1, speed: float = 1.0

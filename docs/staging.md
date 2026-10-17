@@ -152,31 +152,47 @@ library never holds one thing twice under different names.
 
 ## People
 
-`content staging people` installs, once, the MPFB extension for Blender and MakeHuman's CC0
-clothes and hair (about 650 MB). Then a person a scene describes is made from one parametric
-body (`blender/person.py`): shaped by sex, age and build, made the height asked, dressed
-(suit, casual, work, uniform) with shoes and hair, and posed by code so the pose fits any body
-(standing, seated at a table, mid-stride). What their hands do (`ACTIVITIES` in
-`person.py`) is reached for, not set joint by joint: each hand is given a point (on the table,
-measured from its near edge; by the hips; at the chest) and inverse kinematics bends the arm to
-it, an elbow target keeping it natural; a hand on a table is laid along it (the wrist bent, the
-palm on the top), then the fingers close by how much the grip needs (flat, rest, hold, point).
-A seated person's legs are fitted to the engine's chair the same way: bent until the feet
-reach the floor once they sit on it, so the knees stay clear under a desk. Every seat stands
-`sets.SEAT_REACH` (0.36 m) from the table edge it faces, in every layout and every chair the
-composer draws up. A
-person holding something reports where it sits in their hand (`holds`), so the composer puts
-the glass there. Still people are baked to plain meshes; moving ones
-keep their skeleton and a looping motion written in code for every body alike (breathing,
-talking, walking). Every surface is named for its role, so every look draws them its own way.
-Each description is made once (3 to 4 seconds) and kept in the library by it; a seated
-person's origin is under their hips and their seat height is measured, so they are sat on any
-chair.
+Every person is made one way and posed one way, so no one moves more naturally than anyone
+else. `content staging people` installs, once, the MPFB extension for Blender and MakeHuman's
+CC0 clothes and hair (about 650 MB).
 
-A particular person (`who`) is the library's own model of them, made once with the director's
-sign-off: a figurine model sheet from the image model, then a multiview image-to-3D service
-with a rig (about $1, the only paid step in 3D). The Kushner figure was made this way.
-Without MPFB, people are the engine's simple figurines.
+**Made once.** A person a scene describes is made from one parametric body
+(`blender/person.py`): shaped by sex, age and build, made the height asked, dressed (suit,
+casual, work, uniform) with shoes and hair, on the one skeleton every person shares (MPFB's
+`default` rig, with hands and face). They are kept standing at rest, a rigged model in the
+library, under an id made from their recipe (`people.Recipe`: what shapes them, never how they
+are posed), so the same description is the same person in every scene and every video. Each
+takes about 7 seconds. So a shot can be composed without Blender, every pose is tried on them
+as they are made and measured (`Model.postures`: the room it takes, the seat it fits, where
+what they hold goes). A person not made yet takes the room an average person that tall would
+(`people.STAND_INS`), enough to check a shot; it cannot be rendered until they are made.
+
+**Posed in the shot.** The `person` actor puts them where the composer worked out they go and
+poses them there, on that shot's own furniture (`Stage.perform`). The rules are plain Python
+(`blender/body.py`), turned into bones by one module (`blender/rigging.py`) for everyone:
+
+- each pose (standing, seated, mid-stride) sets where each limb points;
+- seated, the legs are bent by inverse kinematics until the thighs sit on the seat and the
+  feet on the floor;
+- what the hands do (`ACTIVITIES`: resting, drinking, reading, writing, pointing, lap, folded,
+  pockets, phone) is reached for, not set joint by joint: each hand is given a point on the
+  real table before them (measured from its near edge and its top, `body.table_before`), by the
+  hips, or by the floor, and inverse kinematics bends the arm to it, an elbow target keeping it
+  natural;
+- a hand lying on a table turns palm down at the forearm (as a forearm turns, so the wrist
+  never twists), lies along the top with its fingers and thumb laid flat, and is lifted until
+  its lowest point rests on the top, never in it;
+- the fingers close by their grip (flat, rest, hold, point), drawn together from the made
+  hand's spread.
+
+Where they hold things is left as a mark (`<actor>.drink`), and what they hold is put there
+and hangs from them (`put`'s `held_by` and `hold`). Every surface is named for its role, so
+every look draws them its own way. A thing whose words name a person ("a guard", "two
+officials") is a person even when the scene forgot to describe them (`people.is_person`).
+
+**Particular people.** A person with a design (`who`) is the library's own person, made on the
+same skeleton and fitted to their design. Until then they are made from the scene's
+description. Without MPFB a scene with people in it cannot be staged: it is drawn.
 
 A scene that has a keyframe can instead be moved as the keyframe itself, lifted into depth:
 [picture-shots.md](picture-shots.md).
@@ -202,7 +218,7 @@ is an ordinary job of `put` actors.
 People in a group are made different, as a room of real people is: what the scene leaves open
 (age, build, what their hands do) is filled per copy from short lists (`NATURAL`, `AGES`,
 `BUILDS` in `compose.py`) in a seeded order, so no two neighbours do the same thing; each is
-turned a few degrees off square (`SWAY`) and starts breathing at a different moment. A thing
+turned a few degrees off square (`SWAY`). A thing
 `held_by` people decides their activity (a glass: drinking; papers: reading; a pen: writing; a
 phone: on the phone, by the words in `HELD`), and it is placed at their hand, one per holder:
 three glasses held by eight men are three men drinking, not eight hands round eight cups.
@@ -251,7 +267,7 @@ channel's look; a description without one is drawn the starter kit's way.
 | moves | `orbit`, `dolly`, `pan`, `track`, `fly`, `hold`, `vertigo` | `camera.film`, `camera.around` |
 | lights | `lamp`, `window`, `overhead`, `studio`, `headlights`, `streetlights`, `sky` | `lighting.source`, `lighting.flicker` |
 | transitions (rendered joins) | `dissolve`, `flow`, `zoom_through`, `swirl`, `fractal_dive`, `shatter_dive`, `kaleidoscope`, `dots`, `melt` | `patterns` on the `Canvas` verbs |
-| props (made in code) | 35, families among them (cup, glass, bottle, box, table, book, building), and standing and seated figurines | `shapes`, `shapes_figure` |
+| props (made in code) | 33, families among them (cup, glass, bottle, box, table, book, building) | `shapes` |
 | looks | `plain`; the starter kit's `starter`; a channel's own | `Plain` |
 
 The theme's camera moves (`visual.camera_moves`) are 3D moves too: `staging.moves` in

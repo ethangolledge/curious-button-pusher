@@ -13,8 +13,8 @@ from content.blender.materials import linear, nearest_role
 from content.providers.assets import Candidate, licence_terms
 from content.schemas.staging import Thing
 from content.staging.catalogue import load_catalogue, with_models
-from content.staging.library import Model, load_library
-from content.staging.people import person_id
+from content.staging.library import Model, Posture, load_library
+from content.staging.people import character_id, recipe
 from content.staging.resolve import from_library, with_online
 from content.staging.sourcing import TOO_DETAILED, rank
 from content.staging.store import Store
@@ -228,24 +228,31 @@ def test_a_family_is_made_to_the_size_asked_and_anything_else_is_stretched_to_it
     assert desk[0] == pytest.approx(2.4) and desk_file.fit == (2.4, 0.0, 0.0)
 
 
-def test_a_described_person_is_made_once_and_is_a_figurine_until_then(tmp_path: Path) -> None:
+def test_a_described_person_is_made_once_and_until_then_only_takes_room(tmp_path: Path) -> None:
     library = load_library(tmp_path)
     seated = {"thing_id": "men", "what": "man in a suit", "height": 1.8,
-              "person": {"pose": "seated", "motion": "talking"},
+              "person": {"pose": "seated", "activity": "drink"},
               "place": {"relation": "seated_at", "target": "table"}}  # fmt: skip
     thing = Thing.model_validate(seated)
     assert thing.person is not None
+    character = character_id(recipe(thing.person, 1.8))
 
     before = from_library(library)(thing)
-    made = Model(model_id=person_id(thing.person, 1.8), names=("middle man suit seated",),
-                 describe="A man", size=(0.5, 0.8, 1.39), source="MakeHuman (MPFB)",
-                 licence="CC0", file="p.glb", capabilities=("person", "seated"), seat=0.375,
-                 motions=("talking",))  # fmt: skip
+    made = Model(model_id=character, names=("middle man suit",), describe="A man",
+                 size=(0.54, 0.35, 1.8), source="MakeHuman (MPFB)", licence="CC0", file="p.glb",
+                 capabilities=("person",),
+                 postures={"seated:": Posture((0.6, 0.8, 1.4), (0.0, -0.3), 0.45),
+                           "seated:drink": Posture((0.6, 0.8, 1.4), (0.0, -0.3), 0.45,
+                                                   {"drink": (-0.15, -0.5, 0.75)})})  # fmt: skip
     library.add(made, alongside=True)
     after = from_library(library)(thing)
     other = from_library(library)(Thing.model_validate({**seated, "height": 1.6}))
 
-    assert before is not None and before.model == "seated_person"
-    assert after is not None and after.model == made.model_id
-    assert after.seat == 0.375 and after.motion == "talking" and after.seated
-    assert other is not None and other.model == "seated_person"  # a shorter man: not made yet
+    # Not made yet: the room an average man takes, seated, named so it cannot be drawn.
+    assert before is not None and before.model == character and before.pose == "seated"
+    assert before.file is not None and before.file.path == ""
+    assert before.size.z == pytest.approx(1.47)
+    # Made: posed in the shot, measured as they were made, holding their drink.
+    assert after is not None and after.model == character and after.doing == "drink"
+    assert after.size.z == pytest.approx(1.4) and after.holds["drink"].z == pytest.approx(0.75)
+    assert other is not None and other.model != character  # a shorter man: someone else

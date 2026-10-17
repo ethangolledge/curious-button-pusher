@@ -59,8 +59,8 @@ def _people() -> Check:
     return Check(
         "People in 3D",
         "optional",
-        "simple figurines only",
-        "To make real-looking people for 3D shots: content staging people (once, ~650 MB).",
+        "not installed: scenes with people in them are drawn",
+        "To put people in 3D shots: content staging people (once, ~650 MB).",
     )
 
 

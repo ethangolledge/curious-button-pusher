@@ -1,8 +1,8 @@
 """A model put exactly where the shot's composer worked out it goes (`staging/compose.py`):
 standing at a point, turned to a heading, and, for a figure with a skeleton, playing one of
-its motions (breathing, talking, walking) all through the shot. What the composer places,
-every placed thing is: a cup on a table, a man in a chair, a chair round a table, a glass
-in a hand (held by its holder, it moves with them)."""
+its motions all through the shot. Everything the composer places is put, but a person
+(`person.py`): a cup on a table, a chair round a table, a glass in a hand (held by its holder,
+it moves with them)."""
 
 from dataclasses import dataclass
 from typing import Annotated
@@ -26,6 +26,7 @@ class Settings:
     picture: Annotated[float, Range(0, 200, "metres wide, when the model is a picture")] = 0.0
     lying: bool = False
     held_by: Annotated[str, About("the actor holding it: it moves with them")] = ""
+    hold: Annotated[str, About("where its holder holds it (drink, document): put there")] = ""
 
 
 class Put(Actor):
@@ -39,7 +40,11 @@ class Put(Actor):
             if p.picture
             else stage.model(model, name=actor_id, height=p.height or None)
         )
-        stage.place(thing, Vec(p.x, p.y, p.z), facing=axis_angle(UP, p.heading).rotate(FRONT))
+        at = Vec(p.x, p.y, p.z)
+        if p.held_by and p.hold:
+            # Where its holder's hand is, as they were posed (`actors/person.py`).
+            at = stage.find_mark(f"{p.held_by}.{p.hold}").at
+        stage.place(thing, at, facing=axis_angle(UP, p.heading).rotate(FRONT))
         if p.motion:
             begins = round(p.start * stage.frames) + 1
             stage.play(thing, p.motion, start_frame=begins, speed=p.speed)

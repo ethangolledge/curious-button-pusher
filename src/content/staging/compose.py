@@ -16,13 +16,13 @@ from dataclasses import dataclass, field
 
 from content.blender.api import Box, Mark, standing_in
 from content.blender.blocks.base import Layout, SettingError, read, settings
-from content.blender.blocks.props.chair import SEAT_HEIGHT as CHAIR_SEAT
 from content.blender.job import ActorCall, BlockCall, ModelFile
 from content.blender.maths import FRONT, UP, Vec, axis_angle, degrees_round
 from content.blender.registry import Registry, RegistryError
 from content.blender.rehearsal import RehearsalStage
 from content.blender.sets import SEAT_REACH, resting_on
-from content.schemas.staging import Action, Setting, StagePlan, Thing
+from content.schemas.staging import Action, Person, Setting, StagePlan, Thing
+from content.staging.people import is_person
 
 # Room to leave between things that stand side by side, and round a thing's edge.
 GAP = 0.08
@@ -35,6 +35,9 @@ TRIES = 60
 STEP = 0.3
 # An open place without walls is used out to this far from its centre.
 OPEN_REACH = 12.0
+# Something stood at a place in the room (the window) steps back from it this far at a time,
+# so many times, when what is before the place (a sill) leaves no room.
+STEP_BACK, STEPS_BACK = 0.1, 4
 # A backdrop (taller than the place's own space) is tried this far out, step by step.
 BEYOND_STEP, BEYOND_STEPS = 2.0, 100
 
@@ -48,17 +51,17 @@ class Resolved:
     model: str
     size: Vec
     file: ModelFile | None = None
-    seated: bool = False  # a figure already in a seated pose: it needs a seat
-    # How high the seat it fits is (0: the engine's chair, or not seated).
-    seat: float = 0.0
-    # The motion it plays all through the shot (a figure with a skeleton), if any.
+    # The motion it plays all through the shot (a model with a skeleton), if any.
     motion: str = ""
     # A picture (a map, a painting): drawn on a card, lying flat on what it is on.
     picture: bool = False
-    # A figure posed to hold something: where each held thing's base goes, from its feet.
+    # A person: the pose they are placed in and what their hands do (posed in the shot,
+    # `blocks/actors/person.py`), where each thing they hold goes (its base, from their feet),
+    # and where the middle of the room they take up is, from where they stand (a seated
+    # person's knees and arms reach forward of their hips).
+    pose: str = ""
+    doing: str = ""
     holds: dict[str, Vec] = field(default_factory=dict)
-    # Where the middle of the room it takes up is, from where it stands (a seated figure's
-    # knees and arms reach forward of its hips).
     middle: Vec = Vec()
 
 
@@ -188,6 +191,12 @@ class Composer:
 
     def compose(self, plan: StagePlan) -> Composition:
         self._build_room(plan)
+        # A person the scene forgot to describe is still a person (posed, never a statue).
+        plan = plan.model_copy(update={"things": [
+            t.model_copy(update={"person": Person()}) if t.person is None and is_person(t.what)
+            else t
+            for t in plan.things
+        ]})  # fmt: skip
         people = {t.thing_id: t.person.pose for t in plan.things if t.person}
         self._people = set(people)
         # What each person holds decides what their hands do: every copy (`each`), or as
@@ -262,13 +271,27 @@ class Composer:
                 placed = Placed(actor_id, thing.thing_id, box, heading, support, at, holds)
                 self._placed.append(placed)
                 copies.append(placed)
+                if resolved.pose:
+                    table = self._table_for(target, group)
+                    self._out.actors.append(_person(actor_id, resolved, at, heading, table))
+                    continue
                 lying = relation in SMALL
                 begins = self._chance.uniform(0, 0.3) if resolved.motion else 0.0
                 # In a holder's hand (not set down for want of one), it moves with them.
                 in_hand = relation == "held_by" and any(a.actor_id == support for a in group)
                 held = support if in_hand else ""
+                hold = self._hold_name(target) if in_hand else ""
                 self._out.actors.append(
-                    _put(actor_id, resolved, at, heading, lying=lying, start=begins, held_by=held)
+                    _put(
+                        actor_id,
+                        resolved,
+                        at,
+                        heading,
+                        lying=lying,
+                        start=begins,
+                        held_by=held,
+                        hold=hold,
+                    )  # fmt: skip
                 )
         self._copies[thing.thing_id] = copies
         if len(copies) > 1:
@@ -292,6 +315,18 @@ class Composer:
             or natural[(index + turn) % len(natural)],
         }
         return thing.model_copy(update={"person": person.model_copy(update=filled)})
+
+    def _table_for(self, target: str, group: Sequence[Placed]) -> str:
+        """The table or desk a person is placed at, by the actor's name, for their hands to
+        rest on: the room's own furniture, or a thing placed in it."""
+        if target in self._furniture:
+            return target
+        return group[0].actor_id if len(group) == 1 else ""
+
+    def _hold_name(self, holder: str) -> str:
+        """Where the people of `holder` hold what they hold ("drink"), as they are posed."""
+        kind, _ = self._holding.get(holder, (None, 0))
+        return HOLD[kind] if kind else ""
 
     def _held_by(self, thing_id: str, index: int) -> str | None:
         kind, holders = self._holding.get(thing_id, (None, 0))
@@ -341,12 +376,14 @@ class Composer:
             # A place in the room (the window, a door): stood just in front of it, on the
             # ground (never on a chair under the window); a long thing that does not fit across
             # the place lies along it (a car on a road).
-            point = mark.at + mark.facing * (max(size.x, size.y) / 2 + GAP)
-            z, support = self._support_under(point, below=min(mark.at.z + 0.05, STEP))
-            for turned in (heading, heading + 90.0):
-                spot = self._nudged(Vec(point.x, point.y, z), size, turned, support, ignore=[])
-                if spot is not None:
-                    return spot
+            # Something before the place (a sill under the window) may push it back a little.
+            for back in range(STEPS_BACK):
+                point = mark.at + mark.facing * (max(size.x, size.y) / 2 + GAP + back * STEP_BACK)
+                z, support = self._support_under(point, below=min(mark.at.z + 0.05, STEP))
+                for turned in (heading, heading + 90.0):
+                    spot = self._nudged(Vec(point.x, point.y, z), size, turned, support, ignore=[])
+                    if spot is not None:
+                        return spot
             return None
         if relation == "stacked_on":
             base = self._stacked_height(target, anchor)
@@ -445,19 +482,17 @@ class Composer:
         target: str,
     ) -> tuple[Vec, float, str] | None:
         seated = relation == "seated_at"
-        # A seated figure made for a lower seat is raised to sit on the chair, not in it.
-        lift = Vec(0, 0, max(0.0, CHAIR_SEAT - resolved.seat) if resolved.seat else 0.0)
         if seated:
             seat = self._free_seat(anchor)
             if seat is not None:
-                return seat.at + lift, degrees_round(seat.facing), seat.name
+                return seat.at, degrees_round(seat.facing), seat.name
         depth = max(resolved.size.x, resolved.size.y)
         margin = SEAT_REACH if seated else depth / 2 + 0.25
         point, facing = _round_edge(anchor, margin, (index + 0.5) / count)
         heading = degrees_round(facing)
         if seated:
             self._add_chair(point, heading)
-            return point + lift, heading, f"chair for {target}"
+            return point, heading, f"chair for {target}"
         return self._nudged(point, resolved.size, heading, "floor", ignore=[])
 
     def _free_seat(self, anchor: Box) -> Mark | None:
@@ -602,10 +637,11 @@ def _put(
     lying: bool = False,
     start: float = 0.0,
     held_by: str = "",
+    hold: str = "",
 ) -> ActorCall:
     """A placed thing, drawn at the size it was resolved to; a moving figure starts its
     motion at `start` (so a group does not move in step); a thing in a hand is `held_by`
-    its holder."""
+    its holder, where they `hold` it."""
     values = {"x": _n(at.x), "y": _n(at.y), "z": _n(at.z), "heading": _n(heading)}
     if resolved.file is None:
         values["height"] = _n(resolved.size.z)
@@ -617,7 +653,23 @@ def _put(
         values.pop("height", None)
     if held_by:
         values["held_by"] = held_by
+    if hold:
+        values["hold"] = hold
     return ActorCall(actor_id, "put", resolved.model, values)
+
+
+def _person(actor_id: str, resolved: Resolved, at: Vec, heading: float, table: str) -> ActorCall:
+    """A placed person, posed in the shot: their pose, what their hands do, the table before
+    them."""
+    values = {
+        "x": _n(at.x), "y": _n(at.y), "z": _n(at.z), "heading": _n(heading),
+        "pose": resolved.pose,
+    }  # fmt: skip
+    if resolved.doing:
+        values["doing"] = resolved.doing
+    if table:
+        values["table"] = table
+    return ActorCall(actor_id, "person", resolved.model, values)
 
 
 def _n(value: float) -> str:

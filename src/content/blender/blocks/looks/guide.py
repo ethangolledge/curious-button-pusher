@@ -2,8 +2,9 @@
 """A shot as a guide for the image model, never shown to a viewer
 ([docs/3d-reuse.md](../../../../../docs/3d-reuse.md)): every solid in plain clay, a shade of
 grey per kind of surface so neighbours stay apart, outlined in ink, lit softly enough that
-nothing is lost in shadow. It says where everything is, how big, how it turns and where the
-light comes from; the image model repaints it in the channel's look, from the channel's designs."""
+nothing is lost in shadow, its lamps and screens glowing as they do in the shot. It says where
+everything is, how big, how it turns and where the light comes from; the image model repaints
+it in the channel's look, from the channel's designs."""
 
 from dataclasses import dataclass
 from typing import Annotated, Any, ClassVar
@@ -12,6 +13,8 @@ from content.blender.blocks.base import About, Range
 from content.blender.blocks.looks.plain import Plain
 from content.blender.materials import linear
 
+# What gives light, and glows in the guide as it does in the shot.
+GLOWING = frozenset({"bulb", "screen"})
 # How light each kind of surface is drawn, 0 to 1: the room recedes, the things in it stand
 # out, people stand out most.
 LIGHTNESS: dict[str, float] = {
@@ -41,12 +44,14 @@ class Guide(Plain):
         return linear(f"#{grey}{grey}{grey}")
 
     def material(self, role: str) -> Any:
-        """Clay: no shine, no metal, nothing glowing, so light reads only as shape."""
+        """Clay: no shine, no metal, so light reads only as shape. What gives light (a lamp's
+        bulb, a screen) still glows: the layout says it is on, and is drawn on."""
         if role not in self._made:
             material = super().material(role)
             shader = material.node_tree.nodes["Principled BSDF"]
             shader.inputs["Roughness"].default_value = 1.0
             shader.inputs["Metallic"].default_value = 0.0
-            shader.inputs["Emission Strength"].default_value = 0.0
+            if role not in GLOWING:
+                shader.inputs["Emission Strength"].default_value = 0.0
             shader.inputs["Transmission Weight"].default_value = 0.0
         return self._made[role]

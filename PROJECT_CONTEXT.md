@@ -95,9 +95,11 @@ with a change). `AGENTS.md` says which applies when a session starts.
 - 3D shots (Blender 5.2): scenes described and composed (relations, groups, furnishing);
   things resolved through a cascade into a SQLite catalogue with lineage (families, versions,
   people made with MakeHuman, Infinigen, an Objaverse index, Sketchfab, Poly Pizza, Gazebo
-  Fuel, the Smithsonian; CLIP scoring, automatic taking with keep/veto); people posed by
-  inverse kinematics to touch what they use, varied across a group, holding what is `held_by`
-  them; 42 blocks (the `guide` look among them), 35 props. `production.pictures: "staged"`
+  Fuel, the Smithsonian; CLIP scoring, automatic taking with keep/veto); every person made once
+  on one shared skeleton (2026-10-17: no figurines, no per-person meshes) and posed in the shot
+  on its real furniture by the same code (`blender/body.py`, `rigging.py`): hands reached by
+  inverse kinematics, laid palm down on a table and lifted until they rest on it; varied across
+  a group, holding what is `held_by` them; 43 blocks (the `guide` look among them), 33 props. `production.pictures: "staged"`
   draws each staged scene's keyframe over its 3D layout (proved 2026-10-16 on a Kushner scene
   from a new angle: the layout held, boxes overlapping 0.84–1.0, in the channel's look and the
   keyframe's likeness, 14 cents for three) and its vision check looks for physical mistakes;

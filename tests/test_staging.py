@@ -76,7 +76,11 @@ def _stage(registry: Any = REGISTRY) -> RehearsalStage:
     stage = RehearsalStage(
         frames=60,
         props=registry.props(),
-        model_sizes={"sample_set": (8.0, 6.0, 3.0), "sample_picture": (1.0, 0.0, 1.5)},
+        model_sizes={
+            "sample_set": (8.0, 6.0, 3.0),
+            "sample_picture": (1.0, 0.0, 1.5),
+            "sample_person": (0.54, 0.35, 1.8),
+        },
         model_parts={"sample_set": SAMPLE_SET},
     )
     top = Box(Vec(-0.6, -0.4, 0), Vec(0.6, 0.4, 0.75))

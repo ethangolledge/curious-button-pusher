@@ -101,10 +101,12 @@ on this computer (Grounding DINO, SAM 2). It is sent only if it was found clearl
 0.5; on real keyframes a person scored 0.84 and a lamp that was not there 0.40), fills between
 2% and 90% of the picture, is clear of the frame's edge, and is in one piece. On three real
 keyframes all three were held back (things in a full scene run off the edge): exactly why
-designs are drawn alone on plain grey. A person goes to SAM 3D Body with their box, an object to
-SAM 3D Objects with its outline; each model comes back, is brought into the library's form (upright, in metres, facing −Y) like
-any model taken in, and becomes its design's file. Places stay
-pictures: they are lifted, not modelled.
+designs are drawn alone on plain grey. An object goes to SAM 3D Objects with its outline; its
+model comes back, is brought into the library's form (upright, in metres, facing −Y) like any
+model taken in, and becomes its design's file. A person is never made as a mesh of their own:
+every person is made on the one skeleton everyone shares and posed by the same code
+([staging.md](staging.md#people)), so no one moves more naturally than anyone else; a person's
+design is fitted onto it. Places stay pictures: they are lifted, not modelled.
 
 ## How a scene is made to move
 
@@ -137,10 +139,11 @@ questions with a right answer; taste belongs to the director.
 ## Still to come
 
 1. **First GPU run** (the director's steps in [the SAM 3D README](../cloud/sam3d/README.md)):
-   `content staging model --go` on one person and one object design; measure memory, time and
-   cost. About 25 cents.
-2. **SAM 3D models as stand-ins**: a design's mesh in the layout in place of a made person or
-   stock prop, so the guide carries its true shape; the after-GPU checks.
+   `content staging model --go` on one object design; measure memory, time and cost. About 25
+   cents.
+2. **SAM 3D models as stand-ins**: a design's mesh in the layout in place of a stock prop, so
+   the guide carries its true shape; the after-GPU checks. People are fitted to their designs
+   on the shared skeleton instead.
 3. **Action**: the Wan control job on Cloud Run (the SAM 3D job's pattern, its shared parts
    moved into one provider), Blender's depth and pose passes, motion clips on one shared
    skeleton (free sources only, licences checked), the director's sign-off per shot.
@@ -186,10 +189,13 @@ questions with a right answer; taste belongs to the director.
   ([fal](https://fal.ai/models/fal-ai/wan-vace-14b/depth)); OpenRouter's video API takes first
   and last frames and reference pictures, not a control video
   ([docs](https://openrouter.ai/docs/features/multimodal/video-generation)).
-- Motion for people: HY-Motion (text to motion, SMPL-X, retargeted in Blender:
-  [OpenBlender-HyMotion](https://github.com/PGCRT/OpenBlender-HyMotion-CRT); its licence is to be
-  checked for commercial use); scene-aware motion such as
-  [TeSMo](https://github.com/nv-tlabs/tesmo); Bandai Namco's mocap set is non-commercial.
+- Motion for people: the CMU motion capture library ("may be copied, modified, or redistributed
+  without permission", [FAQ](http://mocap.cs.cmu.edu/faqs.php)) and 100STYLE (100 walking and
+  idle styles, CC BY 4.0, credited "The 100STYLE Dataset - Ian Mason":
+  [100STYLE](https://www.ianxmason.com/100style/)), retargeted once onto the shared skeleton.
+  Not used: HY-Motion (its licence excludes the UK and EU:
+  [issue](https://github.com/Tencent-Hunyuan/HY-Motion-1.0/issues/49)), Bandai Namco and LaFAN1
+  (non-commercial).
 - Cities: Buildify and blender-osm build streets from map data, with primitive buildings
   ([CG Channel](https://www.cgchannel.com/2022/07/download-free-blender-3d-building-generator-buildify/));
   drawn over, plain blocks were enough (below), so neither is used.

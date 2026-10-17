@@ -64,7 +64,8 @@ def test_people_take_the_rooms_seats_then_chairs_are_drawn_up_for_the_rest() -> 
     assert len(men) == 11 and shot.groups["men"] == tuple(a.actor_id for a in men)
     # The boardroom has nine seats (four a side and the head): two chairs are added.
     assert len(added) == 2
-    assert {a.model for a in men} == {"seated_person"}
+    # Each a person posed seated in the shot, on the shared skeleton.
+    assert {(a.block, a.settings["pose"]) for a in men} == {("person", "seated")}
 
 
 def test_a_glass_goes_on_the_table_in_front_of_each_man() -> None:
@@ -153,6 +154,8 @@ def test_words_for_a_things_look_become_the_role_it_is_drawn_in() -> None:
 
 def _boxes(shot: Composition) -> dict[str, Box]:
     sizes = {m.model_id: m.size for m in CATALOGUE.library.models.values()}
+    # People not made yet are sent with the room they take.
+    sizes.update({m.model_id: m.size for m in shot.models})
     out = {}
     for actor in shot.actors:
         w, d, h = sizes[actor.model]
@@ -176,8 +179,8 @@ def test_a_thing_too_big_for_where_it_was_asked_is_said_not_squeezed_in() -> Non
 
 
 class _People:
-    """Resolves people as figures posed for what their hands do (a holder's glass 0.4 m in
-    front of their feet), noting who was asked for; anything else as the library has it."""
+    """Resolves people as posed for what their hands do (a holder's glass 0.4 m in front of
+    their feet), noting who was asked for; anything else as the library has it."""
 
     def __init__(self) -> None:
         self.asked: list[Person] = []
@@ -187,7 +190,9 @@ class _People:
             return RESOLVE(thing)
         self.asked.append(thing.person)
         holds = {"drink": Vec(0.0, -0.4, 0.8)} if thing.person.activity == "drink" else {}
-        return Resolved("seated_person", Vec(0.5, 0.5, 1.3), seated=True, holds=holds)
+        person = thing.person
+        return Resolved("person_test", Vec(0.5, 0.5, 1.3), pose=person.pose,
+                        doing=person.activity or "", holds=holds)  # fmt: skip
 
 
 def _people_compose(things: list[dict[str, Any]], resolve: _People) -> Composition:
@@ -229,7 +234,7 @@ def test_three_glasses_held_by_men_are_three_men_each_with_one_in_his_hand() -> 
         assert (glass - (man + turn.rotate(Vec(0.0, -0.4, 0.8)))).length() < 0.01
         # In his hand, it moves with him.
         held = next(a for a in shot.actors if a.actor_id == f"glasses_{index}")
-        assert held.settings["held_by"] == f"men_{index}"
+        assert held.settings["held_by"] == f"men_{index}" and held.settings["hold"] == "drink"
 
 
 def test_outdoors_people_stand_on_the_pavement_and_a_car_lies_along_the_road() -> None:

@@ -25,10 +25,12 @@ from content.staging.store import Store
 
 # Words that do not change what a thing is.
 FILLER = re.compile(r"^(the|a|an) ")
-# Which SAM 3D model makes each kind of design (a place stays a picture: it is lifted).
-MAKERS: dict[str, sam3d.Model] = {"object": "objects", "person": "body"}
+# Which SAM 3D model makes each kind of design. A place stays a picture (it is lifted); a
+# person is made on the skeleton every person shares, fitted to their design
+# (`staging/people.py`), never as a mesh of their own: everyone is posed the same way.
+MAKERS: dict[str, sam3d.Model] = {"object": "objects"}
 # The file each SAM 3D model makes for the first thing in a picture.
-MADE = {"objects": "0.glb", "body": "person_0.glb"}
+MADE = {"objects": "0.glb"}
 # Checked for free before a design is sent to the GPU: the thing found in it with at least this
 # confidence (on real keyframes a person scored 0.84 and a lamp that was not there 0.40),
 # filling this share of the picture, clear of the frame's edge by this many pixels,
@@ -124,24 +126,28 @@ def mask_problems(mask: np.ndarray) -> list[str]:
     return problems
 
 
-def prepare(library: Library, model: Model, scratch: Path) -> tuple[sam3d.Picture, list[str]]:
-    """A design as a SAM 3D picture (an object's outline, a person's box), found on this
-    computer with the vision models, and what the free checks found wrong with it."""
-    from PIL import Image
-
+def outline(library: Library, model: Model) -> np.ndarray | None:
+    """The outline of what a design shows (the person, the object), found on this computer
+    with the vision models; None when it is not clearly there."""
     from content.providers import vision
 
     assert model.identity is not None
     image = picture(library, model)
     phrase = "a person." if model.identity.kind == "person" else f"{model.identity.query}."
     found = vision.find(image, phrase, threshold=FIND_THRESHOLD)
-    sent = sam3d.Picture(model.model_id, image)
-    if not found:
+    return vision.outline(image, [found[0].box])[0] if found else None
+
+
+def prepare(library: Library, model: Model, scratch: Path) -> tuple[sam3d.Picture, list[str]]:
+    """An object's design as a SAM 3D picture (with its outline), and what the free checks
+    found wrong with it."""
+    from PIL import Image
+
+    assert model.identity is not None
+    sent = sam3d.Picture(model.model_id, picture(library, model))
+    mask = outline(library, model)
+    if mask is None:
         return sent, [f"no {model.identity.kind} clearly found in it"]
-    box = found[0].box
-    mask = vision.outline(image, [box])[0]
-    if model.identity.kind == "person":
-        return replace(sent, boxes=(box,)), mask_problems(mask)
     mask_path = scratch / f"{model.model_id}-mask.png"
     Image.fromarray(mask.astype(np.uint8) * 255).save(mask_path)
     return replace(sent, masks=(mask_path,)), mask_problems(mask)

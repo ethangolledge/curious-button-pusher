@@ -11,15 +11,16 @@ import hashlib
 import json
 import re
 from collections.abc import Callable
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 
 from content.blender.blocks.base import Prop, settings
+from content.blender.job import ModelFile
 from content.blender.materials import BY_COLOUR, linear, nearest_role
 from content.blender.maths import Vec
 from content.schemas.staging import Thing
 from content.staging.compose import Resolve, Resolved
 from content.staging.library import PICTURES, Library, Model
-from content.staging.people import made_person
+from content.staging.people import character, character_id, posture, recipe
 
 # Finding a model online for some words: taken into the library, or None.
 FindModel = Callable[[str], Model | None]
@@ -73,7 +74,7 @@ def look_of(thing: Thing) -> Look:
 
 def from_library(library: Library, *, make_people: bool = False) -> Resolve:
     """Things resolved from the library alone (what the free check before a run can do);
-    people the scene describes are made when `make_people`, else drawn as figurines."""
+    people the scene describes are made when `make_people`."""
 
     def resolve(thing: Thing) -> Resolved | None:
         if thing.person is not None:
@@ -129,15 +130,14 @@ def fitted(library: Library, model: Model, thing: Thing) -> Resolved:
         return Resolved(model.model_id, Vec(wide, wide * h / w, 0.002), None, picture=True)
     if not look.paint and not params and not any(fit):
         w, d, h = model.size
-        return Resolved(model.model_id, Vec(w, d, h), library.model_file(model.model_id),
-                        seated=_seated(model))  # fmt: skip
+        return Resolved(model.model_id, Vec(w, d, h), library.model_file(model.model_id))
     key = f"{model.model_id}~{_digest([look.paint, params, fit])}"
     file = library.model_file(
         model.model_id, key=key, paint=look.paint, params=params, fit=(fit[0], fit[1], fit[2])
     )
     assert file is not None
     w, d, h = file.size
-    return Resolved(key, Vec(w, d, h), file, seated=_seated(model))
+    return Resolved(key, Vec(w, d, h), file)
 
 
 def settings_for(family: type[Prop], thing: Thing) -> dict[str, str]:
@@ -179,29 +179,29 @@ def _search(library: Library, words: str) -> Model | None:
     return found[0].model if found and found[0].score >= GOOD_MATCH else None
 
 
-def _person(library: Library, thing: Thing, *, make: bool) -> Resolved | None:
-    """A particular person from the library, a person made to the description (at their
-    height: a seated person is not stretched to a standing height), or a figurine."""
+def _person(library: Library, thing: Thing, *, make: bool) -> Resolved:
+    """A person: the library's own (`who`, a person made from a design), or one made to the
+    scene's description (made now when `make`; until then, the room an average person that
+    tall takes, enough to compose and check a shot), in the pose the scene asks."""
     assert thing.person is not None
-    who = thing.person.who
-    if who and who in library.models:
-        # Their own model, playing the motion asked for, or the one it has.
-        own = library.get(who)
-        wanted = thing.person.motion
-        moving = wanted if wanted in own.motions else next(iter(own.motions), "")
-        return replace(fitted(library, own, thing), motion="" if wanted == "still" else moving)
-    figurine = "seated_person" if thing.person.pose == "seated" else "person"
-    model = made_person(library, thing.person, thing.height, make=make) or library.get(figurine)
-    w, d, h = model.size
-    motion = thing.person.motion if thing.person.motion in model.motions else ""
-    holds = {name: Vec(*at) for name, at in model.holds.items()}
-    return Resolved(model.model_id, Vec(w, d, h), library.model_file(model.model_id),
-                    seated=_seated(model), seat=model.seat, motion=motion,
-                    holds=holds, middle=Vec(*model.middle, 0.0))  # fmt: skip
-
-
-def _seated(model: Model) -> bool:
-    return "seated" in model.capabilities or model.model_id == "seated_person"
+    person = thing.person
+    own = library.models.get(person.who)
+    model = own if own is not None and own.postures and own.placeable else None
+    if model is None:
+        made = recipe(person, thing.height)
+        model = character(library, made, make=make)
+        model_id, height = character_id(made), made.height
+    else:
+        model_id, height = model.model_id, model.size[2]
+    doing = person.activity or ""
+    room = posture(model, person.pose, doing, height)
+    # Not made yet: named with nothing to draw it from, so it cannot be rendered by mistake.
+    file = library.model_file(model_id) if model else ModelFile(model_id, "", room.size)
+    return Resolved(
+        model_id, Vec(*room.size), file, pose=person.pose, doing=doing,
+        holds={name: Vec(*at) for name, at in room.holds.items()},
+        middle=Vec(*room.middle, 0.0),
+    )  # fmt: skip
 
 
 def _digest(value: object) -> str:

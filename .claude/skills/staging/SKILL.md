@@ -109,12 +109,12 @@ on two real keyframes (a join job: `docs/staging.md`) at small size before anyth
 
 ## A character
 
-Anyone a scene describes is made free, to fit (`docs/staging.md`, "People"): describe them
-(`person`: sex, age, build, dress, pose, activity, motion) and they are made once and kept; run
-`content staging people` once first. A particular person (`who`) is made only with the
-director's sign-off, once: a figurine model sheet (front approved first), a multiview
-image-to-3D model with a rig, then `content staging add … --can humanoid --turn … --height …`.
-Check its four-view sheet faces the front and stands on the plinth.
+Every person is made and posed the same way (`docs/staging.md`, "People"): describe them
+(`person`: sex, age, build, dress, pose, activity) and they are made once, on the shared
+skeleton, and posed in each shot on its own furniture; run `content staging people` once first.
+Never add a person as a model file of their own (a scan, a downloaded or generated character):
+it would move differently from everyone else. A particular person is a design, fitted onto the
+same skeleton.
 
 ## A channel's look
 
