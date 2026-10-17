@@ -78,7 +78,7 @@ class Identity:
     kind: str  # person, place or object (`schemas.references.ReferenceKind`)
     query: str  # the words it was asked for by
     picture: str  # the drawing, relative to the library folder
-    look: str  # the channel's look it was drawn in (`Theme.look_signature`)
+    look: str  # the channel's look it was drawn in (`references.design_look`)
     attempt: int  # how many times it was drawn before: each attempt is drawn differently
 
 

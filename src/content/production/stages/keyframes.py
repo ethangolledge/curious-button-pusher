@@ -361,7 +361,7 @@ class Keyframes(Studio):
                 "target_id": task["scene_id"],
                 "state": {
                     "anchor": task["anchor"],
-                    "theme_look": self.theme_look(),
+                    "theme_look": self.theme.look(),
                     "expected_framing": task["expected_framing"],
                     "observation": observations[0].model_dump(),
                 },

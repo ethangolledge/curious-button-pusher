@@ -22,6 +22,7 @@ from content.staging import designs
 from content.staging.library import Library, Model
 from content.state import CallRecord, ContentState
 from content.story.notes import rejected_reference_ids
+from content.theme import Theme
 
 # A design's shape: a person stands, an object sits square; a place takes the video's own.
 DESIGN_ASPECT = {"person": "9:16", "object": "1:1"}
@@ -43,6 +44,12 @@ class References(Studio):
         judgements: list[Judgement] = []
         calls: list[CallRecord] = []
         for request in visuals.references:
+            if request.query in self.theme.spec.visual.cast:
+                # The channel's own character: drawn from its design, never searched for.
+                references[request.ref_id] = ReferenceSet(
+                    request=request, relevant=True, candidates=[], chosen=[]
+                )
+                continue
             previous = existing.get(request.ref_id)
             if previous is not None and previous.request != request:
                 previous = None
@@ -206,12 +213,13 @@ class References(Studio):
         updated = {}
         for ref_id, reference in references.items():
             request = reference.request
-            look = self._design_look(request)
+            look = design_look(self.theme, self.config.image_model, request)
             design = designs.usable(library, request.kind, request.query, look)
+            cast = request.query in self.theme.spec.visual.cast
             if (
                 design is None
                 and reference.relevant
-                and (scenes[ref_id] >= self.config.design_min_scenes)
+                and (cast or scenes[ref_id] >= self.config.design_min_scenes)
             ):
                 design, drawn_judgements, drawn_calls = self._draw_design(
                     reference, look, library, video
@@ -221,15 +229,6 @@ class References(Studio):
             path = None if design is None else str(designs.picture(library, design))
             updated[ref_id] = reference.model_copy(update={"design": path})
         return updated, judgements, calls
-
-    def _design_look(self, request: ReferenceRequest) -> str:
-        """Everything that decides how a design looks, apart from its photos and attempt."""
-        return render_signature(
-            self.config.image_model,
-            self.theme_look(),
-            self.theme.design_prompt(request.kind, request.query),
-            *(file_digest(path) for path in self.theme.references),
-        )
 
     def _draw_design(
         self, reference: ReferenceSet, look: str, library: Library, video: str
@@ -279,7 +278,7 @@ class References(Studio):
                     "target_id": designs.design_id(request.kind, request.query),
                     "state": {
                         "view": self.theme.spec.visual.design_views[request.kind],
-                        "query": request.query,
+                        "query": self.theme.spec.visual.cast.get(request.query, request.query),
                         "kind": request.kind,
                         "observation": observation.model_dump(),
                     },
@@ -295,6 +294,17 @@ class References(Studio):
                 )  # fmt: skip
                 return kept, judgements, calls
         return None, judgements, calls
+
+
+def design_look(theme: Theme, image_model: str, request: ReferenceRequest) -> str:
+    """Everything that decides how a design looks, apart from its photos and attempt: when it
+    changes, the design is drawn again."""
+    return render_signature(
+        image_model,
+        theme.look(),
+        theme.design_prompt(request.kind, request.query),
+        *(file_digest(path) for path in theme.references),
+    )
 
 
 def _download(source: ImageSource, url: str) -> tuple[bytes, Usage]:

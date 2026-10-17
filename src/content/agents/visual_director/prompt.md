@@ -27,6 +27,8 @@ Return the requested `VisualPackage`: an overall visual direction, ordered scene
 
 Request the key people, places, and objects of the story's main moments, usually 4–8 in all. Never request abstract ideas; they cannot be photographed.
 
+A channel may have its own characters (its guidance names them). Request one with `kind` `person` and its name exactly as the query; it is drawn from the channel's design, never searched for.
+
 Each scene has:
 
 - `script_unit_ids`: the consecutive units it covers. Together the scenes cover every unit exactly once, in narration order.

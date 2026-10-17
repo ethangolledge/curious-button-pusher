@@ -113,6 +113,10 @@ with a change). `AGENTS.md` says which applies when a session starts.
   usable in a shot once `content staging model` has made its 3D model in
   one GPU job after free checks ([docs/3d-reuse.md](docs/3d-reuse.md#designs)). Not yet tried
   in a real run.
+- A channel's own characters (2026-10-17): `visual.cast` names each and what it is drawn as; the
+  storyboard asks for one by name, it is never searched for, and a drawing the director approved
+  is kept as its design (`content staging cast`). A person is never a 3D model: they are posed
+  and drawn over the pose from their design. Not yet tried in a real run.
 - `content eval` caught all seven failures a director named in a rejected final cut, three runs
   out of three ([docs/narration.md](docs/narration.md#regression-content-eval)); false alarms on an
   approved script are not measured yet.

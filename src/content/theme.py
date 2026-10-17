@@ -261,6 +261,9 @@ class VisualSpec(ImmutableModel):
     # what each kind of design shows.
     design_template: str
     design_views: dict[ReferenceKind, str]
+    # The channel's own characters, by name: what each is drawn as (its design's subject). A
+    # storyboard asks for one by its name; it is never searched for, only drawn.
+    cast: dict[str, str] = {}
     segment_template: str
     final_segment_template: str
 
@@ -628,13 +631,19 @@ class Theme:
             },
         )
 
+    def look(self) -> str:
+        """How everything in the channel is drawn, in one line."""
+        visual = self.spec.visual
+        palette = ", ".join(self.spec.palette)
+        return f"{visual.style}. {visual.texture}. {visual.lighting}. Palette: {palette}."
+
     def design_prompt(self, kind: ReferenceKind, query: str) -> str:
         visual = self.spec.visual
         return _render(
             visual.design_template,
             {
                 "view": visual.design_views[kind],
-                "query": query,
+                "query": visual.cast.get(query, query),
                 "style": visual.style,
                 "texture": visual.texture,
                 "lighting": visual.lighting,

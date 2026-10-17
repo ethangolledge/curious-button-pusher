@@ -14,7 +14,7 @@ from content.blender.job import Job
 from content.blender.materials import ROLES
 from content.blender.registry import ENGINE
 from content.cli.cloud import SAM3D_UNSET
-from content.config import load_config
+from content.config import ContentConfig, load_config
 from content.production.assemble import contact_sheet
 from content.providers import ffmpeg
 from content.providers.assets import ALLOWED, AssetSource, Candidate
@@ -102,6 +102,13 @@ def _staging(arguments: list[str]) -> int:
     actions.add_parser(
         "designs", parents=[common], help="The channel's designs, and which have a 3D model"
     )
+    cast = actions.add_parser(
+        "cast",
+        parents=[common],
+        help="Keep a drawing a person approved as one of the channel's own characters' design",
+    )
+    cast.add_argument("character", help="Its name, as the theme's visual.cast has it")
+    cast.add_argument("picture", type=Path, help="The approved drawing (a turnaround sheet)")
     model = actions.add_parser(
         "model",
         parents=[common],
@@ -183,6 +190,10 @@ def _staging(arguments: list[str]) -> int:
         if theme is None:
             parser.error("poses are a channel's: pass --config themes/<name>/config.json")
         return _poses(catalogue)
+    elif args.action == "cast":
+        if theme is None:
+            parser.error("a cast is a channel's: pass --config themes/<name>/config.json")
+        return _cast(load_config(args.config), catalogue, args.character, args.picture, parser)
     elif args.action in ("keep", "veto", "history", "designs", "model"):
         if theme is None:
             parser.error("models are a channel's: pass --config themes/<name>/config.json")
@@ -273,8 +284,43 @@ def _review(catalogue: Catalogue, args: argparse.Namespace) -> int:
 def _designs(catalogue: Catalogue) -> int:
     for model in sorted(catalogue.library.models.values(), key=lambda m: m.model_id):
         if model.identity is not None:
-            made = "3D model made" if model.file else "no 3D model yet"
+            # A person is never modelled: they are posed, and drawn over their pose.
+            made = (
+                "posed, none needed" if model.identity.kind == "person"
+                else "3D model made" if model.file else "no 3D model yet"
+            )  # fmt: skip
             print(f"{model.model_id:40} {model.status:7} {made}  {model.identity.query}")
+    return 0
+
+
+def _cast(
+    config: ContentConfig,
+    catalogue: Catalogue,
+    character: str,
+    picture: Path,
+    parser: argparse.ArgumentParser,
+) -> int:
+    """A drawing a person approved, kept as a cast member's design in the channel's current
+    look: every keyframe that shows the character is drawn from it, and it is drawn again only
+    when the look changes."""
+    from content.production.stages.references import design_look
+    from content.schemas.references import ReferenceRequest
+
+    if character not in config.theme.spec.visual.cast:
+        parser.error(f"'{character}' is not in the theme's visual.cast: describe them there first")
+    if config.production is None:
+        parser.error("the config has no production section: its image model draws the cast")
+    request = ReferenceRequest(
+        ref_id="cast", kind="person", query=character, unit_ids=[], purpose="the channel's cast"
+    )
+    look = design_look(config.theme, config.production.image_model, request)
+    attempt = designs.next_attempt(catalogue.library, "person", character)
+    kept = designs.keep(
+        catalogue.library, "person", character, picture, look=look, attempt=attempt, video="cast"
+    )
+    print(
+        f"{character} is kept as {kept.model_id}: every keyframe that shows them is drawn from it."
+    )
     return 0
 
 

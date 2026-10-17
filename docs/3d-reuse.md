@@ -89,9 +89,19 @@ punctuation and "the" do not matter) and by the look it was drawn in; when the c
 changes, it is drawn again in the new one. No shot can use a design until its 3D model is made:
 a flat drawing in a 3D shot was turned down.
 
+**A channel's own characters** (`visual.cast`: a name and what the character is drawn as) are
+designs too, but never searched for: a storyboard names one (a mascot standing for ordinary
+people, say), the request is relevant without photos, and the character is drawn from its
+description, even if it is in only one scene. A drawing the person approved is kept as the
+character's design with `content staging cast`; it is drawn again only if the look changes.
+In a staged shot the character is posed like any other person (`docs/staging.md`, People):
+the skeleton says how they stand, the design what they look like. The design shows their
+usual clothes; a scene that needs others (overalls, a uniform) says so in its anchor.
+
 | You want to | Run |
 |---|---|
 | see the designs | `content staging designs --config themes/<name>/config.json` |
+| keep an approved drawing as a cast member's design | `content staging cast <name> <drawing.png> --config …` |
 | turn one down (drawn again, differently, when next needed) | `content staging veto <design-id> --why "…" --config …` |
 | see how one was made | `content staging history <design-id> --config …` |
 | see which are ready to become 3D, for free | `content staging model --config …` |

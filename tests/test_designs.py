@@ -1,9 +1,11 @@
 """Designs: a person, place or object in several scenes is drawn once in the channel's look, and
 every keyframe that shows it, in this video and later ones, is drawn from that design."""
 
+import json
 import shutil
 from dataclasses import replace
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any
 
 import numpy as np
@@ -119,6 +121,30 @@ def test_a_thing_in_one_scene_is_not_designed(tmp_path: Path) -> None:
     studio, media = _studio(tmp_path)
     references, _, _ = studio._designs(_storyboard(_scene("s1", "lamp")), _found(), "v")
     assert references["lamp"].design is None and media.calls == []
+
+
+def test_a_cast_member_is_never_searched_for_and_drawn_from_its_description(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    shutil.copytree(ROOT / "themes/starter", tmp_path / "theme")
+    spec = json.loads((tmp_path / "theme/theme.json").read_text())
+    spec["visual"]["cast"] = {"Pat": "a round grey office worker with slit eyes"}
+    (tmp_path / "theme/theme.json").write_text(json.dumps(spec))
+    studio, media = _studio(tmp_path)
+    prompts: list[str] = []
+    drawn = media.image
+    monkeypatch.setattr(media, "image", lambda **kw: (prompts.append(kw["prompt"]), drawn(**kw))[1])
+    monkeypatch.setattr(studio, "_find_reference", lambda *a: pytest.fail("searched for"))
+    pat = ReferenceRequest(ref_id="pat", kind="person", query="Pat", unit_ids=["u1"], purpose="")
+    board = _storyboard(_scene("s1", "pat")).model_copy(update={"references": [pat]})
+    state: Any = {"visual_package": board, "script_package": SimpleNamespace(script_units=[]),
+                  "topic": "v"}  # fmt: skip
+
+    found = studio.find_references(state)["references"]["pat"]
+
+    # In one scene only, it is drawn all the same: the cast is always drawn from its design.
+    assert found.relevant and found.chosen == [] and found.design is not None
+    assert len(prompts) == 1 and "a round grey office worker with slit eyes" in prompts[0]
 
 
 def test_a_design_jev_finds_wrong_is_drawn_again_differently(tmp_path: Path) -> None:

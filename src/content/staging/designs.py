@@ -26,8 +26,8 @@ from content.staging.store import Store
 # Words that do not change what a thing is.
 FILLER = re.compile(r"^(the|a|an) ")
 # Which SAM 3D model makes each kind of design. A place stays a picture (it is lifted); a
-# person is made on the skeleton every person shares, fitted to their design
-# (`staging/people.py`), never as a mesh of their own: everyone is posed the same way.
+# person is never a mesh: they are posed (`staging/poses.py`) and drawn over their pose from
+# their design, everyone the same way.
 MAKERS: dict[str, sam3d.Model] = {"object": "objects"}
 # The file each SAM 3D model makes for the first thing in a picture.
 MADE = {"objects": "0.glb"}

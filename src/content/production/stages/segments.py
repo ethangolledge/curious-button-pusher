@@ -189,7 +189,7 @@ class Segments(Studio):
                 "target_id": task["scene_id"],
                 "state": {
                     "anchor": task["anchor"],
-                    "theme_look": self.theme_look(),
+                    "theme_look": self.theme.look(),
                     "next_anchor": task["next_anchor"] or "the image settling into shadow",
                     "expected_shift": task["expected_shift"] or "the space settles and fades",
                     "observations": {

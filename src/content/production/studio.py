@@ -197,11 +197,6 @@ class Studio:
             raise RuntimeError(f"{model} described {len(observations)} of {len(images)} images")
         return observations, calls
 
-    def theme_look(self) -> str:
-        visual = self.theme.spec.visual
-        palette = ", ".join(self.theme.spec.palette)
-        return f"{visual.style}. {visual.texture}. {visual.lighting}. Palette: {palette}."
-
     def current(self, state: ContentState, kind: JudgedStage) -> list[RenderedAsset]:
         """The asset of every current scene, in scene order."""
         visuals = required(state.get("visual_package"), "a storyboard")
