@@ -22,7 +22,7 @@ from content.blender.registry import Registry, RegistryError
 from content.blender.rehearsal import RehearsalStage
 from content.blender.sets import SEAT_REACH, resting_on
 from content.schemas.staging import Action, Person, Setting, StagePlan, Thing
-from content.staging.people import is_person
+from content.staging.poses import is_person
 
 # Room to leave between things that stand side by side, and round a thing's edge.
 GAP = 0.08
@@ -55,20 +55,19 @@ class Resolved:
     motion: str = ""
     # A picture (a map, a painting): drawn on a card, lying flat on what it is on.
     picture: bool = False
-    # A person: the pose they are placed in and what their hands do (posed in the shot,
+    # A person (their `model` a pose clip, `staging/poses.py`): the pose they are placed in,
+    # how far through the clip, what their hands do (posed in the shot,
     # `blocks/actors/person.py`), where each thing they hold goes (its base, from their feet),
-    # and where the middle of the room they take up is, from where they stand (a seated
-    # person's knees and arms reach forward of their hips).
+    # where the middle of the room they take up is from where they stand (a seated person's
+    # knees reach forward of their hips), their height, and the pace they walk at (metres a
+    # second).
     pose: str = ""
+    at: float = 0.0
     doing: str = ""
     holds: dict[str, Vec] = field(default_factory=dict)
     middle: Vec = Vec()
-    # The motion a person stands as, and how far through it (`staging/motions.py`); their
-    # walk, and the pace it carries them at (metres a second).
-    stance: ModelFile | None = None
-    at: float = 0.0
-    gait: ModelFile | None = None
-    stride: float = 0.0
+    height: float = 0.0
+    pace: float = 0.0
 
 
 Resolve = Callable[[Thing], Resolved | None]
@@ -140,15 +139,15 @@ HELD = {
 }  # fmt: skip
 HOLD = {"drink": "drink", "reading": "document", "writing": "paper", "phone": "phone"}
 HOLDING_POSES = {"seated": {"drink", "reading", "writing"}, "standing": {"drink", "phone"}}
-# How a group varies when a scene leaves it open: activities by pose (None: arms at rest),
-# ages and builds. Copies take them in a shuffled order, so no two neighbours match.
+# How a group varies when a scene leaves it open: activities by pose (None: arms at rest).
+# Copies take them in a shuffled order (starting at one of `STARTS`), so no two neighbours
+# match.
 NATURAL: dict[str, tuple[str | None, ...]] = {
     "seated": ("resting", "lap", "folded", "resting", "pointing", "lap"),
     "standing": (None, "pockets", "folded", None, "pockets"),
     "walking": (None,),
 }
-AGES = ("middle", "old", "young", "middle", "old")
-BUILDS = ("average", "slim", "heavy", "average", "slim")
+STARTS = 5
 # People are never quite square to what they face (degrees either way).
 SWAY = 7.0
 # What a person can do, given to any action of theirs that has the setting (unless the
@@ -167,7 +166,7 @@ class Composer:
         # The things that are people: their actions are done at a person's pace.
         self._people: set[str] = set()
         # Each person's walk and its pace, by actor: what their travel plays.
-        self._gaits: dict[str, tuple[str, float]] = {}
+        self._paces: dict[str, float] = {}
         self._placed: list[Placed] = []
         self._copies: dict[str, list[Placed]] = {}
         self._out = Composition()
@@ -262,9 +261,8 @@ class Composer:
                 if thing.person is not None and len(copies):
                     # Each person in a group is someone a little different.
                     resolved = self._resolve(self._copy_of(thing, len(copies))) or resolved
-                for file in (resolved.file, resolved.stance, resolved.gait):
-                    if file is not None and file not in self._out.models:
-                        self._out.models.append(file)
+                if resolved.file is not None and resolved.file not in self._out.models:
+                    self._out.models.append(resolved.file)
                 spot = self._spot(relation, target, anchor, group, resolved, index, thing.count)
                 if spot is None:
                     if required:
@@ -281,8 +279,8 @@ class Composer:
                 self._placed.append(placed)
                 copies.append(placed)
                 if resolved.pose:
-                    if resolved.gait is not None:
-                        self._gaits[actor_id] = (resolved.gait.model_id, resolved.stride)
+                    if resolved.pace:
+                        self._paces[actor_id] = resolved.pace
                     table = self._table_for(target, group)
                     self._out.actors.append(_person(actor_id, resolved, at, heading, table))
                     continue
@@ -310,17 +308,15 @@ class Composer:
 
     def _copy_of(self, thing: Thing, index: int) -> Thing:
         """A thing as its copy `index` is made: a person given what the scene leaves open
-        (their age, build and what their hands do) so a group is not one man repeated."""
+        (what their hands do) so a group is not one man repeated."""
         person = thing.person
         if person is None:
             return thing
         if thing.thing_id not in self._turns:
-            self._turns[thing.thing_id] = self._chance.randrange(len(AGES))
+            self._turns[thing.thing_id] = self._chance.randrange(STARTS)
         turn = self._turns[thing.thing_id]
         natural = NATURAL[person.pose]
         filled = {
-            "age": person.age or AGES[(index + turn) % len(AGES)],
-            "build": person.build or BUILDS[(index * 2 + turn) % len(BUILDS)],
             "activity": person.activity
             or self._held_by(thing.thing_id, index)
             or natural[(index + turn) % len(natural)],
@@ -608,11 +604,11 @@ class Composer:
         calls = []
         for index, member in enumerate(members):
             values = {s.name: member if s.value == action.who else s.value for s in action.settings}
-            walk = self._gaits.get(member)
-            if walk is not None and {"gait", "stride"} <= named:
-                # Their own walk, at its own pace, unless the scene says how fast.
-                gait, stride = walk
-                human = {**human, "gait": gait, "stride": _n(stride), "speed": _n(stride)}
+            pace = self._paces.get(member)
+            if pace and "speed" in named:
+                # At their own walk's pace, so their feet keep up with the ground, unless the
+                # scene says how fast.
+                human = {**human, "speed": _n(pace)}
             values = {**human, **values}
             for name in timed:
                 begins = float(values.get(name, "0") or 0)
@@ -679,10 +675,8 @@ def _person(actor_id: str, resolved: Resolved, at: Vec, heading: float, table: s
     them."""
     values = {
         "x": _n(at.x), "y": _n(at.y), "z": _n(at.z), "heading": _n(heading),
-        "pose": resolved.pose,
+        "pose": resolved.pose, "at": _n(resolved.at), "height": _n(resolved.height),
     }  # fmt: skip
-    if resolved.stance is not None:
-        values = {**values, "stance": resolved.stance.model_id, "at": _n(resolved.at)}
     if resolved.doing:
         values["doing"] = resolved.doing
     if table:

@@ -22,7 +22,7 @@ the scene (the Visual Director's words)                     schemas/staging.py: 
         │
         ▼  resolve each thing, cheapest first, everything kept       staging/resolve.py
    the library (made in code, families, versions, models kept before)
-   → a person made to fit (MakeHuman)                                  staging/people.py
+   → a person: a pose of real recorded motion                         staging/poses.py
    → made on this computer (Infinigen) or found in free collections   staging/sourcing.py
      (Objaverse index, Sketchfab, Poly Pizza, Gazebo Fuel, Smithsonian),
      scored by eye (CLIP) and taken when plainly the thing             staging/scoring.py
@@ -92,7 +92,7 @@ and goes in the channel's backlog.
 |---|---|---|
 | the library | the channel's models, the engine's props, versions of either, people made before: searched by words and meaning | always; free and instant |
 | a family | a prop with settings made to fit the words: "espresso cup", "conference table" eight metres long, "tower" of 20 storeys | when the library's match is a family |
-| a person | made from one parametric body to the description, once, and kept (below) | for people, when `content staging people` has been run |
+| a person | a pose of real recorded motion, drawn over the layout as a skeleton (below) | for people; Sketchfab's poses need its free token |
 | made here | Infinigen's generators: about a hundred kinds of everyday object, each in endless variations; the channel's own to use | when installed (`content staging infinigen`) |
 | found | the free collections, searched together, the best six prepared and drawn plainly, each scored | when Blender and the `vision` extra are here; each collection when ready (below) |
 | drawn instead | the scene becomes a keyframe; the gap goes in the backlog | when nothing fits |
@@ -152,74 +152,49 @@ library never holds one thing twice under different names.
 
 ## People
 
-Every person is made one way and posed one way, so no one moves more naturally than anyone
-else. `content staging people` installs, once, the MPFB extension for Blender and MakeHuman's
-CC0 clothes and hair (about 650 MB).
+A person is never rendered. The image model draws people far better than any body we could
+build, so a layout gives it only where each person is and how they stand: their **pose**, the
+joints of a body from real recorded motion, drawn over the grey layout as a coloured skeleton
+(the OpenPose convention pose models are trained on). The keyframe is drawn from that skeleton,
+the scene's words and its references (who they are, their likeness). Everyone is posed and
+drawn by the same code, so no one moves more naturally than anyone else. Tested on the desk
+scene: drawn from a skeleton, a natural, well-proportioned man sat at the desk with his hands
+on it, the room held; built 3D bodies came out warped (channel notes, 2026-10-17).
 
-**Made once.** A person a scene describes is made from one parametric body
-(`blender/person.py`): shaped by sex, age and build, made the height asked, dressed (suit,
-casual, work, uniform) with shoes and hair, on the one skeleton every person shares (MPFB's
-`default` rig, with hands and face). They are kept standing at rest, a rigged model in the
-library, under an id made from their recipe (`people.Recipe`: what shapes them, never how they
-are posed), so the same description is the same person in every scene and every video. Each
-takes about 7 seconds. So a shot can be composed without Blender, every pose is tried on them
-as they are made and measured (`Model.postures`: the room it takes, the seat it fits, where
-what they hold goes). A person not made yet takes the room an average person that tall would
-(`people.STAND_INS`), enough to check a shot; it cannot be rendered until they are made.
+**Poses.** `content staging poses --config …` lists them, reading any missing (free: a few MB
+each, read in Blender in seconds). A pose clip is a stretch of a free animated character or a
+motion capture take (`staging/poses.py` `CLIPS`; `STANCES` says which clip, and how far through,
+each way of being placed holds: sitting, standing, walking). `blender/poses.py` reads its
+skeleton by family (`blender/skeletons.py`: Mixamo and CMU, 100STYLE, Renderpeople, Unreal):
+each joint is only read where its bone starts, so nothing can twist. The joints are written
+facing −Y, standing at the origin, at the standard height; the face's points (nose, eyes, ears)
+come from the head, so the skeleton shows which way it looks. A walk is cut on the spot and its
+pace kept (from its travel, or for one recorded on the spot, from how fast the planted foot
+slides back). Clips are library models with their rights: Sketchfab's CC BY characters are
+credited in the video, as any credited model is. Sketchfab needs a free account's token in
+`.env` (`SKETCHFAB_API_TOKEN`).
 
-**Posed in the shot.** The `person` actor puts them where the composer worked out they go and
-poses them there, on that shot's own furniture (`Stage.perform`). The rules are plain Python
-(`blender/body.py`), turned into bones by one module (`blender/rigging.py`) for everyone:
+**Placed in the shot** (`blocks/actors/person.py`, all plain Python in `blender/body.py`):
 
-- each pose holds a stance from real motion capture (`staging/motions.py`): a frame of
-  standing at ease, of sitting upright, of mid-stride, kept square to the way they face (the
-  performer's own turn taken out);
-- seated, the thighs run forward from the hips a little apart, each tilted until the thighs sit
-  on the seat, and each shin stands upright under its knee, the foot a little ahead (clear of
-  the chair's legs and the desk's drawers), the feet on the floor;
+- the clip's pose is scaled to the person's height (`sex` sets the usual one), turned, and
+  stood where the composer put them;
+- seated, the hips are set on the real seat and each shin brought upright under its knee,
+  the ankles on the floor (a two-bone bend that keeps every bone its length);
 - what the hands do (`ACTIVITIES`: resting, drinking, reading, writing, pointing, lap, folded,
-  pockets, phone) is reached for, not set joint by joint: each hand is given a point on the
-  real table before them (measured from its near edge and its top, `body.table_before`), by the
-  hips, or by the floor, and inverse kinematics bends the arm to it, an elbow target keeping it
-  natural;
-- a hand lying on a table turns palm down at the forearm (as a forearm turns, so the wrist
-  never twists), lies along the top with its fingers and thumb laid flat, and is lifted until
-  its lowest point rests on the top, never in it;
-- the fingers close by their grip (flat, rest, hold, point), drawn together from the made
-  hand's spread.
+  pockets, phone) is reached for: each wrist goes to a point on the real table before them
+  (measured from its near edge and its top, `body.table_before`), by the hips or by the floor,
+  the elbow bending out and back;
+- the person takes the room their pose does (`body.extent`), so cameras frame them and the
+  composer keeps things clear of them; held things go where their hand is (marks named
+  `<actor>.drink`) and hang from them.
 
-A walking person travels along a path (`travel`) playing their walk (a motion capture loop on
-the spot), played as fast as they go so their feet keep pace with the ground; unless the scene
-says how fast, they go at their walk's own pace (0.88 m/s for the standard height, longer legs
-further). Hands doing nothing hang relaxed (motion capture records no fingers).
-
-**Motions.** `content staging motions --config …` lists them and makes any missing: each a
-stretch of a free recording, fetched one take at a time (a few MB), retargeted once onto the
-shared skeleton (`blender/retarget.py`: scaled to its legs, turned to face −Y, each bone turning
-as its match did from rest, a hand by its wrist-to-knuckles line; a loop cut where it returns
-to its first pose, its travel taken out) and kept in the library with its rights. A motion's id
-names exactly how it was taken, so changing a stretch makes a new motion, and every person made
-with the old one is made again. Sources: the CMU Graphics Lab Motion Capture Database (no
-restrictions) and 100STYLE (CC BY 4.0: a video using it is credited, as any credited model is).
-Not used: HY-Motion (its licence excludes the UK and EU), Bandai Namco and LaFAN1
-(non-commercial).
-
-Where they hold things is left as a mark (`<actor>.drink`), and what they hold is put there
-and hangs from them (`put`'s `held_by` and `hold`). Every surface is named for its role, so
-every look draws them its own way. A thing whose words name a person ("a guard", "two
-officials") is a person even when the scene forgot to describe them (`people.is_person`).
-
-**Particular people.** A person with a design (`who`) is the library's own person, made on the
-same skeleton with the body that matches their design: `content staging fit <design> --sex …
---age … --dress … --height … --config …` (free, about two and a half minutes). A person's design
-is a turnaround sheet, front and profile (`visual.design_views.person`); both outlines are
-found on this computer (`designs.outlines`), and `blender/fit.py` turns the body's dials
-(`person.DIALS`: weight, muscle, head, shoulders, hips, belly) a step at a time, smaller each
-round, keeping whatever makes the outlines overlap more. Front shows breadth, profile depth (a
-paunch). Fitted to a test sheet of a known body (heavy, a big head, a paunch), it found weight
-0.8 for 0.85 and head and belly exactly, its outlines overlapping 97%. The fitted body becomes
-the design's file, so it is placed and posed like anyone. Until then they are made from the
-scene's description. Without MPFB a scene with people in it cannot be staged: it is drawn.
+The worker projects each person's joints through the camera on every rendered frame into the
+report (`Report.skeletons`), and the keyframe stage draws them over the layout before it is
+sent (`poses.draw`), with the theme's `repaint_note` saying how to read them. A walking person
+plays their clip's loop as they travel, at its own pace unless the scene says how fast: the
+same joints, frame by frame, are what an action shot's pose control will take later. A thing
+whose words name a person ("a guard", "two officials") is a person even when the scene forgot
+to describe them (`poses.is_person`).
 
 A scene that has a keyframe can instead be moved as the keyframe itself, lifted into depth:
 [picture-shots.md](picture-shots.md).
@@ -275,9 +250,8 @@ long thing that does not fit across a place lies along it (a car on a road).
 | where a model came from | `content staging history <id> --config …` |
 | another word for a model | `content staging name side_chair "dining chair" --config …` |
 | what scenes could not be staged for | `content staging backlog --config …` (`--find`: find and take a model for every model wanted, as `stock` does) |
-| install people, Infinigen, the Objaverse index | `content staging people`, `content staging infinigen`, `content staging objaverse` |
-| people's motions: list them, making any missing | `content staging motions --config …` |
-| a person's design made into their body (fitted to its outlines; free) | `content staging fit person_<name> --sex man --age middle --dress suit --height 1.8 --config …` |
+| install Infinigen, the Objaverse index | `content staging infinigen`, `content staging objaverse` |
+| people's poses: list them, reading any missing (free) | `content staging poses --config …` |
 | start a new block | `content staging new action pour_drink [--channel --config …]` |
 
 `preview` renders into `.cache/staging/` (gitignored) and prints the contact sheet's path;
@@ -405,8 +379,8 @@ real GPU.
 
 Code that uses Blender's API is a derivative of Blender, so those files (marked
 `GPL-3.0-or-later` in their first line: `stage.py`, `canvas.py`, `worker.py`, `audit.py`,
-`ingest.py`, `imports.py`, `person.py`, `generate.py`, and looks) are GPL; everything else
-stays MIT (`LICENSE`). MakeHuman's assets are CC0; what Infinigen makes is the channel's own;
+`ingest.py`, `imports.py`, `poses.py`, `generate.py`, and looks) are GPL; everything else
+stays MIT (`LICENSE`). What Infinigen makes is the channel's own;
 CC BY models are credited with the video. Renders belong to whoever makes them.
 
 ## Installing
@@ -416,7 +390,7 @@ CC BY models are credited with the video. Renders belong to whoever makes them.
 | Blender 5.2 LTS | from [blender.org](https://www.blender.org/download/lts/); on macOS set `BLENDER=/Applications/Blender.app/Contents/MacOS/Blender` in `.env`, on Linux put it on the path or set `BLENDER` |
 | scoring candidates | the `vision` extra (CLIP is fetched once, ~600 MB) |
 | COLLADA models | the `models` extra |
-| people | `content staging people` |
+| people's poses | a free Sketchfab account's token in `.env` (`SKETCHFAB_API_TOKEN`), then `content staging poses --config …` |
 | Infinigen | `content staging infinigen` (needs `uv`) |
 | Objaverse index | `content staging objaverse` |
 | Sketchfab, Poly Pizza | free keys in `.env` (`SKETCHFAB_API_TOKEN`, `POLY_PIZZA_API_KEY`) |

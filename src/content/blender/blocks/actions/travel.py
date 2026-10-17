@@ -1,6 +1,6 @@
 """An actor travels along one of the layout's paths, facing the way it goes: a figure crossing
-a room, a boat along a river, a plane across the sky (not upright, banking into turns). A
-person walks as they go: their walk played as fast as they travel, so their feet keep pace."""
+a room, a boat along a river, a plane across the sky (not upright, banking into turns). A person
+walking plays their walk as they go (`actors/person.py`), at its own pace (`speed`)."""
 
 from dataclasses import dataclass
 from typing import Annotated, Literal
@@ -8,7 +8,7 @@ from typing import Annotated, Literal
 from content.blender.api import Stage
 from content.blender.blocks.base import About, Action, Range, Ref
 from content.blender.maths import Curve, Partway, length
-from content.blender.motion import distances, route, travel
+from content.blender.motion import route, travel
 
 
 @dataclass(frozen=True)
@@ -24,10 +24,6 @@ class Settings:
     ] = True
     speed: Annotated[
         float, Range(0, 100, "metres a second at most, 0 for any: a walker goes about 1.4")
-    ] = 0.0
-    gait: Annotated[str, About("a person's walk (a library motion), played as they go")] = ""
-    stride: Annotated[
-        float, Range(0, 10, "metres a second the walk carries them at, played as it is")
     ] = 0.0
 
 
@@ -53,11 +49,4 @@ class Travel(Action):
             bank=p.bank,
             upright=p.upright,
         )
-        actor = stage.actor(p.actor.name)
-        stage.animate(actor, poses)
-        if p.gait and p.stride:
-            # The walk played as fast as they go, so their feet keep pace with the ground.
-            walked = distances(poses)[-1]
-            seconds = max((p.end - p.start) * stage.frames / stage.fps, 1e-6)
-            begins = round(p.start * stage.frames) + 1
-            stage.play(actor, p.gait, start_frame=begins, speed=walked / seconds / p.stride)
+        stage.animate(stage.actor(p.actor.name), poses)

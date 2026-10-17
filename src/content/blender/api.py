@@ -7,7 +7,7 @@ reason to touch the foundation."""
 
 import random
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Literal, Protocol
 
 from content.blender.maths import ORIGIN, Quat, Vec
@@ -91,6 +91,17 @@ class Pose:
     frame: int
     at: Vec
     rotation: Quat
+
+
+@dataclass(frozen=True)
+class Figure:
+    """The joints of a person, by name (`body.JOINTS`: the OpenPose body set)."""
+
+    joints: dict[str, Vec] = field(default_factory=dict)
+
+    @property
+    def hips(self) -> Vec:
+        return self.joints["hip.L"].lerp(self.joints["hip.R"], 0.5)
 
 
 @dataclass(frozen=True, slots=True)
@@ -240,22 +251,18 @@ class Stage(Protocol):
         motion."""
         ...
 
-    def perform(
-        self,
-        thing: Thing,
-        pose: str,
-        doing: str = "",
-        *,
-        stance: str,
-        at: float = 0.0,
-        seat: float = 0.0,
-        table: Thing | None = None,
-    ) -> dict[str, Vec]:
-        """A person (a model with the shared skeleton) posed where they stand, the way they
-        face: standing as the motion `stance` stands `at` this far through it (standing at
-        ease, sitting, mid-stride), then as `body.py` says: seated, on a seat `seat` metres
-        high, their feet on the floor; their hands doing `doing` (resting on `table`, holding
-        a drink…). Returns where each thing they hold goes (its base), by name."""
+    def recording(self, model_id: str) -> list[Figure]:
+        """A pose clip the shot was sent (`staging/poses.py`): a person's poses, frame by
+        frame (`body.RECORDED_FPS` a second), each facing −Y, standing at the origin."""
+        ...
+
+    def skeleton(self, name: str, figures: Sequence[Figure], *, fps: float, room: Box) -> Thing:
+        """A person as their joints: nothing rendered, but the joints, in the thing's own
+        terms, are projected through the camera on every rendered frame and written to the
+        report, to be drawn over the layout as a skeleton (the image model draws the person
+        from it). `figures` play `fps` a second, round and round (one: still). The thing
+        takes `room` (its own terms), so cameras frame it and the composer's checks see it;
+        it is placed, moved and turned like anything else."""
         ...
 
     def play(self, thing: Thing, motion: str, *, start_frame: int = 1, speed: float = 1.0) -> None:

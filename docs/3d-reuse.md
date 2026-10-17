@@ -104,10 +104,10 @@ on this computer (Grounding DINO, SAM 2). It is sent only if it was found clearl
 keyframes all three were held back (things in a full scene run off the edge): exactly why
 designs are drawn alone on plain grey. An object goes to SAM 3D Objects with its outline; its
 model comes back, is brought into the library's form (upright, in metres, facing −Y) like any
-model taken in, and becomes its design's file. A person is never made as a mesh of their own:
-every person is made on the one skeleton everyone shares and posed by the same code
-([staging.md](staging.md#people)), so no one moves more naturally than anyone else; a person's
-design is fitted onto it. Places stay pictures: they are lifted, not modelled.
+model taken in, and becomes its design's file. A person is never made as a mesh at all:
+in a layout every person is a pose of real recorded motion, drawn over it as a skeleton
+([staging.md](staging.md#people)), and the image model draws them from it and from their
+design. Places stay pictures: they are lifted, not modelled.
 
 ## How a scene is made to move
 
@@ -143,12 +143,11 @@ questions with a right answer; taste belongs to the director.
    `content staging model --go` on one object design; measure memory, time and cost. About 25
    cents.
 2. **SAM 3D models as stand-ins**: a design's mesh in the layout in place of a stock prop, so
-   the guide carries its true shape; the after-GPU checks. People are fitted to their designs
-   on the shared skeleton instead.
+   the guide carries its true shape; the after-GPU checks. People stay poses.
 3. **Action**: the Wan control job on Cloud Run (the SAM 3D job's pattern, its shared parts
    moved into one provider), Blender's depth and pose passes, the director's sign-off per shot.
-   People already walk on one shared skeleton from free motion capture
-   ([staging.md](staging.md#people)); this turns that grey motion into drawn footage.
+   People's poses already move frame by frame from free recorded motion
+   ([staging.md](staging.md#people)): the pose control it takes.
 4. **Places kept across videos**: a recurring place's layout saved in the catalogue, so a later
    video's scene there starts from it.
 5. **The starter kit**: the guide look and `repaint_note` are already theme data; anything new
@@ -194,7 +193,9 @@ questions with a right answer; taste belongs to the director.
 - Motion for people: the CMU motion capture library ("may be copied, modified, or redistributed
   without permission", [FAQ](http://mocap.cs.cmu.edu/faqs.php)) and 100STYLE (100 walking and
   idle styles, CC BY 4.0, credited "The 100STYLE Dataset - Ian Mason":
-  [100STYLE](https://www.ianxmason.com/100style/)), retargeted once onto the shared skeleton.
+  [100STYLE](https://www.ianxmason.com/100style/)), and free animated characters on Sketchfab
+  (CC BY), read once as poses. Built 3D bodies were tried and dropped (2026-10-17): the image
+  model draws a person far better from a pose skeleton than from any body we render.
   Not used: HY-Motion (its licence excludes the UK and EU:
   [issue](https://github.com/Tencent-Hunyuan/HY-Motion-1.0/issues/49)), Bandai Namco and LaFAN1
   (non-commercial).

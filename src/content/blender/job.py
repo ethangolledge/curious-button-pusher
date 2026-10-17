@@ -162,6 +162,10 @@ class Report:
     seconds_building: float
     seconds_rendering: float
     blend: str | None = None
+    # Each person's joints where the camera saw them on each rendered frame (by frame, then
+    # person, then joint: pixels across, down, and how far in front of the camera), to be
+    # drawn over the layout (`staging/poses.draw`).
+    skeletons: dict[str, dict[str, dict[str, list[float]]]] = field(default_factory=dict)
 
     def dumps(self) -> str:
         return json.dumps(asdict(self), indent=2)

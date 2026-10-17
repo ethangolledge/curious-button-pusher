@@ -8,7 +8,7 @@ Stage a scene when its anchor is a place with things in it: rooms, desks, tables
 
 - when several scenes happen in the same place, stage every one of them with the same layout and the same things where they stood, changing only the camera and what has moved: the room then stays the same room;
 - choose the camera's angle for the story (a new angle on a room already seen is cheap and keeps its geography);
-- describe a particular person as a figure (sex, age, build, dress, pose); who they are comes from their references when the picture is drawn. Use `who` only for a person the things on hand list by name.
+- describe a particular person by their pose (and in `what`, their look); who they are comes from their references when the picture is drawn.
 
 Leave `staging` empty and say in `missing` what is lacking, in a few words naming the kind and the thing ("layout: harbour at night", "action: crowd surging"), when:
 
@@ -30,7 +30,7 @@ A scene left unstaged is drawn as a keyframe, as before; `missing` is how the to
   - `height`: its real height in metres, always (a mug 0.1, a briefcase 0.35, a traffic cone 0.7, a man 1.8, a lorry 3.5): a model found online can be any size, and is scaled to this;
   - `looks`: its colour or material when the story needs it ("colour: red", "material: brass");
   - `place`: where it goes: a `relation` to a `target` (a thing's id, the room's furniture or marks, or `floor`), and `each: true` for one per copy of the target (a glass in front of each man). Relations: `on`, `scattered_on`, `stacked_on`, `in_row_on`, `beside`, `in_front_of`, `behind`, `around`, `seated_at` (people on chairs round a table; chairs are added where there are none), `against_wall`, `at` (a mark), `held_by` (in the hand of people: a drink, a document, a pen or a phone; with `each: true` everyone holds one, without it `count` of them do);
-  - `person`, for people only: `who` (a person the things on hand list by name, or empty for anyone), `sex`, `age` (`young`, `middle`, `old`), `build` (`slim`, `average`, `heavy`), `dress`, `pose` (`standing`, `seated`, `walking`) and `activity` (what their hands do: `resting`, `lap`, `folded`, `pointing`, `pockets`). Someone walking has pose `walking` and a `travel` action along a path: they walk at their own pace. Leave `age`, `build` and `activity` empty unless the story needs them: a group is then varied, as real people are, rather than eight copies of one man. People round a table are `seated_at` it with pose `seated`. Give a thing to people with `held_by` rather than an activity: they are posed to hold it.
+  - `person`, for people only: `sex` (their usual height), `pose` (`standing`, `seated`, `walking`) and `activity` (what their hands do: `resting`, `lap`, `folded`, `pointing`, `pockets`). A person is placed as a pose from real recorded motion and drawn by the picture, so describe who they are (their look, dress, build) in `what` and the scene, never here. Someone walking has pose `walking` and a `travel` action along a path: they walk at their own pace. Leave `activity` empty unless the story needs it: a group is then varied, as real people are. People round a table are `seated_at` it with pose `seated`. Give a thing to people with `held_by` rather than an activity: they are posed to hold it.
 - **furnish**: `bare`, `some` (pieces against the walls) or `lived_in` (also small things on surfaces): background detail beyond what you name. Use `lived_in` for working rooms, `bare` when emptiness is the point.
 - **actions**: what happens, in order: an action from the catalogue with `who` (a thing's id: every copy does it, each `stagger` of the shot after the last) and its settings; a setting that names the actor takes `who`. Their `start` and `end` are fractions of the scene's length. For now the picture shows where everyone stands as the scene begins: put people where the moment needs them rather than relying on an action to bring them there.
 - **lights**: one to three, matching the anchor's `light_and_colour`: a practical lamp, a window, overhead, or outdoor sky; at night, the sources in the scene.
@@ -48,7 +48,7 @@ A board meeting at night: eight men in suits round the long table, three of them
 {"layout": {"block": "boardroom", "settings": [{"name": "chairs", "value": "4"}]},
  "things": [
    {"thing_id": "men", "what": "man in a suit", "count": 8,
-    "height": 1.8, "person": {"pose": "seated", "dress": "suit"},
+    "height": 1.8, "person": {"pose": "seated"},
     "place": {"relation": "seated_at", "target": "table"}},
    {"thing_id": "glasses", "what": "water glass", "count": 3, "height": 0.12,
     "place": {"relation": "held_by", "target": "men"}},

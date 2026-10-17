@@ -57,15 +57,13 @@ class Placement(ImmutableModel):
 
 
 class Person(ImmutableModel):
-    """Who a person is, for a figure built to fit: a particular person from the library
-    (`who`), or anyone of this description. What is left empty varies from one copy to the
-    next (eight men at a table are not eight of the same man doing the same thing)."""
+    """How a person is placed: posed from real recorded motion and drawn over the layout as a
+    skeleton, so who they are (their face, build, clothes) is the picture's to draw, from the
+    scene and its references. What is left empty varies from one copy to the next (eight men
+    at a table are not eight of the same man doing the same thing)."""
 
-    who: str = ""
+    # Their sex sets their usual height when the thing gives none.
     sex: Literal["man", "woman"] = "man"
-    age: Literal["young", "middle", "old"] | None = None
-    build: Literal["slim", "average", "heavy"] | None = None
-    dress: Literal["suit", "casual", "uniform", "work"] = "suit"
     pose: Literal["standing", "seated", "walking"] = "standing"
     # What their hands do: resting on the table, in the lap, arms folded, pointing, hands in
     # pockets; holding something is set by what they hold (`held_by`).

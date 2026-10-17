@@ -104,6 +104,9 @@ class Sketchfab(_Http):
     def __init__(self, http: Any | None = None) -> None:
         token = os.environ.get(self.key, "")
         super().__init__(http, {"Authorization": f"Token {token}"} if token else None)
+        # Files come from signed links on Amazon's storage, which refuses a request that also
+        # carries Sketchfab's key.
+        self._files = http if http is not None else _Http(None)._http
 
     def search(self, words: str, limit: int) -> list[Candidate]:
         found = []
@@ -129,9 +132,16 @@ class Sketchfab(_Http):
                     )
         return found
 
+    def about(self, uid: str) -> dict[str, Any]:
+        """What Sketchfab says of one model: its name, licence, maker and page."""
+        found: dict[str, Any] = self._get(f"{self.api}/models/{uid}").json()
+        return found
+
     def download(self, candidate: Candidate) -> bytes:
         archives = self._get(f"{self.api}/models/{candidate.file_url}/download").json()
-        content: bytes = self._get(archives["glb"]["url"]).content
+        response = self._files.get(archives["glb"]["url"], follow_redirects=True)
+        response.raise_for_status()
+        content: bytes = response.content
         return content
 
 

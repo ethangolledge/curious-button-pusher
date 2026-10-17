@@ -67,25 +67,27 @@ imports nothing from the rest of `content`; only the files marked † use Blende
 | Module | Owns |
 |---|---|
 | `blender/job.py` | the job: everything one shot needs, as JSON; the whole contract between the two sides |
-| `blender/api.py` | `Stage`: every verb a block may use, and `Box`, `Pose`, `Mark` |
+| `blender/api.py` | `Stage`: every verb a block may use, and `Box`, `Pose`, `Figure`, `Mark` |
+| `blender/body.py`, `skeletons.py` | how a person is posed, as joints: placed, seated on the real seat, hands reaching the real table (two-bone bends), the room they take; which bone gives each joint, by skeleton family |
 | `blender/bookkeeping.py` | what every stage keeps alike: the shot's length and shape, seeded randomness, marks, paths and actors by name |
 | `blender/materials.py` | each surface role's everyday colour, and the role an imported surface is nearest to |
 | `blender/maths.py` | vectors, rotations, easing, curves (line, arc, spline, constant-speed), turn limits, drift |
 | `blender/canvas_api.py`, `patterns.py` | `Canvas`: the verbs a transition's per-pixel program uses; the patterns transitions share (polar coordinates, turning, mirrored wedges, the Droste spiral) |
 | `blender/canvas.py` † | `Canvas` built as a GPU shader on a plane filling an orthographic camera; moving pictures as image sequences |
-| `blender/camera.py`, `motion.py`, `sets.py`, `shapes.py`, `shapes_figure.py`, `lighting.py` | what blocks share: framing and keeping inside the set; travel and finding things; room shells; legs, slabs and drawers; light sources and flicker |
+| `blender/camera.py`, `motion.py`, `sets.py`, `shapes.py`, `lighting.py` | what blocks share: framing and keeping inside the set; travel and finding things; room shells; legs, slabs and drawers; light sources and flicker |
 | `blender/blocks/` | one block per file, a folder per kind (`base.py`: what a block is, reading settings) |
 | `blender/registry.py`, `direct.py` | finding blocks by folder; building a shot in its one order |
 | `blender/rehearsal.py` | a `Stage` and a `Canvas` without Blender: checks shots and tests blocks and transitions |
 | `blender/stage.py` †, `worker.py` †, `audit.py` †, `ingest.py` †, `imports.py` † | the foundation (every surface drawn in its role; families made with settings; models stretched to fit); the runner of shot and join jobs; the checks before rendering (the camera, the view, things passing into each other); preparing a downloaded model or character; reading a model file the one way both use |
-| `blender/person.py` †, `generate.py` † | scripts Blender (or Infinigen's Python) runs: a person made from one parametric body, posed and moving by code; one object from an Infinigen generator |
+| `blender/poses.py` †, `generate.py` † | scripts Blender (or Infinigen's Python) runs: a stretch of recorded motion read as poses (joints frame by frame); one object from an Infinigen generator |
+| `blender/rigging.py` † | the looping motions a lifted picture's people breathe and talk by |
 | `staging/catalogue.py` | the blocks and models, described; the shot check |
 | `staging/library.py` | the model library: search by meaning, no duplicates, versions of a model, a model as Blender needs it, credits, keep and veto |
 | `staging/store.py` | where the library is kept: SQLite (models, lineage, usage) and files by their hash |
 | `staging/designs.py` | the channel's designs, kept as catalogue models with an `Identity`: each recurring person, place or object drawn once and reused ([3d-reuse.md](3d-reuse.md#designs)); the free checks before the GPU; their 3D models in one SAM 3D job per kind |
 | `staging/compose.py` | a scene's description to a shot: the room built, every copy placed by its relation clear of everything, background detail, actions for every copy |
-| `staging/resolve.py` | what each thing is drawn with: the library, families from its words, people made, then found online; its looks as paint, its size as a fit |
-| `staging/people.py` | people made to a description, once, and kept |
+| `staging/resolve.py` | what each thing is drawn with: the library, families from its words, people as poses, then found online; its looks as paint, its size as a fit |
+| `staging/poses.py` | people's poses: clips of free recorded motion read once and kept with their rights, the room a pose takes, the skeleton drawn over a layout |
 | `staging/sourcing.py` | where models come from: every source searched, the best prepared and drawn, scored, one taken with its rights and lineage |
 | `staging/scoring.py` | how sure a candidate is the thing, by eye: CLIP against everyday others |
 | `staging/templates.py` | the starting file for a new block of each kind |

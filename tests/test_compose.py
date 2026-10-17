@@ -212,7 +212,7 @@ def test_a_group_left_open_is_varied_with_no_two_neighbours_doing_the_same() -> 
     men = people.asked[-8:]
     activities = [m.activity for m in men]
     assert all(a != b for a, b in zip(activities, activities[1:], strict=False))
-    assert len({m.age for m in men}) > 1 and len({m.build for m in men}) > 1
+    assert len(set(activities)) > 2
 
 
 def test_three_glasses_held_by_men_are_three_men_each_with_one_in_his_hand() -> None:

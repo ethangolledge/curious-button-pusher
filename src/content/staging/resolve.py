@@ -21,8 +21,7 @@ from content.blender.maths import Vec
 from content.schemas.staging import Thing
 from content.staging.compose import Resolve, Resolved
 from content.staging.library import PICTURES, Library, Model
-from content.staging.motions import STANCES, WALK, motion, motion_id, stance
-from content.staging.people import character, character_id, posture, recipe
+from content.staging.poses import STANCES, USUAL_HEIGHT, clip, pose_id, room
 
 # Finding a model online for some words: taken into the library, or None.
 FindModel = Callable[[str], Model | None]
@@ -74,13 +73,13 @@ def look_of(thing: Thing) -> Look:
     return Look()
 
 
-def from_library(library: Library, *, make_people: bool = False) -> Resolve:
+def from_library(library: Library, *, make_poses: bool = False) -> Resolve:
     """Things resolved from the library alone (what the free check before a run can do);
-    people the scene describes are made when `make_people`."""
+    the poses of the people a scene describes are read when `make_poses`."""
 
     def resolve(thing: Thing) -> Resolved | None:
         if thing.person is not None:
-            return _person(library, thing, make=make_people)
+            return _person(library, thing, make=make_poses)
         model = _search(library, thing.what)
         return None if model is None else fitted(library, model, thing)
 
@@ -88,11 +87,11 @@ def from_library(library: Library, *, make_people: bool = False) -> Resolve:
 
 
 def with_online(
-    library: Library, find_model: FindModel | None, *, make_people: bool = False
+    library: Library, find_model: FindModel | None, *, make_poses: bool = False
 ) -> Resolve:
     """Things resolved from the library, what it lacks found online (each looked for once),
     and people made: the cascade a run uses."""
-    local = from_library(library, make_people=make_people)
+    local = from_library(library, make_poses=make_poses)
     tried: dict[str, Model | None] = {}
 
     def resolve(thing: Thing) -> Resolved | None:
@@ -182,37 +181,25 @@ def _search(library: Library, words: str) -> Model | None:
 
 
 def _person(library: Library, thing: Thing, *, make: bool) -> Resolved:
-    """A person: the library's own (`who`, a person made from a design), or one made to the
-    scene's description (made now when `make`; until then, the room an average person that
-    tall takes, enough to compose and check a shot), in the pose the scene asks."""
+    """A person, as the pose the scene asks (sitting, standing, walking): a clip of real
+    recorded motion (read now when `make`; until then, the room an average person that tall
+    takes, enough to compose and check a shot), at their height."""
     assert thing.person is not None
     person = thing.person
-    own = library.models.get(person.who)
-    model = own if own is not None and own.postures and own.placeable else None
-    if model is None:
-        made = recipe(person, thing.height)
-        model = character(library, made, make=make)
-        model_id, height = character_id(made), made.height
-    else:
-        model_id, height = model.model_id, model.size[2]
+    height = thing.height or USUAL_HEIGHT[person.sex]
     doing = person.activity or ""
-    room = posture(model, person.pose, doing, height)
-    held = stance(library, person.pose, make=make)
-    if held is not None:
-        stance_file, at = library.model_file(held[0].model_id), held[1]
-    else:
-        name, at = STANCES[person.pose]
-        stance_file = ModelFile(motion_id(name), "", (0.0, 0.0, 0.0))
-    walk = motion(library, WALK, make=make)
-    gait = library.model_file(walk.model_id) if walk is not None else None
-    # Longer legs walk further a stride.
-    stride = walk.movement.speed * height / STANDARD_HEIGHT if walk and walk.movement else 0.0
-    # Not made yet: named with nothing to draw it from, so it cannot be rendered by mistake.
-    file = library.model_file(model_id) if model else ModelFile(model_id, "", room.size)
+    name, at = STANCES[person.pose]
+    model = clip(library, name, make=make)
+    taken = room(library, model, person.pose, doing, height)
+    # Walking at the clip's own pace; longer legs walk further a stride.
+    movement = model.movement if model is not None and person.pose == "walking" else None
+    pace = movement.speed * height / STANDARD_HEIGHT if movement else 0.0
+    # Not read yet: named with nothing to pose from, so it cannot be rendered by mistake.
+    file = library.model_file(model.model_id) if model else ModelFile(pose_id(name), "", (0, 0, 0))
+    assert file is not None
     return Resolved(
-        model_id, Vec(*room.size), file, pose=person.pose, doing=doing,
-        holds={name: Vec(*point) for name, point in room.holds.items()},
-        middle=Vec(*room.middle, 0.0), stance=stance_file, at=at, gait=gait, stride=stride,
+        file.model_id, taken.size, file, pose=person.pose, doing=doing, holds=taken.holds,
+        middle=taken.middle, at=at, height=height, pace=pace,
     )  # fmt: skip
 
 

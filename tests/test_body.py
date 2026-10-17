@@ -1,29 +1,75 @@
-"""How a person is posed, as rules (`blender/body.py`): the same for everyone, wherever they
-are and whichever way they face, measured on the real table before them."""
+"""How a person is posed, as joints (`blender/body.py`): the same for everyone, wherever they
+are and whichever way they face, fitted to the real seat and table before them; and the
+skeletons recorded motion comes on, read by name (`blender/skeletons.py`)."""
+
+from pathlib import Path
 
 import pytest
 
-from content.blender.api import Box
+from content.blender.api import Box, Figure
 from content.blender.body import (
-    RESTING_HAND,
+    ANKLE_HEIGHT,
+    HIP_ABOVE_SEAT,
     SEAT_REACH,
+    STANDING,
     TABLE_HEIGHT,
     Frame,
     holds,
+    placed,
+    reached,
     reaches,
+    seated,
     table_before,
+    two_bone,
 )
 from content.blender.maths import UP, Quat, Vec, axis_angle
+from content.blender.skeletons import matched
+from content.staging.poses import draw
 
+STANDS = Figure({name: Vec(*point) for name, point in STANDING.items()})
 SEATED = Frame(hips=Vec(0.0, 0.0, 0.5), floor=0.0, turn=Quat())
 
 
-def test_a_table_is_measured_from_its_nearest_edge_along_the_way_they_face() -> None:
-    desk = Box(Vec(-0.75, -1.1, 0.0), Vec(0.75, -0.4, 0.76))
+def _sitting() -> Figure:
+    """A standing figure with its thighs run forward, as a recorded sitting pose has them."""
+    joints = dict(STANDS.joints)
+    for side, x in (("L", 0.1), ("R", -0.1)):
+        joints[f"knee.{side}"] = Vec(x, -0.43, 0.94)
+        joints[f"ankle.{side}"] = Vec(x, -0.45, 0.51)
+    return Figure(joints)
 
-    table = table_before(desk, SEATED)
 
-    assert table.near == pytest.approx(0.4) and table.top == pytest.approx(0.76)
+def test_a_two_bone_limb_reaches_its_target_and_keeps_its_bones() -> None:
+    root, middle, end = Vec(0, 0, 1), Vec(0, 0, 0.6), Vec(0, 0, 0.2)
+    target, pole = Vec(0.3, -0.4, 0.5), Vec(0, -1, 0.6)
+
+    bent, reached_end = two_bone(root, middle, end, target, pole)
+
+    assert (reached_end - target).length() == pytest.approx(0.0, abs=1e-6)
+    assert (bent - root).length() == pytest.approx(0.4)
+    assert (reached_end - bent).length() == pytest.approx(0.4)
+    assert bent.y < 0  # bent towards the pole, not away from it
+
+
+def test_a_limb_too_short_to_reach_points_straight_at_it() -> None:
+    root, middle, end = Vec(0, 0, 1), Vec(0, 0, 0.6), Vec(0, 0, 0.2)
+
+    _, reached_end = two_bone(root, middle, end, Vec(0, -3, 1), Vec(0, -1, 0))
+
+    assert (reached_end - root).length() == pytest.approx(0.8, abs=1e-5)
+    assert reached_end.y < -0.79
+
+
+def test_seated_the_hips_are_on_the_seat_and_the_feet_on_the_floor() -> None:
+    turn = Quat()
+
+    sat = seated(placed(_sitting(), Vec(1, 2, 0), turn, 1.0), 0.45, 0.0, turn, 1.0)
+
+    assert sat.hips.z == pytest.approx(0.45 + HIP_ABOVE_SEAT)
+    for side in "LR":
+        assert sat.joints[f"ankle.{side}"].z == pytest.approx(ANKLE_HEIGHT, abs=1e-4)
+        # The shin stands under its knee, the foot a little ahead (−Y).
+        assert sat.joints[f"ankle.{side}"].y < sat.joints[f"knee.{side}"].y
 
 
 def test_hands_rest_on_the_real_table_whatever_its_height_and_distance() -> None:
@@ -34,16 +80,25 @@ def test_hands_rest_on_the_real_table_whatever_its_height_and_distance() -> None
     on_far = reaches("seated", "resting", SEATED, table_before(far, SEATED))
 
     for hand_near, hand_far in zip(on_near, on_far, strict=True):
-        # Further back by the table's extra distance, higher by its extra height.
         assert hand_near.at.y - hand_far.at.y == pytest.approx(0.15)
         assert hand_far.at.z - hand_near.at.z == pytest.approx(0.08)
-        assert hand_far.lying == RESTING_HAND and hand_far.surface == pytest.approx(0.8)
 
 
-def test_without_a_table_hands_go_to_the_table_a_person_is_made_for() -> None:
+def test_a_seated_figure_reaching_a_table_puts_its_wrists_there() -> None:
+    turn = Quat()
+    sat = seated(placed(_sitting(), Vec(), turn, 1.0), 0.45, 0.0, turn, 1.0)
+    frame = Frame(sat.hips, 0.0, turn)
+    desk = Box(Vec(-0.75, -0.9, 0.0), Vec(0.75, -0.35, 0.76))
+
+    for hand in reaches("seated", "resting", frame, table_before(desk, frame)):
+        sat = reached(sat, hand.side, hand.at, hand.elbow)
+        assert (sat.joints[f"wrist.{hand.side}"] - hand.at).length() < 1e-3
+
+
+def test_without_a_table_hands_go_to_the_usual_table() -> None:
     hands = reaches("seated", "resting", SEATED, None)
 
-    assert all(hand.surface == pytest.approx(TABLE_HEIGHT) for hand in hands)
+    assert all(hand.at.z == pytest.approx(TABLE_HEIGHT + 0.05) for hand in hands)
     assert all(hand.at.y < -SEAT_REACH for hand in hands)
 
 
@@ -52,20 +107,50 @@ def test_a_person_turned_is_posed_turned() -> None:
 
     straight = holds("seated", "drink", SEATED, None)["drink"]
     round_ = holds("seated", "drink", turned, None)["drink"]
+    placed_turned = placed(STANDS, Vec(), axis_angle(UP, 90.0), 1.0)
 
     assert round_.z == pytest.approx(straight.z)
     assert axis_angle(UP, 90.0).rotate(straight).x == pytest.approx(round_.x)
-    elbows = [r.elbow - SEATED.hips for r in reaches("seated", "resting", SEATED, None)]
-    turned_elbows = [r.elbow - turned.hips for r in reaches("seated", "resting", turned, None)]
-    for elbow, turned_elbow in zip(elbows, turned_elbows, strict=True):
-        assert axis_angle(UP, 90.0).rotate(elbow).y == pytest.approx(turned_elbow.y)
+    # Facing −Y the nose is in front; turned a quarter it points the turned way.
+    assert placed_turned.joints["nose"].x == pytest.approx(0.1)
 
 
-def test_a_taller_person_reaches_further_from_their_hips_but_not_into_the_table() -> None:
-    tall = Frame(SEATED.hips, 0.0, Quat(), scale=1.2)
+@pytest.mark.parametrize(
+    ("bones", "family"),
+    [
+        (["mixamorig:LeftArm_011", "mixamorig:RightArm_035", "mixamorig:LeftForeArm_012",
+          "mixamorig:RightForeArm_036", "mixamorig:LeftHand_013", "mixamorig:RightHand_037",
+          "mixamorig:LeftUpLeg_062", "mixamorig:RightUpLeg_067", "mixamorig:LeftLeg_063",
+          "mixamorig:RightLeg_068", "mixamorig:LeftFoot_064", "mixamorig:RightFoot_069",
+          "mixamorig:Neck_05", "mixamorig:Head_06", "mixamorig:HeadTop_End_07"], "mixamo"),
+        (["Neck", "Head", "LeftShoulder", "RightShoulder", "LeftElbow", "RightElbow",
+          "LeftWrist", "RightWrist", "LeftHip", "RightHip", "LeftKnee", "RightKnee",
+          "LeftAnkle", "RightAnkle"], "100style"),
+        ([f"rp_nathan_walking_{b}_0{i}" for i, b in enumerate(
+            ["neck", "head", "head_end", "upperarm_l", "upperarm_r", "lowerarm_l",
+             "lowerarm_r", "hand_l", "hand_r", "upperleg_l", "upperleg_r", "lowerleg_l",
+             "lowerleg_r", "foot_l", "foot_r"])], "renderpeople"),
+    ],
+)  # fmt: skip
+def test_each_family_of_skeleton_gives_every_joint(bones: list[str], family: str) -> None:
+    found = matched(bones)
 
-    pocket, tall_pocket = (reaches("standing", "pockets", f, None)[0] for f in (SEATED, tall))
-    on_table, tall_on_table = (reaches("seated", "resting", f, None)[0] for f in (SEATED, tall))
+    assert found is not None and found[0] == family
+    assert {"neck", "head", "elbow.L", "ankle.R"} <= found[1].keys()
 
-    assert abs(tall_pocket.at.x) == pytest.approx(abs(pocket.at.x) * 1.2)
-    assert tall_on_table.at.z == pytest.approx(on_table.at.z)  # the table's top is the table's
+
+def test_a_skeleton_with_no_known_family_is_refused() -> None:
+    assert matched(["Bone", "Bone.001", "spine"]) is None
+
+
+def test_a_skeleton_is_drawn_where_its_joints_are_seen(tmp_path: Path) -> None:
+    from PIL import Image
+
+    picture = tmp_path / "layout.png"
+    Image.new("RGB", (200, 400), (90, 90, 90)).save(picture)
+    seen = {"man": {"neck": [100.0, 100.0, 3.0], "shoulder.R": [60.0, 110.0, 3.0]}}
+
+    drawn = Image.open(draw(picture, seen, tmp_path / "posed.png"))
+
+    assert drawn.getpixel((80, 105)) == (255, 0, 0)  # neck to right shoulder: OpenPose red
+    assert drawn.getpixel((10, 10)) == (90, 90, 90)

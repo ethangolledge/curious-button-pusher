@@ -62,8 +62,11 @@ def main(job_path: Path, out: Path, *, force: bool) -> int:
         bpy.ops.wm.save_as_mainfile(filepath=blend)
     built = time.perf_counter()
     frames: list[str] = []
+    skeletons = {}
     if not issues or force:
         frames = _render(job, out / "frames")
+        rendered = job.frames or tuple(range(1, job.frame_count + 1))
+        skeletons = {str(frame): stage.projected(frame) for frame in rendered}
     report = Report(
         shot_id=job.shot_id,
         frames=frames,
@@ -71,6 +74,7 @@ def main(job_path: Path, out: Path, *, force: bool) -> int:
         seconds_building=round(built - started, 2),
         seconds_rendering=round(time.perf_counter() - built, 2),
         blend=blend,
+        skeletons={frame: seen for frame, seen in skeletons.items() if seen},
     )
     (out / "report.json").write_text(report.dumps())
     return 0 if frames else 2

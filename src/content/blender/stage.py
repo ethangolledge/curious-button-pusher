@@ -8,16 +8,17 @@ simulated bodies are recorded as ordinary animation."""
 
 import math
 from collections.abc import Mapping, Sequence
+from pathlib import Path
 from typing import Any
 
 import bmesh  # type: ignore[import-not-found]
 import bpy  # type: ignore[import-not-found]
 from mathutils import Matrix, Vector  # type: ignore[import-not-found]
 
-from content.blender import rigging
 from content.blender.api import (
     Box,
     Channel,
+    Figure,
     LightKind,
     Pose,
     Role,
@@ -25,7 +26,7 @@ from content.blender.api import (
     standing_in,
 )
 from content.blender.blocks.base import Look, Prop, read
-from content.blender.body import STANDARD_HEIGHT, Frame
+from content.blender.body import recording
 from content.blender.bookkeeping import Bookkeeping
 from content.blender.imports import import_model, surface
 from content.blender.job import ModelFile
@@ -61,6 +62,8 @@ class BlenderStage(Bookkeeping):
         self._model_files = model_files
         self._scene = bpy.context.scene
         self._poses: dict[str, list[Pose]] = {}
+        # People, as their joints (`skeleton`): the poses, how fast they play, the room taken.
+        self._skeletons: dict[str, tuple[list[Figure], float, Box]] = {}
         self._camera = self._make_camera()
 
     # --- Building ------------------------------------------------------------------------
@@ -247,6 +250,17 @@ class BlenderStage(Bookkeeping):
 
     def bounds(self, thing: BlenderObject) -> Box:
         bpy.context.view_layer.update()
+        if thing.name in self._skeletons:
+            # A person takes the room their pose does, wherever they are put.
+            room = self._skeletons[thing.name][2]
+            taken = [
+                thing.matrix_world @ Vector((x, y, z))
+                for x in (room.low.x, room.high.x)
+                for y in (room.low.y, room.high.y)
+                for z in (room.low.z, room.high.z)
+            ]
+            low = Vec(*(min(c[i] for c in taken) for i in range(3)))
+            return Box(low, Vec(*(max(c[i] for c in taken) for i in range(3))))
         corners: list[Vector] = []
         stack = [thing]
         while stack:
@@ -355,37 +369,44 @@ class BlenderStage(Bookkeeping):
             thing.rotation_euler = tuple(rest + turn)
             thing.keyframe_insert("rotation_euler", frame=frame)
 
-    def perform(
-        self,
-        thing: BlenderObject,
-        pose: str,
-        doing: str = "",
-        *,
-        stance: str,
-        at: float = 0.0,
-        seat: float = 0.0,
-        table: BlenderObject | None = None,
-    ) -> dict[str, Vec]:
-        rig = rigging.rig_of(thing)
-        if rig is None:
-            raise ValueError(f"{thing.name} has no skeleton to pose")
-        standing = self.bounds(thing)
-        frame = Frame(
-            rigging.hips(rig),
-            standing.low.z,
-            Quat(*thing.matrix_world.to_quaternion()),
-            standing.size.z / STANDARD_HEIGHT,
-        )
-        on = self.bounds(table) if table is not None else None
-        held = (self._motion(stance), at)
-        return rigging.perform(rig, frame, pose, doing, stance=held, seat=seat, table=on)
-
-    def _motion(self, name: str) -> Any:
-        """A library motion the shot was sent (`staging/motions.py`), read from its file."""
-        spec = self._model_files.get(name)
+    def recording(self, model_id: str) -> list[Figure]:
+        spec = self._model_files.get(model_id)
         if spec is None or not spec.path:
-            raise KeyError(f"no motion called '{name}' (content staging motions)")
-        return rigging.motion(spec.path, name)
+            raise KeyError(f"no pose called '{model_id}' (content staging poses)")
+        return recording(Path(spec.path))
+
+    def skeleton(
+        self, name: str, figures: Sequence[Figure], *, fps: float, room: Box
+    ) -> BlenderObject:
+        thing = self.group(name)
+        self._skeletons[thing.name] = (list(figures), fps, room)
+        return thing
+
+    def projected(self, frame: int) -> dict[str, dict[str, list[float]]]:
+        """Every person's joints where the camera sees them on a frame: pixels across and down
+        the picture, and how far in front of the camera (negative: behind it)."""
+        from bpy_extras.object_utils import world_to_camera_view  # type: ignore[import-not-found]
+
+        scene = self._scene
+        scene.frame_set(frame)
+        bpy.context.view_layer.update()
+        width, height = scene.render.resolution_x, scene.render.resolution_y
+        out = {}
+        for name, (figures, fps, _) in self._skeletons.items():
+            thing = bpy.data.objects[name]
+            index = int((frame - 1) * fps / self._fps) % len(figures) if fps else 0
+            joints = {}
+            for joint, point in figures[index].joints.items():
+                seen = world_to_camera_view(
+                    scene, scene.camera, thing.matrix_world @ Vector(point.tuple())
+                )
+                joints[joint] = [
+                    round(seen.x * width, 1),
+                    round((1 - seen.y) * height, 1),
+                    round(seen.z, 3),
+                ]
+            out[name] = joints
+        return out
 
     def play(
         self, thing: BlenderObject, motion: str, *, start_frame: int = 1, speed: float = 1.0
@@ -398,8 +419,9 @@ class BlenderStage(Bookkeeping):
         # Its own copy of the motion: importing a model twice numbers the second "idle.001".
         held = [data.action, *(strip.action for track in data.nla_tracks for strip in track.strips)]
         found = next((a for a in held if a and a.name.split(".")[0] == motion), None)
-        # Else a motion it was made for, or one of the library's, every person's alike.
-        found = found or bpy.data.actions.get(motion) or self._motion(motion)
+        found = found or bpy.data.actions.get(motion)
+        if found is None:
+            raise KeyError(f"{thing.name} has no motion '{motion}'")
         data.action = None
         for track in list(data.nla_tracks):
             data.nla_tracks.remove(track)

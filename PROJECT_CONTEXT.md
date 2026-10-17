@@ -94,20 +94,19 @@ with a change). `AGENTS.md` says which applies when a session starts.
   long-form production.
 - 3D shots (Blender 5.2): scenes described and composed (relations, groups, furnishing);
   things resolved through a cascade into a SQLite catalogue with lineage (families, versions,
-  people made with MakeHuman, Infinigen, an Objaverse index, Sketchfab, Poly Pizza, Gazebo
-  Fuel, the Smithsonian; CLIP scoring, automatic taking with keep/veto); every person made once
-  on one shared skeleton (2026-10-17: no figurines, no per-person meshes) and posed in the shot
-  on its real furniture by the same code (`blender/body.py`, `rigging.py`): hands reached by
-  inverse kinematics, laid palm down on a table and lifted until they rest on it; standing,
-  sitting and walking from free motion capture (CMU, 100STYLE) retargeted once onto that
-  skeleton, a walker's stride played at their pace (2026-10-17); varied across
-  a group, holding what is `held_by` them; 43 blocks (the `guide` look among them), 33 props. `production.pictures: "staged"`
+  Infinigen, an Objaverse index, Sketchfab, Poly Pizza, Gazebo Fuel, the Smithsonian; CLIP
+  scoring, automatic taking with keep/veto); people are never rendered (2026-10-17, after
+  built bodies came out warped): each is a pose of real recorded motion (free Sketchfab
+  characters, CMU, 100STYLE, read once by `blender/poses.py`), placed and fitted to the shot's
+  real seat and table in plain Python (`blender/body.py`), and drawn over the layout as an
+  OpenPose skeleton for the image model to draw them from (tested: a natural man at the desk,
+  the layout held); varied across a group, holding what is `held_by` them; 43 blocks (the
+  `guide` look among them), 33 props. `production.pictures: "staged"`
   draws each staged scene's keyframe over its 3D layout (proved 2026-10-16 on a Kushner scene
   from a new angle: the layout held, boxes overlapping 0.84–1.0, in the channel's look and the
   keyframe's likeness, 14 cents for three) and its vision check looks for physical mistakes;
   then every keyframe moves; `"animated"` moves each keyframe itself
-  ([docs/picture-shots.md](docs/picture-shots.md)). Not yet: motion capture, likenesses on made
-  people, cloud rendering.
+  ([docs/picture-shots.md](docs/picture-shots.md)). Not yet: cloud rendering, action video.
 - Designs (2026-10-16): a person, place or object in two or more scenes is drawn once in the
   channel's look, checked by Gemini and Jev, kept with the channel, and every keyframe showing
   it is drawn from it, in later videos too; a design is a model in the channel's catalogue,

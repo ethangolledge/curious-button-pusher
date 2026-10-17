@@ -8,13 +8,14 @@ from pathlib import Path
 
 import pytest
 
+from content.blender.body import JOINTS, STANDING, TABLE_HEIGHT
 from content.blender.job import ActorCall, BlockCall, Job, ModelFile
 from content.blender.materials import linear, nearest_role
 from content.providers.assets import Candidate, licence_terms
 from content.schemas.staging import Thing
 from content.staging.catalogue import load_catalogue, with_models
-from content.staging.library import Model, Posture, load_library
-from content.staging.people import character_id, recipe
+from content.staging.library import Model, Movement, load_library
+from content.staging.poses import pose_id
 from content.staging.resolve import from_library, with_online
 from content.staging.sourcing import TOO_DETAILED, rank
 from content.staging.store import Store
@@ -228,31 +229,36 @@ def test_a_family_is_made_to_the_size_asked_and_anything_else_is_stretched_to_it
     assert desk[0] == pytest.approx(2.4) and desk_file.fit == (2.4, 0.0, 0.0)
 
 
-def test_a_described_person_is_made_once_and_until_then_only_takes_room(tmp_path: Path) -> None:
+def test_a_person_is_a_pose_of_recorded_motion_and_until_read_only_takes_room(
+    tmp_path: Path,
+) -> None:
     library = load_library(tmp_path)
     seated = {"thing_id": "men", "what": "man in a suit", "height": 1.8,
               "person": {"pose": "seated", "activity": "drink"},
               "place": {"relation": "seated_at", "target": "table"}}  # fmt: skip
     thing = Thing.model_validate(seated)
-    assert thing.person is not None
-    character = character_id(recipe(thing.person, 1.8))
+    clip = pose_id("sit")
 
     before = from_library(library)(thing)
-    made = Model(model_id=character, names=("middle man suit",), describe="A man",
-                 size=(0.54, 0.35, 1.8), source="MakeHuman (MPFB)", licence="CC0", file="p.glb",
-                 capabilities=("person",),
-                 postures={"seated:": Posture((0.6, 0.8, 1.4), (0.0, -0.3), 0.45),
-                           "seated:drink": Posture((0.6, 0.8, 1.4), (0.0, -0.3), 0.45,
-                                                   {"drink": (-0.15, -0.5, 0.75)})})  # fmt: skip
-    library.add(made, alongside=True)
+    # A clip as `blender/poses.py` writes one: a figure with its thighs run forward.
+    joints = {**STANDING, "knee.L": (0.1, -0.43, 0.94), "knee.R": (-0.1, -0.43, 0.94),
+              "ankle.L": (0.1, -0.45, 0.51), "ankle.R": (-0.1, -0.45, 0.51)}  # fmt: skip
+    written = tmp_path / "sit.json"
+    written.write_text(json.dumps({"frames": [[joints[j] for j in JOINTS]], "fps": 30}))
+    kept = Store(tmp_path).keep_file(written)
+    library.add(Model(model_id=clip, names=("sit pose",), describe="a man sitting",
+                      size=(0.0, 0.0, 0.0), capabilities=("pose",), source="Sketchfab",
+                      licence="CC-BY", author="someone", file=kept,
+                      movement=Movement(1, 0.0)), alongside=True)  # fmt: skip
     after = from_library(library)(thing)
-    other = from_library(library)(Thing.model_validate({**seated, "height": 1.6}))
+    shorter = from_library(library)(Thing.model_validate({**seated, "height": 1.6}))
 
-    # Not made yet: the room an average man takes, seated, named so it cannot be drawn.
-    assert before is not None and before.model == character and before.pose == "seated"
+    # Not read yet: the room an average man takes, seated, named so it cannot be drawn.
+    assert before is not None and before.model == clip and before.pose == "seated"
     assert before.file is not None and before.file.path == ""
-    assert before.size.z == pytest.approx(1.47)
-    # Made: posed in the shot, measured as they were made, holding their drink.
-    assert after is not None and after.model == character and after.doing == "drink"
-    assert after.size.z == pytest.approx(1.4) and after.holds["drink"].z == pytest.approx(0.75)
-    assert other is not None and other.model != character  # a shorter man: someone else
+    # Read: measured as the shot will pose him, on the engine's chair, his drink on the
+    # usual table.
+    assert after is not None and after.file is not None and after.file.path
+    assert after.doing == "drink" and after.holds["drink"].z == pytest.approx(TABLE_HEIGHT)
+    assert 1.2 < after.size.z < 1.6
+    assert shorter is not None and shorter.size.z < after.size.z

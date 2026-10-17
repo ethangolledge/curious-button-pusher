@@ -15,7 +15,8 @@ from typing import Literal
 
 from content.config import ContentConfig, load_config
 from content.errors import ConfigurationError
-from content.providers.blender import VERSION, blender_path, people_ready
+from content.providers.assets import Sketchfab
+from content.providers.blender import VERSION, blender_path
 from content.providers.sources import SOURCES
 from content.workflow.providers import MIN_RUN_USD
 
@@ -54,13 +55,14 @@ def checks(config_path: Path | None) -> list[Check]:
 
 
 def _people() -> Check:
-    if people_ready():
-        return Check("People in 3D", "ready", "made to fit each scene (MakeHuman, CC0)")
+    """People in 3D shots are poses of real recorded motion, some of it on Sketchfab."""
+    if Sketchfab.ready():
+        return Check("People in 3D", "ready", "posed from free recorded motion (Sketchfab, CMU)")
     return Check(
         "People in 3D",
         "optional",
-        "not installed: scenes with people in them are drawn",
-        "To put people in 3D shots: content staging people (once, ~650 MB).",
+        "no Sketchfab key: scenes with people in them are drawn",
+        "A free Sketchfab account's API token in .env as SKETCHFAB_API_TOKEN (docs/staging.md).",
     )
 
 

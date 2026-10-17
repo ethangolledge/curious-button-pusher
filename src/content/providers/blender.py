@@ -8,10 +8,6 @@ import math
 import os
 import shutil
 import subprocess
-import sys
-import tempfile
-import zipfile
-from collections.abc import Callable
 from pathlib import Path
 from typing import Any, Protocol
 
@@ -20,20 +16,8 @@ from content.blender.job import Job, Join, Report
 SOURCE = Path(__file__).parents[2]
 WORKER = SOURCE / "content" / "blender" / "worker.py"
 INGEST = SOURCE / "content" / "blender" / "ingest.py"
-PERSON = SOURCE / "content" / "blender" / "person.py"
-RETARGET = SOURCE / "content" / "blender" / "retarget.py"
-FIT = SOURCE / "content" / "blender" / "fit.py"
+POSES = SOURCE / "content" / "blender" / "poses.py"
 VERSION = "5.2"
-# Where Blender keeps its user extensions (the MPFB extension that makes people, and its
-# CC0 clothes and hair), on macOS and on Linux.
-CONFIG = (
-    Path("~/Library/Application Support/Blender")
-    if sys.platform == "darwin"
-    else Path("~/.config/blender")
-)
-EXTENSIONS = CONFIG.expanduser() / VERSION / "extensions"
-PEOPLE = EXTENSIONS / "user_default" / "mpfb"
-PEOPLE_ASSETS = EXTENSIONS / ".user" / "user_default" / "mpfb" / "data"
 
 
 class BlenderError(RuntimeError):
@@ -42,51 +26,6 @@ class BlenderError(RuntimeError):
 
 class Renderer(Protocol):
     def render(self, job: Job | Join, out: Path, *, force: bool = False) -> Report: ...
-
-
-# What making people needs, all CC0 (MakeHuman's asset packs): the base body's eyes,
-# teeth and skins, suits, shoes and hair; casual and work clothes come with the base.
-PEOPLE_PACKS = ("makehuman_system_assets", "suits01", "shoes01", "hair01")
-PACKS_URL = "https://files.makehumancommunity.org/asset_packs/{name}/{name}_cc0.zip"
-EXTENSIONS_URL = "https://extensions.blender.org/api/v1/extensions/"
-
-
-def install_people(blender: "LocalBlender", say: Callable[[str], None]) -> None:
-    """Install the MPFB extension into Blender and its CC0 clothes and hair (about 650 MB,
-    once): what `people_ready` needs."""
-    import httpx
-
-    listing = httpx.get(EXTENSIONS_URL, params={"format": "json"}, timeout=60).json()
-    mpfb = next(e for e in listing["data"] if e["id"] == "mpfb")
-    with tempfile.TemporaryDirectory() as work:
-        archive = Path(work) / "mpfb.zip"
-        say(f"Fetching the MPFB extension {mpfb['version']}…")
-        archive.write_bytes(
-            httpx.get(mpfb["archive_url"], timeout=600, follow_redirects=True).content
-        )
-        subprocess.run(
-            [str(blender.program), "-b", "--command", "extension", "install-file",
-             "-r", "user_default", "--enable", str(archive)],
-            check=True, capture_output=True,
-        )  # fmt: skip
-        PEOPLE_ASSETS.mkdir(parents=True, exist_ok=True)
-        for name in PEOPLE_PACKS:
-            say(f"Fetching {name} (CC0)…")
-            pack = Path(work) / f"{name}.zip"
-            with httpx.stream("GET", PACKS_URL.format(name=name), timeout=1800,
-                              follow_redirects=True) as response:  # fmt: skip
-                response.raise_for_status()
-                with pack.open("wb") as out:
-                    for chunk in response.iter_bytes():
-                        out.write(chunk)
-            zipfile.ZipFile(pack).extractall(PEOPLE_ASSETS)
-            pack.unlink()
-
-
-def people_ready() -> bool:
-    """Whether people can be made: the MPFB extension and its clothes and hair are here
-    (`content staging people` installs them)."""
-    return (PEOPLE / "__init__.py").is_file() and (PEOPLE_ASSETS / "clothes").is_dir()
 
 
 def blender_path() -> Path | None:
@@ -146,40 +85,16 @@ class LocalBlender:
         facts.unlink()
         return result
 
-    def person(self, description: dict[str, Any], target: Path) -> dict[str, Any]:
-        """Make a person to a description (`blender/person.py`); returns their size."""
-        target.parent.mkdir(parents=True, exist_ok=True)
-        described = target.with_suffix(".person.json")
-        facts = target.with_suffix(".facts.json")
-        described.write_text(json.dumps(description), encoding="utf-8")
-        self._run(PERSON, str(described), str(target), str(facts))
-        result: dict[str, Any] = json.loads(facts.read_text(encoding="utf-8"))
-        described.unlink()
-        facts.unlink()
-        return result
-
-    def retarget(self, request: dict[str, Any], target: Path) -> dict[str, Any]:
-        """A stretch of a motion capture recording retargeted onto the shared skeleton
-        (`blender/retarget.py`), saved as an action; returns its length and pace."""
+    def poses(self, request: dict[str, Any], target: Path) -> dict[str, Any]:
+        """A stretch of recorded motion read as poses (`blender/poses.py`): the joints of a
+        body frame by frame, written to `target`; returns what was written."""
         target.parent.mkdir(parents=True, exist_ok=True)
         asked = target.with_suffix(".request.json")
-        facts = target.with_suffix(".facts.json")
         asked.write_text(json.dumps(request), encoding="utf-8")
-        self._run(RETARGET, str(asked), str(target), str(facts))
-        result: dict[str, Any] = json.loads(facts.read_text(encoding="utf-8"))
+        self._run(POSES, str(asked), str(target))
         asked.unlink()
-        facts.unlink()
-        return result
-
-    def fit(self, request: dict[str, Any], out: Path) -> dict[str, Any]:
-        """A person's body fitted to their design's outlines (`blender/fit.py`); returns the
-        dials found and how well they fit, its pictures in `out`."""
-        out.mkdir(parents=True, exist_ok=True)
-        asked, result = out / "request.json", out / "result.json"
-        asked.write_text(json.dumps(request), encoding="utf-8")
-        self._run(FIT, str(asked), str(out), str(result))
-        found: dict[str, Any] = json.loads(result.read_text(encoding="utf-8"))
-        return found
+        written: dict[str, Any] = json.loads(target.read_text(encoding="utf-8"))
+        return written
 
     def _run(self, script: Path, *arguments: str) -> None:
         command = [

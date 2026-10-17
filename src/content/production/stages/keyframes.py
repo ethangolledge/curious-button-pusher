@@ -27,7 +27,7 @@ from content.production.studio import (
     render_signature,
     required,
 )
-from content.providers.blender import LocalBlender, people_ready
+from content.providers.blender import LocalBlender
 from content.providers.cache import file_digest
 from content.schemas.media import (
     ColourCheck,
@@ -38,6 +38,7 @@ from content.schemas.visuals import Scene
 from content.staging.backlog import record_gap
 from content.staging.compose import compose
 from content.staging.plan import GUIDE, StagingError, job_for, picture_job, staged, unstage
+from content.staging.poses import draw
 from content.staging.resolve import with_online
 from content.state import CallRecord, ContentState, merge_warnings
 from content.story.field import (
@@ -78,19 +79,24 @@ class Keyframes(Studio):
         found online and taken (free; it is kept for every later video). Each model taken
         without a person is named for review."""
         staging = self.staging()
-        people = people_ready() and isinstance(staging[0], LocalBlender) if staging else False
-        if staging is None or (self.find_model is None and not people):
+        # People's poses are read in Blender on this computer, once each.
+        poses = isinstance(staging[0], LocalBlender) if staging else False
+        if staging is None or (self.find_model is None and not poses):
             return []
         catalogue = staging[1]
         before = set(catalogue.library.models)
-        resolve = with_online(catalogue.library, self.find_model, make_people=people)
+        resolve = with_online(catalogue.library, self.find_model, make_poses=poses)
         visuals = required(state.get("visual_package"), "a storyboard")
+        unread = []
         for scene in visuals.scenes:
             shot = staged(scene)
             if shot is not None and shot.staging is not None:
-                compose(shot.staging, catalogue.registry, resolve, seed=shot.scene_id)
+                try:
+                    compose(shot.staging, catalogue.registry, resolve, seed=shot.scene_id)
+                except ValueError as exc:  # a pose that could not be read: drawn from words
+                    unread.append(f"{scene.scene_id}: {exc}")
         taken = [catalogue.library.get(m) for m in sorted(set(catalogue.library.models) - before)]
-        return [
+        return unread + [
             f"Model taken automatically for '{model.names[0]}': {model.describe} by "
             f"{model.author} ({model.source}, {model.licence}, sure {model.score:.2f}). If it "
             f"is wrong: content staging veto {model.model_id}"
@@ -286,8 +292,13 @@ class Keyframes(Studio):
             report = self.render_shot(Job.loads(task["guide"]))
             if not report.frames:
                 return {"keyframes": {task["scene_id"]: _unrendered(task, report.issues)}}
-            # The layout first: the repaint note speaks of "the first image".
-            references = [Path(report.frames[0]), *references]
+            # The layout first (the repaint note speaks of "the first image"), each person on
+            # it as a skeleton of their pose, for the image model to draw them from.
+            layout = Path(report.frames[0])
+            seen = next(iter(report.skeletons.values()), {})  # its first frame's
+            if seen:
+                layout = draw(layout, seen, layout.with_name(f"{layout.stem}-posed.png"))
+            references = [layout, *references]
         try:
             image, calls = self.fetch(
                 "keyframe",

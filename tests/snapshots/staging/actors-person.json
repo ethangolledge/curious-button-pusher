@@ -1,6 +1,6 @@
 [
-["model",{"model":"sample_person","name":"actor","height":null}],
-["place",{"name":"actor","at":{"x":0.0,"y":0.0,"z":0.0},"facing":{"x":0.0,"y":-1.0,"z":0.0}}],
-["perform",{"name":"actor","pose":"standing","doing":"drink","stance":"sample_stance","at":0.0,"seat":0.45}],
-["mark",{"name":"actor.drink","at":{"x":-0.17,"y":-0.27,"z":1.014}}]
+["recording",{"model":"sample_pose"}],
+["mark",{"name":"actor.drink","at":{"x":-0.17,"y":-0.27,"z":1.0}}],
+["skeleton",{"name":"actor","figures":1,"fps":0.0,"room":{"low":{"x":-0.374,"y":-0.32,"z":0.0},"high":{"x":0.35,"y":0.14,"z":1.81}}}],
+["place",{"name":"actor","at":{"x":0.0,"y":0.0,"z":0.0},"facing":{"x":0.0,"y":-1.0,"z":0.0}}]
 ]

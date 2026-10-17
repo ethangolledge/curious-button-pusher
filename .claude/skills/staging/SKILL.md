@@ -109,12 +109,12 @@ on two real keyframes (a join job: `docs/staging.md`) at small size before anyth
 
 ## A character
 
-Every person is made and posed the same way (`docs/staging.md`, "People"): describe them
-(`person`: sex, age, build, dress, pose, activity) and they are made once, on the shared
-skeleton, and posed in each shot on its own furniture; run `content staging people` once first.
-Never add a person as a model file of their own (a scan, a downloaded or generated character):
-it would move differently from everyone else. A particular person is a design, fitted onto the
-same skeleton.
+A person is never rendered (`docs/staging.md`, "People"): they are a pose of real recorded
+motion, fitted to the shot's furniture and drawn over the layout as a skeleton, and the image
+model draws them, their likeness from the scene's references. Describe them by `person` (sex,
+pose, activity) and their look in `what`; `content staging poses` reads the poses once. Never
+add a person as a model of their own (a scan, a downloaded or generated character): a body we
+render comes out worse than the image model's, and moves differently from everyone else.
 
 ## A channel's look
 
