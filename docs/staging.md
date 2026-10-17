@@ -210,8 +210,16 @@ every look draws them its own way. A thing whose words name a person ("a guard",
 officials") is a person even when the scene forgot to describe them (`people.is_person`).
 
 **Particular people.** A person with a design (`who`) is the library's own person, made on the
-same skeleton and fitted to their design. Until then they are made from the scene's
-description. Without MPFB a scene with people in it cannot be staged: it is drawn.
+same skeleton with the body that matches their design: `content staging fit <design> --sex …
+--age … --dress … --height … --config …` (free, about two and a half minutes). A person's design
+is a turnaround sheet, front and profile (`visual.design_views.person`); both outlines are
+found on this computer (`designs.outlines`), and `blender/fit.py` turns the body's dials
+(`person.DIALS`: weight, muscle, head, shoulders, hips, belly) a step at a time, smaller each
+round, keeping whatever makes the outlines overlap more. Front shows breadth, profile depth (a
+paunch). Fitted to a test sheet of a known body (heavy, a big head, a paunch), it found weight
+0.8 for 0.85 and head and belly exactly, its outlines overlapping 97%. The fitted body becomes
+the design's file, so it is placed and posed like anyone. Until then they are made from the
+scene's description. Without MPFB a scene with people in it cannot be staged: it is drawn.
 
 A scene that has a keyframe can instead be moved as the keyframe itself, lifted into depth:
 [picture-shots.md](picture-shots.md).
@@ -269,6 +277,7 @@ long thing that does not fit across a place lies along it (a car on a road).
 | what scenes could not be staged for | `content staging backlog --config …` (`--find`: find and take a model for every model wanted, as `stock` does) |
 | install people, Infinigen, the Objaverse index | `content staging people`, `content staging infinigen`, `content staging objaverse` |
 | people's motions: list them, making any missing | `content staging motions --config …` |
+| a person's design made into their body (fitted to its outlines; free) | `content staging fit person_<name> --sex man --age middle --dress suit --height 1.8 --config …` |
 | start a new block | `content staging new action pour_drink [--channel --config …]` |
 
 `preview` renders into `.cache/staging/` (gitignored) and prints the contact sheet's path;

@@ -43,6 +43,17 @@ DRESS = {
 SHOES = {"man": "shoes01", "woman": "shoes03"}
 HAIR = {("man", False): "short02", ("man", True): "short04", ("woman", False): "bob02",
         ("woman", True): "short03"}  # fmt: skip
+# How a body's shape can be turned from the usual, each by a value from −1 to 1 (`body` in a
+# recipe): weight and muscle (0 to 1, in place of its build), and the MakeHuman targets that
+# make each part bigger or smaller (`{axis}` each of its axes in `AXES`).
+DIALS = {
+    "head": ("head-scale-{axis}-incr", "head-scale-{axis}-decr"),
+    "shoulders": ("torso-scale-horiz-incr", "torso-scale-horiz-decr"),
+    "hips": ("hip-scale-horiz-incr", "hip-scale-horiz-decr"),
+    "belly": ("stomach-pregnant-incr", "stomach-pregnant-decr"),
+    "neck": ("neck-scale-vert-incr", "neck-scale-vert-decr"),
+}
+AXES = {"head": ("vert", "horiz", "depth")}
 
 
 def main(recipe: dict[str, Any], target: Path, facts: Path) -> int:
@@ -89,10 +100,19 @@ def made(recipe: dict[str, Any]) -> tuple[Any, dict[str, str]]:
 
     sex, old = recipe["sex"], recipe["age"] == "old"
     weight, muscle = BUILD[recipe["build"]]
+    dials = dict(recipe.get("body", ()))
     macro = TargetService.get_default_macro_info_dict()
-    macro.update({"gender": SEX[sex], "age": AGE[recipe["age"]], "weight": weight,
-                  "muscle": muscle})  # fmt: skip
+    macro.update({
+        "gender": SEX[sex], "age": AGE[recipe["age"]],
+        "weight": dials.pop("weight", weight), "muscle": dials.pop("muscle", muscle),
+    })  # fmt: skip
     human = HumanService.create_human(macro_detail_dict=macro, scale=0.1)
+    # The body's own shape (a big head, a paunch), before it is rigged and dressed to it.
+    TargetService.bulk_load_targets(human, [
+        {"target": DIALS[dial][0 if value > 0 else 1].format(axis=axis), "value": abs(value)}
+        for dial, value in dials.items() if value
+        for axis in AXES.get(dial, ("",))
+    ])  # fmt: skip
     rig = HumanService.add_builtin_rig(human, "default", import_weights=True)
     data = Path(LocationService.get_user_data())
     roles = {human.name: "skin"}

@@ -23,10 +23,11 @@ from content.providers.infinigen import Infinigen
 from content.providers.infinigen import install as install_infinigen
 from content.providers.objaverse import build_index
 from content.providers.sources import SOURCES, ready_sources
-from content.schemas.staging import StagePlan
-from content.staging import designs, motions, sourcing
+from content.schemas.staging import Person, StagePlan
+from content.staging import designs, fitting, motions, sourcing
 from content.staging.backlog import most_wanted
 from content.staging.catalogue import Catalogue, check, describe, load_catalogue, with_models
+from content.staging.people import recipe
 from content.staging.plan import StagingError, job_for, themed
 from content.staging.resolve import GOOD_MATCH, from_library
 from content.staging.scoring import clip_scorer
@@ -108,6 +109,16 @@ def _staging(arguments: list[str]) -> int:
         help="3D models of the designs without one, on the cloud GPU (a free dry run unless --go)",
     )
     model.add_argument("--go", action="store_true", help="Send them to the GPU (paid)")
+    fit = actions.add_parser(
+        "fit",
+        parents=[common],
+        help="Fit a person's design onto the shared skeleton, by its outline (free)",
+    )
+    fit.add_argument("design", help="The design's id (content staging designs)")
+    fit.add_argument("--sex", choices=("man", "woman"), required=True)
+    fit.add_argument("--age", choices=("young", "middle", "old"), default="middle")
+    fit.add_argument("--dress", choices=("suit", "casual", "uniform", "work"), default="suit")
+    fit.add_argument("--height", type=float, help="Standing height in metres")
     name = actions.add_parser("name", parents=[common], help="Another word for a library model")
     name.add_argument("model_id")
     name.add_argument("words")
@@ -196,6 +207,10 @@ def _staging(arguments: list[str]) -> int:
         for clip in motions.CLIPS:
             motions.motion(catalogue.library, clip, make=True)
         print(motions.describe(catalogue.library))
+    elif args.action == "fit":
+        if theme is None:
+            parser.error("designs are a channel's: pass --config themes/<name>/config.json")
+        return _fit(catalogue, args)
     elif args.action in ("keep", "veto", "history", "designs", "model"):
         if theme is None:
             parser.error("models are a channel's: pass --config themes/<name>/config.json")
@@ -466,6 +481,21 @@ def _shortlist(catalogue: Catalogue, words: str, sources: list[AssetSource]) -> 
         contact_sheet(stills, sheet, columns=3)
         print(f"\nThe candidates as the image model will see them, in order: {sheet}")
     print(f'Take one: content staging find "{words}" --take N --as <id> --about "…"')
+    return 0
+
+
+def _fit(catalogue: Catalogue, args: argparse.Namespace) -> int:
+    person = Person(sex=args.sex, age=args.age, dress=args.dress)
+    start = recipe(person, args.height or 0.0)
+    out = Path(".cache/staging") / f"fit-{args.design}"
+    try:
+        fitted = fitting.fit(catalogue.library, catalogue.library.get(args.design), start, out)
+    except ValueError as exc:
+        print(exc)
+        return 1
+    _strip(fitted.overlays, out / "sheet.png")
+    print(f"✓ {args.design}: fitted, outlines overlapping {fitted.fit:.0%} "
+          f"(the design red, the person green, both yellow): {out / 'sheet.png'}")  # fmt: skip
     return 0
 
 

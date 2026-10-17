@@ -525,14 +525,18 @@ _QUESTIONS = (
         target="design",
         kind="noul",
         instructions=(
-            "Does `observation` show what `view` asks for: the subject alone, whole, on the "
-            "background `view` names, with nothing cut off by the frame?"
+            "Does `observation` show what `view` asks for: the subject alone (once, or once "
+            "from each side `view` asks for, as a turnaround sheet shows a person), whole, on "
+            "the background `view` names, with nothing cut off by the frame?"
         ),
         criteria={
-            "true": "One subject, shown whole as `view` describes, with nothing else in frame.",
+            "true": (
+                "Only the subject, shown whole as `view` describes (each side it asks for, the "
+                "same subject each time), with nothing else in frame."
+            ),
             "false": (
-                "Part of it is cut off, other things or people share the frame, the background "
-                "is busy, or it is a different kind of view."
+                "Part of it is cut off, other things or other people share the frame, the "
+                "background is busy, or it is a different kind of view."
             ),
         },
         correction="{target}: draw the subject alone and whole, as the view describes.",

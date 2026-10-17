@@ -57,6 +57,9 @@ class Recipe:
     maker: int = MAKER
     # The stances each pose is measured in as they are made.
     stances: str = STANCES_MADE
+    # The body's own shape, dial by dial (`blender/person.py` DIALS: weight, head, belly…),
+    # as fitted to their design.
+    body: tuple[tuple[str, float], ...] = ()
 
 
 def recipe(person: Person, height: float) -> Recipe:

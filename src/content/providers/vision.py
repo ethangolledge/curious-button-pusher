@@ -83,11 +83,11 @@ def find(image: Path, phrases: str, *, threshold: float) -> list[Found]:
         text_threshold=threshold,
         target_sizes=[picture.size[::-1]],
     )[0]
+    # With nothing found, the labels still hold one empty label.
+    labels = list(found["text_labels"])[: len(found["boxes"])]
     boxes = [
         Found(tuple(box.tolist()), float(score), label)
-        for box, score, label in zip(
-            found["boxes"], found["scores"], found["text_labels"], strict=True
-        )
+        for box, score, label in zip(found["boxes"], found["scores"], labels, strict=True)
     ]
     return sorted(boxes, key=lambda f: -f.score)
 

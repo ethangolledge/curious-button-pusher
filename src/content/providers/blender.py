@@ -22,6 +22,7 @@ WORKER = SOURCE / "content" / "blender" / "worker.py"
 INGEST = SOURCE / "content" / "blender" / "ingest.py"
 PERSON = SOURCE / "content" / "blender" / "person.py"
 RETARGET = SOURCE / "content" / "blender" / "retarget.py"
+FIT = SOURCE / "content" / "blender" / "fit.py"
 VERSION = "5.2"
 # Where Blender keeps its user extensions (the MPFB extension that makes people, and its
 # CC0 clothes and hair), on macOS and on Linux.
@@ -169,6 +170,16 @@ class LocalBlender:
         asked.unlink()
         facts.unlink()
         return result
+
+    def fit(self, request: dict[str, Any], out: Path) -> dict[str, Any]:
+        """A person's body fitted to their design's outlines (`blender/fit.py`); returns the
+        dials found and how well they fit, its pictures in `out`."""
+        out.mkdir(parents=True, exist_ok=True)
+        asked, result = out / "request.json", out / "result.json"
+        asked.write_text(json.dumps(request), encoding="utf-8")
+        self._run(FIT, str(asked), str(out), str(result))
+        found: dict[str, Any] = json.loads(result.read_text(encoding="utf-8"))
+        return found
 
     def _run(self, script: Path, *arguments: str) -> None:
         command = [

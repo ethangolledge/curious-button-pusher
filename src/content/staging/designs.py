@@ -129,13 +129,21 @@ def mask_problems(mask: np.ndarray) -> list[str]:
 def outline(library: Library, model: Model) -> np.ndarray | None:
     """The outline of what a design shows (the person, the object), found on this computer
     with the vision models; None when it is not clearly there."""
+    found = outlines(library, model)
+    return found[0] if found else None
+
+
+def outlines(library: Library, model: Model) -> list[np.ndarray]:
+    """Every clear view of what a design shows, left to right: a person's sheet shows them
+    from the front, then in profile (`visual.design_views`)."""
     from content.providers import vision
 
     assert model.identity is not None
     image = picture(library, model)
     phrase = "a person." if model.identity.kind == "person" else f"{model.identity.query}."
     found = vision.find(image, phrase, threshold=FIND_THRESHOLD)
-    return vision.outline(image, [found[0].box])[0] if found else None
+    boxes = sorted((f.box for f in found), key=lambda box: box[0])
+    return list(vision.outline(image, boxes)) if boxes else []
 
 
 def prepare(library: Library, model: Model, scratch: Path) -> tuple[sam3d.Picture, list[str]]:

@@ -73,9 +73,10 @@ every picture), and the *theme* (the same style prompt and checks).
 **In a run, by itself.** When the reference photos are chosen (`production/stages/references.py`),
 every person, place or object the storyboard names in `design_min_scenes` scenes or more
 (default 2) gets a design: one picture of it alone, in the channel's look, drawn from its photos
-(`visual.design_template`, `visual.design_views`: a person standing whole on plain grey, an
-object whole on plain grey, a place wide and empty). Gemini describes it and Jev checks two
-things with a right answer: is it alone and whole as the view asks (`design_view`), and is it
+(`visual.design_template`, `visual.design_views`: a person's turnaround sheet, standing whole,
+front and profile, on plain grey; an object whole on plain grey; a place wide and empty).
+Gemini describes it and Jev checks two things with a right answer: is it alone and whole as the
+view asks, once from each side it asks for (`design_view`), and is it
 the thing asked for (`design_matches`). A design that fails is drawn once more, differently;
 if that fails too, keyframes are drawn from the photos as before. Every keyframe showing it is
 then drawn with the design first among its references, so it looks the same in every scene.

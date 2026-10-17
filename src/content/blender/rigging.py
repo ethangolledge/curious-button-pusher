@@ -228,6 +228,15 @@ def _lowest(rig: Any, side: str) -> float:
     return lowest
 
 
+def arms_out(rig: Any, degrees: float) -> None:
+    """The arms hanging this many degrees out from the body, as a person stands for a design
+    (a character sheet)."""
+    out, down = math.sin(math.radians(degrees)), -math.cos(math.radians(degrees))
+    with _posing(rig):
+        for side, sign in (("L", 1.0), ("R", -1.0)):
+            _aim(rig, f"upperarm01.{side}", Vec(out * sign, 0.0, down))
+
+
 def rest(rig: Any) -> None:
     """The skeleton back as it was made: every bone at rest, the body where it stood."""
     for bone in rig.pose.bones:
