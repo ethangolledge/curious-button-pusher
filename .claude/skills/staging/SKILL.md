@@ -52,7 +52,9 @@ thing"). In a run this is automatic; by hand:
 3. `content staging find "<words>" --config <channel>`: Infinigen makes it, or the free
    collections have it; the best six are prepared and drawn. Look at the sheet yourself (is
    it the thing, upright, sane, not a mess of a scan?), show the person, then `--take N --as
-   <id> --about "…"`. Only CC0, public domain, own and CC BY are ever offered.
+   <id> --about "…"`. Only CC0, public domain, own and CC BY are ever offered. To stock
+   things before a run needs them, `content staging stock "<words>=<height>" … --config
+   <channel>` takes the best of each automatically (as a run does).
 4. A model taken automatically in a run is named in its warnings: look at it in the run's
    stills, then `content staging keep <id>`, or `veto <id> --why "…"` (never used again).
    `content staging history <id>` shows where it came from and how it was chosen.

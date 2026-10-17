@@ -1,6 +1,7 @@
 """Where a library's models come from, other than code. A model the library lacks is searched
 for in every free source at once; the closest matches are downloaded, brought into the
-library's form, and drawn side by side in the channel's look, so the best is picked by eye.
+library's form, and drawn side by side as the image model will see them (in the `guide` look:
+a model is only ever drawn over, so its shape is what counts), so the best is picked by eye.
 Nothing joins the library until one is taken, and it then carries its rights (who made it,
 the licence, the page) so the finished video can credit it.
 
@@ -25,10 +26,9 @@ from content.providers.assets import ALLOWED, AssetSource, Candidate
 from content.providers.blender import LocalBlender
 from content.staging.catalogue import Catalogue, with_models
 from content.staging.library import PICTURES, Model, match
-from content.staging.plan import themed
+from content.staging.plan import GUIDE
 from content.staging.scoring import ACCEPT, Scorer
 from content.staging.store import Store
-from content.theme import Theme
 
 # A library model has at most this many faces (more are simplified away as it is added).
 MAX_FACES = 150_000
@@ -37,6 +37,8 @@ TOO_DETAILED = 1_000_000
 SHORTLIST = 6
 MODEL_FILES = (".glb", ".gltf", ".obj", ".fbx", ".stl")
 CANDIDATES = "candidates.json"
+# Anything bigger than this, in metres, is shown on open ground rather than in the studio.
+STUDIO_SIZE = 2.5
 
 
 @dataclass(frozen=True)
@@ -72,7 +74,6 @@ def shortlist(
     sources: Sequence[AssetSource],
     folder: Path,
     catalogue: Catalogue,
-    theme: Theme | None,
 ) -> tuple[list[Entry], list[str]]:
     """Search every source, and prepare and draw the best candidates; kept in `folder`, so
     taking one later downloads nothing again. Returns the entries and any source that
@@ -89,7 +90,7 @@ def shortlist(
     entries = []
     for index, candidate in enumerate(rank(words, found), 1):
         source = by_name[candidate.source]
-        entries.append(_prepare(candidate, source, folder / str(index), catalogue, theme))
+        entries.append(_prepare(candidate, source, folder / str(index), catalogue))
     (folder / CANDIDATES).write_text(
         json.dumps([asdict(entry) for entry in entries], indent=2), encoding="utf-8"
     )
@@ -174,10 +175,10 @@ def add_file(
     return model
 
 
-def turntable(catalogue: Catalogue, model_id: str, theme: Theme | None, out: Path) -> list[Path]:
-    """Four views of a library model in the studio, in the channel's look, to judge it by."""
-    job = with_models(_studio(model_id, (1, 40, 80, 120)), catalogue)
-    job = themed(job, theme) if theme else job
+def turntable(catalogue: Catalogue, model_id: str, out: Path) -> list[Path]:
+    """Four views of a library model in the studio, as the image model will see it."""
+    size = catalogue.library.get(model_id).size
+    job = with_models(_studio(model_id, (1, 40, 80, 120), size), catalogue)
     report = LocalBlender().render(job, out)
     return [Path(frame) for frame in report.frames]
 
@@ -227,7 +228,6 @@ def _prepare(
     source: AssetSource,
     folder: Path,
     catalogue: Catalogue,
-    theme: Theme | None,
 ) -> Entry:
     """Download a candidate, bring it into the library's form, and draw it on its own."""
     try:
@@ -243,11 +243,11 @@ def _prepare(
         )
         size = (facts["width"], facts["depth"], facts["height"])
         job = replace(
-            _studio("candidate", (60,)),
+            _studio("candidate", (60,), size),
             models=(ModelFile("candidate", str(prepared), size),),
             channel_blocks=tuple(str(blocks) for blocks in catalogue.channel_blocks),
         )
-        report = LocalBlender().render(themed(job, theme) if theme else job, folder / "still")
+        report = LocalBlender().render(job, folder / "still")
     except Exception as exc:  # a broken download is a candidate passed over
         lines = [line for line in str(exc).splitlines() if line.strip()]
         return Entry(candidate, problem=(lines[-1] if lines else type(exc).__name__)[:200])
@@ -255,12 +255,15 @@ def _prepare(
     return Entry(candidate, str(download), str(prepared), size, still)
 
 
-def _studio(model_id: str, frames: tuple[int, ...]) -> Job:
-    """A model alone on the studio's plinth, the camera going round it."""
+def _studio(model_id: str, frames: tuple[int, ...], size: Sequence[float]) -> Job:
+    """A model alone on the studio's plinth, the camera going round it; anything bigger than
+    the studio (a crane, a jet) on open ground instead."""
+    big = max(size) > STUDIO_SIZE
     return Job(
         shot_id=f"model-{model_id}", seconds=4, width=540, height=960, quality="still",
-        layout=BlockCall("studio"), look=BlockCall("plain"),
-        actors=(ActorCall("model", "prop", model_id, {"at": "plinth_top"}),),
+        layout=BlockCall("open_ground", {"road": "no"}) if big else BlockCall("studio"),
+        look=BlockCall(GUIDE),
+        actors=(ActorCall("model", "prop", model_id, {"at": "centre" if big else "plinth_top"}),),
         lights=(BlockCall("studio", {"subject": "model"}),),
         camera=BlockCall("orbit", {
             "subject": "model", "degrees": "270", "start": "-30", "framing": "medium",
@@ -294,16 +297,18 @@ def find(
     scorer: Scorer,
     *,
     model_id: str,
+    height: float | None = None,
 ) -> Model | None:
-    """A model for `what`, found and taken without a person: every source searched, the
-    best candidates prepared and drawn plainly, each scored by eye (`scoring.py`) and by
-    its title, and the best taken if it is plainly the thing. It joins the library as
-    `auto`, for a person to keep or turn down; every candidate's score is in its lineage.
+    """A model for `what` (`height` metres tall, if given), found and taken without a person:
+    every source searched, the best candidates prepared and drawn, each scored by eye
+    (`scoring.py`) and by its title, and the best taken if it is plainly the thing. It joins
+    the library as `auto`, for a person to keep or turn down; every candidate's score is in
+    its lineage.
     None when nothing is good enough: the scene is drawn instead."""
     library = catalogue.library
     turned_down = {m.page for m in library.models.values() if m.status == "vetoed"}
     folder = folder_for(what)
-    entries, _ = shortlist(what, sources, folder, catalogue, None)
+    entries, _ = shortlist(what, sources, folder, catalogue)
     scored = [
         (score_of(scorer, entry, what), entry)
         for entry in entries
@@ -319,8 +324,8 @@ def find(
         unique = f"{model_id}_{len(unique)}"
     model = add_file(
         catalogue, Path(entry.download), entry.candidate, model_id=unique,
-        describe=entry.candidate.title, names=(what,), status="auto", score=best,
-        alongside=True,
+        describe=entry.candidate.title, names=(what,), height=height, status="auto",
+        score=best, alongside=True,
     )  # fmt: skip
     Store(library.folder or folder).note(model.model_id, "chosen", {
         "asked": what,

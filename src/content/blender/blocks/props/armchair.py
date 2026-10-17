@@ -7,7 +7,7 @@ from content.blender.maths import Vec
 
 class Armchair(Prop):
     name = "armchair"
-    names = ("easy chair", "club chair", "chair", "lounge chair")
+    names = ("easy chair", "club chair", "lounge chair")
     capabilities = frozenset({"seat"})
 
     def build(self, stage: Stage, name: str) -> Thing:

@@ -224,13 +224,14 @@ long thing that does not fit across a place lies along it (a car on a road).
 | every block and model, with their settings | `content staging catalogue [--config themes/<name>/config.json]` |
 | the models, or those matching some words | `content staging models "desk lamp"` |
 | check or preview a shot: a job file, or a scene's description | `content staging check shot.json`, `content staging preview shot.json [--frames 1,60] [--scene] --config …` |
-| a model from every source, drawn side by side | `content staging find "typewriter" --config …`, then `--take N --as typewriter --about "…"` |
+| a model from every source, drawn side by side (in the `guide` look: a model is only drawn over, so its shape is what counts) | `content staging find "typewriter" --config …`, then `--take N --as typewriter --about "…"` |
+| free models found and taken ahead of the scenes that need them, as a run would | `content staging stock "construction crane=40" "yacht=6" --config …` (each `words=height in metres`; one the library has is skipped) |
 | a version of a model | `content staging vary red_ballot_box --from box --paint card=brick --height 0.5 --about "…" --config …` |
 | add a file you downloaded | `content staging add chair.glb --as side_chair --about "…" --licence CC0 --source "…" --config …` |
 | keep or turn down a model taken automatically | `content staging keep <id>`, `content staging veto <id> --why "…"` |
 | where a model came from | `content staging history <id> --config …` |
 | another word for a model | `content staging name side_chair "dining chair" --config …` |
-| what scenes could not be staged for | `content staging backlog --config …` (`--find`: search for every model wanted) |
+| what scenes could not be staged for | `content staging backlog --config …` (`--find`: find and take a model for every model wanted, as `stock` does) |
 | install people, Infinigen, the Objaverse index | `content staging people`, `content staging infinigen`, `content staging objaverse` |
 | start a new block | `content staging new action pour_drink [--channel --config …]` |
 

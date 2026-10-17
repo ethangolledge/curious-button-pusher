@@ -28,7 +28,8 @@ from content.staging import designs, sourcing
 from content.staging.backlog import most_wanted
 from content.staging.catalogue import Catalogue, check, describe, load_catalogue, with_models
 from content.staging.plan import StagingError, job_for, themed
-from content.staging.resolve import from_library
+from content.staging.resolve import GOOD_MATCH, from_library
+from content.staging.scoring import clip_scorer
 from content.staging.store import Store
 from content.staging.templates import TEMPLATES, render
 from content.theme import Theme, load_theme
@@ -145,7 +146,15 @@ def _staging(arguments: list[str]) -> int:
         "backlog", parents=[common], help="What scenes could not be staged for, most wanted first"
     )
     backlog.add_argument(
-        "--find", action="store_true", help="Search the free sources for every model wanted"
+        "--find", action="store_true", help="Find and take a free model for every model wanted"
+    )
+    stock = actions.add_parser(
+        "stock",
+        parents=[common],
+        help="Find and take free models for things, ahead of the scenes that need them",
+    )
+    stock.add_argument(
+        "things", nargs="+", help='What each is, with its real height if known: "desk lamp=0.55"'
     )
     new = actions.add_parser("new", parents=[common], help="Start a new block from its template")
     new.add_argument("kind", choices=sorted(TEMPLATES))
@@ -189,9 +198,9 @@ def _staging(arguments: list[str]) -> int:
             parser.error("models are added to a channel: pass --config themes/<name>/config.json")
         try:
             if args.action == "find":
-                return _find(catalogue, theme, args)
+                return _find(catalogue, args)
             if args.action == "add":
-                return _add(catalogue, theme, args)
+                return _add(catalogue, args)
             return _vary(catalogue, args)
         except ValueError as exc:
             print(exc)
@@ -212,10 +221,12 @@ def _staging(arguments: list[str]) -> int:
         for missing, times in wanted:
             print(f"{times:3}× {missing}")
         if args.find:
-            for missing, _ in wanted:
-                if missing.startswith("model:"):
-                    print(f"\n— {missing}")
-                    _shortlist(catalogue, theme, missing.removeprefix("model:").strip(), None)
+            things = [m.removeprefix("model:").strip() for m, _ in wanted if m.startswith("model:")]
+            return _stock(catalogue, things)
+    elif args.action == "stock":
+        if theme is None:
+            parser.error("models are added to a channel: pass --config themes/<name>/config.json")
+        return _stock(catalogue, args.things)
     elif args.action == "new":
         return _new(args.kind, args.name, theme.root if theme and args.channel else None, parser)
     return 0
@@ -393,7 +404,7 @@ def _strip(frames: list[Path], sheet: Path) -> None:
     ffmpeg.run(*inputs, "-filter_complex", f"{stack},scale=1600:-2", sheet)
 
 
-def _find(catalogue: Catalogue, theme: Theme, args: argparse.Namespace) -> int:
+def _find(catalogue: Catalogue, args: argparse.Namespace) -> int:
     folder = sourcing.folder_for(args.words)
     if args.take is None:
         known = catalogue.library.search(args.words)
@@ -402,7 +413,7 @@ def _find(catalogue: Catalogue, theme: Theme, args: argparse.Namespace) -> int:
             _models(catalogue, args.words)
             print()
         sources = [s for s in ready_sources() if not args.source or s.name == args.source]
-        return _shortlist(catalogue, theme, args.words, sources)
+        return _shortlist(catalogue, args.words, sources)
     entries = sourcing.shortlisted(folder)
     if not 1 <= args.take <= len(entries) or not args.model_id:
         print(f'--take needs a number from the shortlist (content staging find "{args.words}") '
@@ -418,19 +429,11 @@ def _find(catalogue: Catalogue, theme: Theme, args: argparse.Namespace) -> int:
         height=args.height, turn=args.turn, capabilities=_listed(args.can),
         alongside=args.alongside,
     )  # fmt: skip
-    return _added(catalogue, theme, model.model_id)
+    return _added(catalogue, model.model_id)
 
 
-def _shortlist(
-    catalogue: Catalogue, theme: Theme, words: str, sources: list[AssetSource] | None
-) -> int:
-    entries, failed = sourcing.shortlist(
-        words,
-        ready_sources() if sources is None else sources,
-        sourcing.folder_for(words),
-        catalogue,
-        theme,
-    )
+def _shortlist(catalogue: Catalogue, words: str, sources: list[AssetSource]) -> int:
+    entries, failed = sourcing.shortlist(words, sources, sourcing.folder_for(words), catalogue)
     for problem in failed:
         print(f"  (skipped {problem})")
     missing = [s.name for s in SOURCES if not s.ready()]
@@ -450,12 +453,41 @@ def _shortlist(
     if stills:
         sheet = sourcing.folder_for(words) / "sheet.png"
         contact_sheet(stills, sheet, columns=3)
-        print(f"\nThe candidates in the channel's look, in order: {sheet}")
+        print(f"\nThe candidates as the image model will see them, in order: {sheet}")
     print(f'Take one: content staging find "{words}" --take N --as <id> --about "…"')
     return 0
 
 
-def _add(catalogue: Catalogue, theme: Theme, args: argparse.Namespace) -> int:
+def _stock(catalogue: Catalogue, things: list[str]) -> int:
+    """A free model found and taken for each thing the library lacks (`words` or
+    `words=height`), as a run would; each taken one is `auto`, for a person to keep or veto."""
+    scorer = clip_scorer()
+    if scorer is None:
+        print("Taking models needs the vision extra: uv sync --extra vision")
+        return 1
+    sources = ready_sources()
+    for thing in things:
+        words, _, height = thing.partition("=")
+        words = words.strip()
+        known = catalogue.library.search(words)
+        if known and known[0].score >= GOOD_MATCH:
+            print(f"✓ {words}: the library has {known[0].model.model_id}")
+            continue
+        model_id = re.sub(r"[^a-z0-9]+", "_", words.lower()).strip("_")
+        model = sourcing.find(
+            words, catalogue, sources, scorer, model_id=model_id,
+            height=float(height) if height else None,
+        )  # fmt: skip
+        if model is None:
+            print(f'✗ {words}: nothing free is plainly one (content staging find "{words}")')
+            continue
+        print(f"✓ {words}: took {model.model_id} ({model.source}, {model.licence}, "
+              f"score {model.score:.2f})")  # fmt: skip
+        _views(catalogue, model.model_id)
+    return 0
+
+
+def _add(catalogue: Catalogue, args: argparse.Namespace) -> int:
     candidate = Candidate(
         args.source, args.about, args.page, str(args.file), args.file.suffix.lstrip("."),
         args.licence, args.author,
@@ -465,7 +497,7 @@ def _add(catalogue: Catalogue, theme: Theme, args: argparse.Namespace) -> int:
         names=_listed(args.names), height=args.height, turn=args.turn,
         capabilities=_listed(args.can), alongside=args.alongside,
     )  # fmt: skip
-    return _added(catalogue, theme, model.model_id)
+    return _added(catalogue, model.model_id)
 
 
 def _vary(catalogue: Catalogue, args: argparse.Namespace) -> int:
@@ -479,19 +511,23 @@ def _vary(catalogue: Catalogue, args: argparse.Namespace) -> int:
     return 0
 
 
-def _added(catalogue: Catalogue, theme: Theme, model_id: str) -> int:
+def _added(catalogue: Catalogue, model_id: str) -> int:
     model = catalogue.library.get(model_id)
     w, d, h = model.size
     print(f"✓ {model_id} added ({w:.2f}×{d:.2f}×{h:.2f} m, {model.licence}).")
     if not model.file.endswith(".glb"):
         print("  A picture: stand it in a shot with the picture actor.")
         return 0
+    _views(catalogue, model_id)
+    return 0
+
+
+def _views(catalogue: Catalogue, model_id: str) -> None:
     out = Path(".cache/staging") / f"model-{model_id}"
-    frames = sourcing.turntable(catalogue, model_id, theme, out)
+    frames = sourcing.turntable(catalogue, model_id, out)
     if frames:
         _strip(frames, out / "sheet.png")
-        print(f"  Four views of it in the channel's look: {out / 'sheet.png'}")
-    return 0
+        print(f"  Four views of it: {out / 'sheet.png'}")
 
 
 def _new(kind: str, name: str, channel: Path | None, parser: argparse.ArgumentParser) -> int:
