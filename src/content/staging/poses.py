@@ -93,6 +93,10 @@ SEATED_LEAN, STANDING_LEAN, LEVEL = 12.0, 6.0, 4.0
 LOOK_UP, LOOK_DOWN, TURNED, TWIST = 3.0, 25.0, 15.0, 10.0
 # Crossed legs count as this many degrees of fault (a pose to place anyone in is neutral).
 CROSSED = 15.0
+# How far out to its side a hand may be from its shoulder (metres) before the arms are out, as
+# in the T-pose a recording often starts in to calibrate its skeleton; past it, a centimetre is
+# a degree of fault.
+ARMS_OUT = 0.25
 # A plausible body: each limb's upper bone between these shares of its lower one, and the
 # shoulders between these shares of the torso (neck to hips).
 PROPORTION, SHOULDERS = (0.7, 1.45), (0.4, 1.1)
@@ -327,7 +331,8 @@ class Judged:
 def judged(figure: Figure) -> Judged:
     """One moment of a recording, judged as a pose to place a person in (as written: facing
     −Y, at the standard height). Measured, never guessed: what would make a person look
-    strange in a picture (leaning, a tilted head, a twisted chest, arms raised, crossed legs)."""
+    strange in a picture (leaning, a tilted head, a twisted chest, arms raised or held out,
+    crossed legs)."""
     j = figure.joints
     hips, neck = figure.hips, j["neck"]
     plausible = _plausible(figure)
@@ -353,6 +358,14 @@ def judged(figure: Figure) -> Judged:
         math.acos(max(-1.0, min(1.0, across.flat().normalised().dot(hips_across))))
     )
     raised = sum(max(0.0, j[f"wrist.{s}"].z - j[f"shoulder.{s}"].z) for s in "LR") * 100
+    side = across.flat().normalised()
+    out = (
+        sum(
+            max(0.0, (j[f"wrist.{s}"] - j[f"shoulder.{s}"]).dot(side) * sign - ARMS_OUT)
+            for s, sign in (("L", 1.0), ("R", -1.0))
+        )
+        * 100
+    )
     crossed = 1.0 if j["knee.L"].x < j["knee.R"].x or j["ankle.L"].x < j["ankle.R"].x else 0.0
     natural_lean = SEATED_LEAN if kind == "seated" else STANDING_LEAN
     faults = {
@@ -363,6 +376,7 @@ def judged(figure: Figure) -> Judged:
         "head turned": max(0.0, turn - TURNED),
         "twisted": max(0.0, twist - TWIST),
         "arms raised": raised,
+        "arms out": out,
         "legs crossed": crossed * CROSSED,
     }
     return Judged(kind, plausible, {name: round(v, 1) for name, v in faults.items() if v > 0})

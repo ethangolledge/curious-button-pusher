@@ -197,3 +197,15 @@ def test_a_sitting_figure_is_seated_and_a_broken_body_never_ranks() -> None:
 
     assert judged(sat).kind == "seated"
     assert not judged(stretched).plausible and judged(stretched).score == float("inf")
+
+
+def test_arms_held_out_as_in_a_t_pose_are_a_fault() -> None:
+    from content.staging.poses import judged
+
+    joints = dict(STANDS.joints)
+    for side, x in (("L", 1.0), ("R", -1.0)):
+        shoulder = joints[f"shoulder.{side}"]
+        joints[f"elbow.{side}"] = shoulder + Vec(0.28 * x, 0.0, 0.0)
+        joints[f"wrist.{side}"] = shoulder + Vec(0.55 * x, 0.0, 0.0)
+
+    assert judged(Figure(joints)).faults["arms out"] > 50

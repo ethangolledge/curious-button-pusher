@@ -69,7 +69,8 @@ def fetch(source: Source, take: str, folder: Path) -> Path:
 def _cmu(take: str) -> bytes:
     subject = int(take.split("_")[0])
     low, high = next(g for g in CMU_GROUPS if g[0] <= subject <= g[1])
-    url = f"{CMU_MIRROR}/Sequence-{low:03d}-{high:03d}/{subject}/Data/{take}.zip"
+    # The mirror names a subject's folder with at least two digits (`02`, `113`).
+    url = f"{CMU_MIRROR}/Sequence-{low:03d}-{high:03d}/{subject:02d}/Data/{take}.zip"
     with zipfile.ZipFile(io.BytesIO(_get(url))) as zipped:
         return zipped.read(f"{take}.bvh")
 
