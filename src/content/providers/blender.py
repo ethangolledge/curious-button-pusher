@@ -21,6 +21,7 @@ SOURCE = Path(__file__).parents[2]
 WORKER = SOURCE / "content" / "blender" / "worker.py"
 INGEST = SOURCE / "content" / "blender" / "ingest.py"
 PERSON = SOURCE / "content" / "blender" / "person.py"
+RETARGET = SOURCE / "content" / "blender" / "retarget.py"
 VERSION = "5.2"
 # Where Blender keeps its user extensions (the MPFB extension that makes people, and its
 # CC0 clothes and hair), on macOS and on Linux.
@@ -153,6 +154,19 @@ class LocalBlender:
         self._run(PERSON, str(described), str(target), str(facts))
         result: dict[str, Any] = json.loads(facts.read_text(encoding="utf-8"))
         described.unlink()
+        facts.unlink()
+        return result
+
+    def retarget(self, request: dict[str, Any], target: Path) -> dict[str, Any]:
+        """A stretch of a motion capture recording retargeted onto the shared skeleton
+        (`blender/retarget.py`), saved as an action; returns its length and pace."""
+        target.parent.mkdir(parents=True, exist_ok=True)
+        asked = target.with_suffix(".request.json")
+        facts = target.with_suffix(".facts.json")
+        asked.write_text(json.dumps(request), encoding="utf-8")
+        self._run(RETARGET, str(asked), str(target), str(facts))
+        result: dict[str, Any] = json.loads(facts.read_text(encoding="utf-8"))
+        asked.unlink()
         facts.unlink()
         return result
 

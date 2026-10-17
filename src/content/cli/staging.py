@@ -24,7 +24,7 @@ from content.providers.infinigen import install as install_infinigen
 from content.providers.objaverse import build_index
 from content.providers.sources import SOURCES, ready_sources
 from content.schemas.staging import StagePlan
-from content.staging import designs, sourcing
+from content.staging import designs, motions, sourcing
 from content.staging.backlog import most_wanted
 from content.staging.catalogue import Catalogue, check, describe, load_catalogue, with_models
 from content.staging.plan import StagingError, job_for, themed
@@ -142,6 +142,11 @@ def _staging(arguments: list[str]) -> int:
         parents=[common],
         help="Install what making people needs (MPFB for Blender, CC0 clothes and hair)",
     )
+    actions.add_parser(
+        "motions",
+        parents=[common],
+        help="People's motions (free motion capture): list them, making any missing",
+    )
     backlog = actions.add_parser(
         "backlog", parents=[common], help="What scenes could not be staged for, most wanted first"
     )
@@ -185,6 +190,12 @@ def _staging(arguments: list[str]) -> int:
             return 0
         install_people(LocalBlender(), print)
         print("✓ People can be made: describe them in a scene, and they are made to fit.")
+    elif args.action == "motions":
+        if theme is None:
+            parser.error("motions are a channel's: pass --config themes/<name>/config.json")
+        for clip in motions.CLIPS:
+            motions.motion(catalogue.library, clip, make=True)
+        print(motions.describe(catalogue.library))
     elif args.action in ("keep", "veto", "history", "designs", "model"):
         if theme is None:
             parser.error("models are a channel's: pass --config themes/<name>/config.json")

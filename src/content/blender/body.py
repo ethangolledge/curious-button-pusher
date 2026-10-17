@@ -1,7 +1,8 @@
-"""How a person's body is posed, as rules: where each limb points in each pose, where the
-hands go for what they are doing, and how the fingers close. The same rules pose everyone,
-made or placed: `rigging.py` turns them into bones inside Blender, when a person is made
-(to measure the room each pose takes) and when a shot places them (on its real furniture).
+"""How a person's body is posed, as rules: where the hands go for what they are doing, how
+the fingers close, which way knees and elbows bend (the stance itself is motion capture). The
+same rules pose everyone, made or placed: `rigging.py` turns them into bones inside Blender,
+when a person is made (to measure the room each pose takes) and when a shot places them (on
+its real furniture).
 
 Plain Python, so the arithmetic is tested without Blender. Directions and points are in the
 world: a person facing −Y is posed as written; one turned is posed turned (`Frame.turn`)."""
@@ -15,28 +16,9 @@ from content.blender.sets import SEAT_REACH
 
 # A person's measures below are for someone this tall, and scale with their height.
 STANDARD_HEIGHT = 1.8
-# Where each limb points in each pose (x right, y back, z up, for a person facing −Y), from
-# the hips out; each pair is the left side's, mirrored for the right.
-POSES: dict[str, dict[str, tuple[float, float, float]]] = {
-    "standing": {
-        "upperarm01": (0.18, 0.0, -1.0), "upperarm02": (0.12, 0.02, -1.0),
-        "lowerarm01": (0.05, -0.12, -1.0), "lowerarm02": (0.04, -0.15, -1.0),
-    },
-    "seated": {
-        "upperleg01": (0.08, -1.0, -0.1), "upperleg02": (0.06, -1.0, 0.0),
-        "lowerleg01": (0.0, -0.08, -1.0), "lowerleg02": (0.0, -0.05, -1.0),
-        "upperarm01": (0.15, -0.35, -1.0), "upperarm02": (0.1, -0.4, -1.0),
-        "lowerarm01": (-0.15, -1.0, -0.05), "lowerarm02": (-0.15, -1.0, -0.05),
-    },
-    "walking": {
-        "upperleg01": (0.05, -0.35, -1.0), "upperleg02": (0.04, -0.35, -1.0),
-        "lowerleg01": (0.0, 0.05, -1.0), "lowerleg02": (0.0, 0.05, -1.0),
-        "upperarm01": (0.15, 0.3, -1.0), "upperarm02": (0.1, 0.3, -1.0),
-        "lowerarm01": (0.05, 0.05, -1.0), "lowerarm02": (0.05, 0.0, -1.0),
-    },
-}  # fmt: skip
-# Mid-stride the right side does the opposite.
-OPPOSED = {"walking"}
+# The poses a person can be placed in. Each holds a stance from motion capture (a frame of
+# standing at ease, of sitting, of mid-stride: `staging/motions.py`), the same for everyone.
+POSES = ("standing", "seated", "walking")
 # What a person does with their hands, by pose: where each wrist that moves goes, how its
 # fingers close, and where what they hold goes. A point is (right, back, up, measured from):
 # from the hips (scaled with height); from a table (back from its near edge, up from its top:
@@ -107,10 +89,8 @@ GRIPS = {
     "flat": (5.0, 8.0, 0.8), "rest": (15.0, 35.0, 0.7), "hold": (30.0, 70.0, 0.9),
     "point": (40.0, 80.0, 0.5),
 }  # fmt: skip
-# Where an elbow points as an arm reaches (out to the side and back), and a knee as a leg
-# bends (forward, a little out), from the hips.
+# Where an elbow points as an arm reaches (out to the side and back), from the hips.
 ELBOW = Vec(0.55, 0.45, -0.1)
-KNEE = Vec(0.1, -0.8, 0.0)
 # The table a person is posed for when made (to measure the room each pose takes): this high,
 # its near edge a seat's reach in front of a seated person's hips (`sets.SEAT_REACH`).
 TABLE_HEIGHT = 0.75
@@ -152,22 +132,6 @@ class Reach:
     grip: str
     lying: Vec | None = None
     surface: float = 0.0
-
-
-def ways(pose: str, frame: Frame) -> dict[str, Vec]:
-    """Each bone the pose sets (`upperarm01.L`), and the way it points in the world."""
-    out = {}
-    for limb, (x, y, z) in POSES[pose].items():
-        for side, sign in (("L", 1), ("R", -1)):
-            back = -y if pose in OPPOSED and side == "R" else y
-            out[f"{limb}.{side}"] = frame.world(Vec(x * sign, back, z))
-    return out
-
-
-def knee(frame: Frame, side: str) -> Vec:
-    """Where a bending leg's knee points at, in the world."""
-    sign = 1 if side == "L" else -1
-    return frame.hips + frame.world(Vec(KNEE.x * sign, KNEE.y, KNEE.z)) * frame.scale
 
 
 def table_before(box: Box, frame: Frame) -> Table:

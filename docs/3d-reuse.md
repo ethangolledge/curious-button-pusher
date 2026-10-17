@@ -145,8 +145,9 @@ questions with a right answer; taste belongs to the director.
    the guide carries its true shape; the after-GPU checks. People are fitted to their designs
    on the shared skeleton instead.
 3. **Action**: the Wan control job on Cloud Run (the SAM 3D job's pattern, its shared parts
-   moved into one provider), Blender's depth and pose passes, motion clips on one shared
-   skeleton (free sources only, licences checked), the director's sign-off per shot.
+   moved into one provider), Blender's depth and pose passes, the director's sign-off per shot.
+   People already walk on one shared skeleton from free motion capture
+   ([staging.md](staging.md#people)); this turns that grey motion into drawn footage.
 4. **Places kept across videos**: a recurring place's layout saved in the catalogue, so a later
    video's scene there starts from it.
 5. **The starter kit**: the guide look and `repaint_note` are already theme data; anything new

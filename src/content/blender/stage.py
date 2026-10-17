@@ -361,6 +361,8 @@ class BlenderStage(Bookkeeping):
         pose: str,
         doing: str = "",
         *,
+        stance: str,
+        at: float = 0.0,
         seat: float = 0.0,
         table: BlenderObject | None = None,
     ) -> dict[str, Vec]:
@@ -375,7 +377,15 @@ class BlenderStage(Bookkeeping):
             standing.size.z / STANDARD_HEIGHT,
         )
         on = self.bounds(table) if table is not None else None
-        return rigging.perform(rig, frame, pose, doing, seat=seat, table=on)
+        held = (self._motion(stance), at)
+        return rigging.perform(rig, frame, pose, doing, stance=held, seat=seat, table=on)
+
+    def _motion(self, name: str) -> Any:
+        """A library motion the shot was sent (`staging/motions.py`), read from its file."""
+        spec = self._model_files.get(name)
+        if spec is None or not spec.path:
+            raise KeyError(f"no motion called '{name}' (content staging motions)")
+        return rigging.motion(spec.path, name)
 
     def play(
         self, thing: BlenderObject, motion: str, *, start_frame: int = 1, speed: float = 1.0
@@ -388,9 +398,8 @@ class BlenderStage(Bookkeeping):
         # Its own copy of the motion: importing a model twice numbers the second "idle.001".
         held = [data.action, *(strip.action for track in data.nla_tracks for strip in track.strips)]
         found = next((a for a in held if a and a.name.split(".")[0] == motion), None)
-        found = found or bpy.data.actions.get(motion)
-        if found is None:
-            raise KeyError(f"{thing.name} has no motion '{motion}'")
+        # Else a motion it was made for, or one of the library's, every person's alike.
+        found = found or bpy.data.actions.get(motion) or self._motion(motion)
         data.action = None
         for track in list(data.nla_tracks):
             data.nla_tracks.remove(track)

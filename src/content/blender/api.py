@@ -246,13 +246,16 @@ class Stage(Protocol):
         pose: str,
         doing: str = "",
         *,
+        stance: str,
+        at: float = 0.0,
         seat: float = 0.0,
         table: Thing | None = None,
     ) -> dict[str, Vec]:
         """A person (a model with the shared skeleton) posed where they stand, the way they
-        face, as `body.py` says: standing, seated or mid-stride, their hands doing `doing`
-        (resting on `table`, holding a drink…); seated, on a seat `seat` metres high, their
-        feet on the floor. Returns where each thing they hold goes (its base), by name."""
+        face: standing as the motion `stance` stands `at` this far through it (standing at
+        ease, sitting, mid-stride), then as `body.py` says: seated, on a seat `seat` metres
+        high, their feet on the floor; their hands doing `doing` (resting on `table`, holding
+        a drink…). Returns where each thing they hold goes (its base), by name."""
         ...
 
     def play(self, thing: Thing, motion: str, *, start_frame: int = 1, speed: float = 1.0) -> None:

@@ -63,7 +63,7 @@ and goes in the channel's backlog.
 {"layout": {"block": "boardroom"},
  "things": [
    {"thing_id": "men", "what": "man in a suit", "count": 8, "height": 1.8,
-    "person": {"pose": "seated", "dress": "suit", "motion": "talking"},
+    "person": {"pose": "seated", "dress": "suit"},
     "place": {"relation": "seated_at", "target": "table"}},
    {"thing_id": "glasses", "what": "water glass", "height": 0.12,
     "place": {"relation": "in_front_of", "target": "men", "each": true}},
@@ -81,7 +81,7 @@ and goes in the channel's backlog.
 | `count`, `height`, `width`, `depth` | how many, and its real size in metres: a model of any size is scaled (or a family made) to it |
 | `looks` | colour and material ("colour: red", "material: brass"): they become the role it is drawn in, and choose a family's settings |
 | `place` | a relation to a target (another thing, the room's furniture or marks, or `floor`), `each` for one per copy of the target: `on`, `scattered_on`, `stacked_on`, `in_row_on`, `beside`, `in_front_of`, `behind`, `around`, `seated_at` (chairs added where there are none), `against_wall`, `at`, `held_by` (in people's hands: a drink, a document, a pen, a phone; `each` for everyone, else `count` of them) |
-| `person` | for people: `who` (a particular person the library holds), or sex, age, build, dress, pose (standing, seated, walking), activity (what the hands do: resting, lap, folded, pointing, pockets) and motion (breathing, talking, walking, still). Age, build and activity left empty vary across a group |
+| `person` | for people: `who` (a particular person the library holds), or sex, age, build, dress, pose (standing, seated, walking) and activity (what the hands do: resting, lap, folded, pointing, pockets). Someone walking has pose walking and a `travel` action: they walk at their own walk's pace. Age, build and activity left empty vary across a group |
 | `furnish` | `bare`, `some` (pieces against the walls), `lived_in` (also small things on surfaces), by the room's own rules |
 | `actions` | an action block done by every copy of `who`, each `stagger` of the shot after the last |
 | `camera` | a move; its `subject` may name a thing, and every copy is framed together |
@@ -171,9 +171,12 @@ what they hold goes). A person not made yet takes the room an average person tha
 poses them there, on that shot's own furniture (`Stage.perform`). The rules are plain Python
 (`blender/body.py`), turned into bones by one module (`blender/rigging.py`) for everyone:
 
-- each pose (standing, seated, mid-stride) sets where each limb points;
-- seated, the legs are bent by inverse kinematics until the thighs sit on the seat and the
-  feet on the floor;
+- each pose holds a stance from real motion capture (`staging/motions.py`): a frame of
+  standing at ease, of sitting upright, of mid-stride, kept square to the way they face (the
+  performer's own turn taken out);
+- seated, the thighs run forward from the hips a little apart, each tilted until the thighs sit
+  on the seat, and each shin stands upright under its knee, the foot a little ahead (clear of
+  the chair's legs and the desk's drawers), the feet on the floor;
 - what the hands do (`ACTIVITIES`: resting, drinking, reading, writing, pointing, lap, folded,
   pockets, phone) is reached for, not set joint by joint: each hand is given a point on the
   real table before them (measured from its near edge and its top, `body.table_before`), by the
@@ -184,6 +187,22 @@ poses them there, on that shot's own furniture (`Stage.perform`). The rules are 
   its lowest point rests on the top, never in it;
 - the fingers close by their grip (flat, rest, hold, point), drawn together from the made
   hand's spread.
+
+A walking person travels along a path (`travel`) playing their walk (a motion capture loop on
+the spot), played as fast as they go so their feet keep pace with the ground; unless the scene
+says how fast, they go at their walk's own pace (0.88 m/s for the standard height, longer legs
+further). Hands doing nothing hang relaxed (motion capture records no fingers).
+
+**Motions.** `content staging motions --config …` lists them and makes any missing: each a
+stretch of a free recording, fetched one take at a time (a few MB), retargeted once onto the
+shared skeleton (`blender/retarget.py`: scaled to its legs, turned to face −Y, each bone turning
+as its match did from rest, a hand by its wrist-to-knuckles line; a loop cut where it returns
+to its first pose, its travel taken out) and kept in the library with its rights. A motion's id
+names exactly how it was taken, so changing a stretch makes a new motion, and every person made
+with the old one is made again. Sources: the CMU Graphics Lab Motion Capture Database (no
+restrictions) and 100STYLE (CC BY 4.0: a video using it is credited, as any credited model is).
+Not used: HY-Motion (its licence excludes the UK and EU), Bandai Namco and LaFAN1
+(non-commercial).
 
 Where they hold things is left as a mark (`<actor>.drink`), and what they hold is put there
 and hangs from them (`put`'s `held_by` and `hold`). Every surface is named for its role, so
@@ -249,6 +268,7 @@ long thing that does not fit across a place lies along it (a car on a road).
 | another word for a model | `content staging name side_chair "dining chair" --config …` |
 | what scenes could not be staged for | `content staging backlog --config …` (`--find`: find and take a model for every model wanted, as `stock` does) |
 | install people, Infinigen, the Objaverse index | `content staging people`, `content staging infinigen`, `content staging objaverse` |
+| people's motions: list them, making any missing | `content staging motions --config …` |
 | start a new block | `content staging new action pour_drink [--channel --config …]` |
 
 `preview` renders into `.cache/staging/` (gitignored) and prints the contact sheet's path;
@@ -262,7 +282,7 @@ channel's look; a description without one is drawn the starter kit's way.
 | Kind | Blocks | Built on |
 |---|---|---|
 | layouts | `room`, `office`, `boardroom`, `corridor`, `street`, `studio`, `open_ground`, and `set` (any hand-built set from the library) | `sets.room` (walls, window, blinds, door), `sets.ground`; each layout names its marks and paths |
-| actors | `put` (exactly where the composer worked out, playing a motion), `prop` (on a mark), `stack`, `vehicle` (on a road), `picture` (an image on a card) | `sets.stand`, `sets.moved` |
+| actors | `put` (exactly where the composer worked out), `person` (placed and posed there on the shot's furniture), `prop` (on a mark), `stack`, `vehicle` (on a road), `picture` (an image on a card) | `sets.stand`, `sets.moved` |
 | actions | `travel`, `drive`, `slide`, `turn`, `scatter` (falling sheets, onto clear spots), `topple` (real physics) | `motion.travel` |
 | moves | `orbit`, `dolly`, `pan`, `track`, `fly`, `hold`, `vertigo` | `camera.film`, `camera.around` |
 | lights | `lamp`, `window`, `overhead`, `studio`, `headlights`, `streetlights`, `sky` | `lighting.source`, `lighting.flicker` |
@@ -398,7 +418,7 @@ CC BY models are credited with the video. Renders belong to whoever makes them.
 
 | Step | What |
 |---|---|
-| richer motions | motion capture (CMU) retargeted onto made people; gestures that move to and from what they hold |
+| richer motions | more of the free motion capture as stances and loops (gestures, sitting down, standing up), each walk and stand in a character's own style; gestures that move to and from what they hold |
 | carrying while walking | a walking person holding a folder or a briefcase (holding is posed for seated and standing people only; a thing `held_by` a walker is set down in front of them) |
 | a particular face on a made person | a likeness from reference photos on the parametric body |
 | `travel` joins | one camera move between two framings of a shared set |

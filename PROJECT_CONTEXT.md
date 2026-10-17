@@ -98,7 +98,9 @@ with a change). `AGENTS.md` says which applies when a session starts.
   Fuel, the Smithsonian; CLIP scoring, automatic taking with keep/veto); every person made once
   on one shared skeleton (2026-10-17: no figurines, no per-person meshes) and posed in the shot
   on its real furniture by the same code (`blender/body.py`, `rigging.py`): hands reached by
-  inverse kinematics, laid palm down on a table and lifted until they rest on it; varied across
+  inverse kinematics, laid palm down on a table and lifted until they rest on it; standing,
+  sitting and walking from free motion capture (CMU, 100STYLE) retargeted once onto that
+  skeleton, a walker's stride played at their pace (2026-10-17); varied across
   a group, holding what is `held_by` them; 43 blocks (the `guide` look among them), 33 props. `production.pictures: "staged"`
   draws each staged scene's keyframe over its 3D layout (proved 2026-10-16 on a Kushner scene
   from a new angle: the layout held, boxes overlapping 0.84–1.0, in the channel's look and the

@@ -14,12 +14,14 @@ from collections.abc import Callable
 from dataclasses import dataclass
 
 from content.blender.blocks.base import Prop, settings
+from content.blender.body import STANDARD_HEIGHT
 from content.blender.job import ModelFile
 from content.blender.materials import BY_COLOUR, linear, nearest_role
 from content.blender.maths import Vec
 from content.schemas.staging import Thing
 from content.staging.compose import Resolve, Resolved
 from content.staging.library import PICTURES, Library, Model
+from content.staging.motions import STANCES, WALK, motion, motion_id, stance
 from content.staging.people import character, character_id, posture, recipe
 
 # Finding a model online for some words: taken into the library, or None.
@@ -195,12 +197,22 @@ def _person(library: Library, thing: Thing, *, make: bool) -> Resolved:
         model_id, height = model.model_id, model.size[2]
     doing = person.activity or ""
     room = posture(model, person.pose, doing, height)
+    held = stance(library, person.pose, make=make)
+    if held is not None:
+        stance_file, at = library.model_file(held[0].model_id), held[1]
+    else:
+        name, at = STANCES[person.pose]
+        stance_file = ModelFile(motion_id(name), "", (0.0, 0.0, 0.0))
+    walk = motion(library, WALK, make=make)
+    gait = library.model_file(walk.model_id) if walk is not None else None
+    # Longer legs walk further a stride.
+    stride = walk.movement.speed * height / STANDARD_HEIGHT if walk and walk.movement else 0.0
     # Not made yet: named with nothing to draw it from, so it cannot be rendered by mistake.
     file = library.model_file(model_id) if model else ModelFile(model_id, "", room.size)
     return Resolved(
         model_id, Vec(*room.size), file, pose=person.pose, doing=doing,
-        holds={name: Vec(*at) for name, at in room.holds.items()},
-        middle=Vec(*room.middle, 0.0),
+        holds={name: Vec(*point) for name, point in room.holds.items()},
+        middle=Vec(*room.middle, 0.0), stance=stance_file, at=at, gait=gait, stride=stride,
     )  # fmt: skip
 
 

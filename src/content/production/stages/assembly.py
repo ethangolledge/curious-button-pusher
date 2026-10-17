@@ -64,14 +64,14 @@ class Assembly(Studio):
         }
 
     def _credits(self, keyframes: Sequence[RenderedAsset]) -> list[str]:
-        """The credits the 3D shots' models ask for, each once."""
+        """The credits the 3D shots' models and motions ask for, each once: those of the
+        layouts pictures were drawn over as well as those of the shots that move."""
         staging = self.staging()
         if staging is None:
             return []
         library = staging[1].library
-        used = sorted(
-            {m.base or m.model_id for a in keyframes if a.shot for m in Job.loads(a.shot).models}
-        )
+        jobs = [Job.loads(job) for a in keyframes for job in (a.guide, a.shot) if job]
+        used = sorted({m.base or m.model_id for job in jobs for m in job.models})
         return sorted({line for model_id in used if (line := library.credit(model_id))})
 
     def _final_issues(self, final: Path, cut: Path, timeline: Timeline) -> list[str]:

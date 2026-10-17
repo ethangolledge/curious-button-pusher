@@ -63,6 +63,12 @@ class Resolved:
     doing: str = ""
     holds: dict[str, Vec] = field(default_factory=dict)
     middle: Vec = Vec()
+    # The motion a person stands as, and how far through it (`staging/motions.py`); their
+    # walk, and the pace it carries them at (metres a second).
+    stance: ModelFile | None = None
+    at: float = 0.0
+    gait: ModelFile | None = None
+    stride: float = 0.0
 
 
 Resolve = Callable[[Thing], Resolved | None]
@@ -160,6 +166,8 @@ class Composer:
         self._turns: dict[str, int] = {}
         # The things that are people: their actions are done at a person's pace.
         self._people: set[str] = set()
+        # Each person's walk and its pace, by actor: what their travel plays.
+        self._gaits: dict[str, tuple[str, float]] = {}
         self._placed: list[Placed] = []
         self._copies: dict[str, list[Placed]] = {}
         self._out = Composition()
@@ -254,8 +262,9 @@ class Composer:
                 if thing.person is not None and len(copies):
                     # Each person in a group is someone a little different.
                     resolved = self._resolve(self._copy_of(thing, len(copies))) or resolved
-                if resolved.file is not None and resolved.file not in self._out.models:
-                    self._out.models.append(resolved.file)
+                for file in (resolved.file, resolved.stance, resolved.gait):
+                    if file is not None and file not in self._out.models:
+                        self._out.models.append(file)
                 spot = self._spot(relation, target, anchor, group, resolved, index, thing.count)
                 if spot is None:
                     if required:
@@ -272,6 +281,8 @@ class Composer:
                 self._placed.append(placed)
                 copies.append(placed)
                 if resolved.pose:
+                    if resolved.gait is not None:
+                        self._gaits[actor_id] = (resolved.gait.model_id, resolved.stride)
                     table = self._table_for(target, group)
                     self._out.actors.append(_person(actor_id, resolved, at, heading, table))
                     continue
@@ -597,6 +608,11 @@ class Composer:
         calls = []
         for index, member in enumerate(members):
             values = {s.name: member if s.value == action.who else s.value for s in action.settings}
+            walk = self._gaits.get(member)
+            if walk is not None and {"gait", "stride"} <= named:
+                # Their own walk, at its own pace, unless the scene says how fast.
+                gait, stride = walk
+                human = {**human, "gait": gait, "stride": _n(stride), "speed": _n(stride)}
             values = {**human, **values}
             for name in timed:
                 begins = float(values.get(name, "0") or 0)
@@ -665,6 +681,8 @@ def _person(actor_id: str, resolved: Resolved, at: Vec, heading: float, table: s
         "x": _n(at.x), "y": _n(at.y), "z": _n(at.z), "heading": _n(heading),
         "pose": resolved.pose,
     }  # fmt: skip
+    if resolved.stance is not None:
+        values = {**values, "stance": resolved.stance.model_id, "at": _n(resolved.at)}
     if resolved.doing:
         values["doing"] = resolved.doing
     if table:

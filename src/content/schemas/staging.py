@@ -70,9 +70,6 @@ class Person(ImmutableModel):
     # What their hands do: resting on the table, in the lap, arms folded, pointing, hands in
     # pockets; holding something is set by what they hold (`held_by`).
     activity: Activity | None = None
-    # How they move through the shot: alive and breathing, talking (head and hands), walking
-    # (in step, wherever an action takes them), or quite still.
-    motion: Literal["breathing", "talking", "walking", "still"] = "breathing"
 
 
 class Thing(ImmutableModel):

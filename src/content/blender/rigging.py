@@ -15,15 +15,20 @@ from mathutils import Matrix, Quaternion, Vector  # type: ignore[import-not-foun
 
 from content.blender import body
 from content.blender.api import Box
-from content.blender.body import GRIPS, Frame, Reach, knee
-from content.blender.maths import Vec
+from content.blender.body import GRIPS, Frame, Reach
+from content.blender.maths import FRONT, UP, Vec, axis_angle
 
 AXES = {"x": (1.0, 0.0, 0.0), "y": (0.0, 1.0, 0.0), "z": (0.0, 0.0, 1.0)}
 Motion = tuple[int, dict[str, tuple[str, float, int, float]]]
 # Keys every so many frames (each motion is smooth between them).
 EVERY = 4
-# A seated body's legs are bent to the seat only when it is further than this from fitting.
-FITS = 0.01
+# How far out from straight ahead a seated person's thighs run (degrees each).
+SPLAY = 6.0
+# How far a seated person's shin leans forward from upright (its foot ahead of its knee),
+# against its length.
+SHIN_LEAN = 0.12
+# How far from the hips a seated body rests on its seat (metres).
+SEAT_SPAN = 0.22
 # A hand resting on a surface: its lowest point this far above it (metres); its thumb turned
 # out from its fingers by this much (against their length).
 RESTS, THUMB_OUT = 0.003, 0.7
@@ -40,49 +45,130 @@ def hips(rig: Any) -> Vec:
     return Vec(*(rig.matrix_world @ rig.pose.bones["root"].head))
 
 
-def pose(rig: Any, ways: dict[str, Vec]) -> None:
-    """Each named bone turned to point its way, parents first, so each child starts from
-    where its parent now ends."""
-    with _posing(rig):
-        for name, way in ways.items():
-            _aim(rig, name, way)
-
-
 def sit(rig: Any, frame: Frame, seat: float) -> None:
-    """A seated body fitted to a seat `seat` metres above the floor: each leg bent by inverse
-    kinematics until the underside of the thighs is that high when the feet stand on the
-    floor (thighs sloping down, as anyone's do on a high seat), then the body lowered (or
-    raised) so the feet do."""
+    """A seated body fitted to a seat `seat` metres above the floor: each thigh tilted about its
+    hip until the underside of the thighs is the seat's height above the feet (thighs sloping
+    down, as anyone's do on a high seat), each shin upright under its knee, the foot a little
+    in front (as anyone's is at a desk: clear of the chair's legs and of whatever is under the
+    desk); then the body lowered (or raised) so the feet stand on the floor."""
+    _thighs_forward(rig, frame)
+    _shins_upright(rig, frame)
     meshes = skin(rig)
     low, _ = extent(meshes)
     drop = seat - (underside(meshes, frame.hips) - low.z)
-    if abs(drop) > FITS:
-        with _posing(rig):
-            targets = {}
-            for side in ("L", "R"):
-                shin = rig.pose.bones[f"lowerleg02.{side}"]
-                ankle = rig.matrix_world @ shin.tail
-                pole = Vector(knee(frame, side).tuple())
-                targets[f"lowerleg02.{side}"] = (ankle - Vector((0.0, 0.0, drop)), pole)
-            _reach_by_ik(rig, targets)
+    with _posing(rig):
+        to_rig = rig.matrix_world.to_3x3().inverted()
+        for side in ("L", "R"):
+            thigh = rig.pose.bones[f"upperleg01.{side}"]
+            bpy.context.view_layer.update()
+            hip = rig.matrix_world @ thigh.head
+            along = rig.matrix_world @ rig.pose.bones[f"lowerleg01.{side}"].head - hip
+            across = along.cross(Vector((0.0, 0.0, 1.0)))
+            if across.length < 1e-6:
+                continue
+            # Turning the thigh about `across` by a positive angle raises the knee.
+            angle = -math.asin(max(-1.0, min(1.0, drop / along.length)))
+            turn = Matrix.Rotation(angle, 4, (to_rig @ across).normalized())
+            head = thigh.matrix.translation.copy()
+            thigh.matrix = (
+                Matrix.Translation(head) @ turn @ Matrix.Translation(-head) @ thigh.matrix
+            )
+    _shins_upright(rig, frame)
     low, _ = extent(skin(rig))
     rig.matrix_world = Matrix.Translation((0.0, 0.0, frame.floor - low.z)) @ rig.matrix_world
     bpy.context.view_layer.update()
 
 
+def _thighs_forward(rig: Any, frame: Frame) -> None:
+    """Each thigh turned about the upright through its hip until it runs the way the person
+    faces, splayed a little (as a seated person's knees are, about hip width apart: under a
+    desk, not into its drawers), its slope kept."""
+    with _posing(rig):
+        to_rig = rig.matrix_world.to_3x3().inverted()
+        for side, sign in (("L", 1.0), ("R", -1.0)):
+            thigh = rig.pose.bones[f"upperleg01.{side}"]
+            bpy.context.view_layer.update()
+            hip = rig.matrix_world @ thigh.head
+            along = rig.matrix_world @ rig.pose.bones[f"lowerleg01.{side}"].head - hip
+            wanted = frame.world(axis_angle(UP, SPLAY * sign).rotate(FRONT))
+            angle = math.atan2(wanted.y, wanted.x) - math.atan2(along.y, along.x)
+            turn = Matrix.Rotation(angle, 4, (to_rig @ Vector((0.0, 0.0, 1.0))).normalized())
+            head = thigh.matrix.translation.copy()
+            thigh.matrix = (
+                Matrix.Translation(head) @ turn @ Matrix.Translation(-head) @ thigh.matrix
+            )
+
+
+def _shins_upright(rig: Any, frame: Frame) -> None:
+    """Each shin pointed straight down from its knee, leaning a little forward."""
+    down = Vec(0.0, 0.0, -1.0) + frame.world(FRONT) * SHIN_LEAN
+    with _posing(rig):
+        for side in ("L", "R"):
+            for half in ("lowerleg01", "lowerleg02"):
+                _aim(rig, f"{half}.{side}", down)
+
+
 def perform(
-    rig: Any, frame: Frame, pose_name: str, doing: str, *, seat: float, table: Box | None
+    rig: Any,
+    frame: Frame,
+    pose_name: str,
+    doing: str,
+    *,
+    stance: tuple[Any, float],
+    seat: float,
+    table: Box | None,
 ) -> dict[str, Vec]:
-    """A person posed as `body.py` says, from rest: their limbs set for the pose; seated on a
-    seat `seat` metres high; their hands doing `doing` (on `table`, the table before them, if
-    any). Returns where each thing they hold goes (its base), by name."""
-    pose(rig, body.ways(pose_name, frame))
+    """A person posed as `body.py` says, from rest: standing as `stance` stands (a motion, and
+    how far through it); seated on a seat `seat` metres high; their hands doing `doing` (on
+    `table`, the table before them, if any). Returns where each thing they hold goes (its
+    base), by name."""
+    hold(rig, *stance)
+    frame = replace(frame, hips=hips(rig))
     if pose_name == "seated":
         sit(rig, frame, seat)
     frame = replace(frame, hips=hips(rig))
     near = body.table_before(table, frame) if table is not None else None
-    reach(rig, body.reaches(pose_name, doing, frame, near))
+    hands = body.reaches(pose_name, doing, frame, near)
+    reach(rig, hands)
+    # A hand doing nothing hangs relaxed (motion capture does not record fingers).
+    with _posing(rig):
+        for side in {"L", "R"} - {hand.side for hand in hands}:
+            _close(rig, side, "rest")
     return body.holds(pose_name, doing, frame, near)
+
+
+def motion(path: str, name: str) -> Any:
+    """A motion (an action) from the library's file, read once."""
+    found = bpy.data.actions.get(name)
+    if found is not None and found.library is not None:
+        return found
+    with bpy.data.libraries.load(path, link=True) as (_, wanted):
+        wanted.actions = [name]
+    return wanted.actions[0]
+
+
+def hold(rig: Any, action: Any, at: float) -> None:
+    """The pose `action` has `at` this far through it, held (evaluated there: nothing else in
+    the shot moves to that moment), the body kept standing where it stands."""
+    for bone in rig.pose.bones:
+        bone.rotation_mode = "QUATERNION"
+        bone.select = False  # every bone takes the pose, not only those selected
+    start, end = action.frame_range
+    rig.pose.apply_pose_from_action(action, evaluation_time=start + at * (end - start))
+    # Standing where they were put, facing the way they were turned: the hips keep their rise
+    # and fall and their tilt, but not the way the performer had turned (square to the line
+    # from hip to hip, in the skeleton's own space, which stands upright). A seated person's
+    # thighs are set apart from that (`sit`).
+    root = rig.pose.bones["root"]
+    root.location.x = root.location.z = 0.0
+    bpy.context.view_layer.update()
+    bones = rig.pose.bones
+    across = bones["upperleg01.L"].head - bones["upperleg01.R"].head
+    facing = math.atan2(across.y, across.x)
+    unturn = Matrix.Rotation(-facing, 4, "Z")
+    head = root.matrix.translation.copy()
+    root.matrix = Matrix.Translation(head) @ unturn @ Matrix.Translation(-head) @ root.matrix
+    bpy.context.view_layer.update()
 
 
 def reach(rig: Any, reaches: Sequence[Reach]) -> None:
@@ -132,11 +218,12 @@ def _lowest(rig: Any, side: str) -> float:
         if not groups:
             continue
         evaluated = obj.evaluated_get(graph)
-        moved = evaluated.to_mesh().vertices
-        for vertex in obj.data.vertices:
+        # The surface as posed (with what the clothes hide taken away), each point's weights
+        # kept with it.
+        for vertex in evaluated.to_mesh().vertices:
             weight = sum(g.weight for g in vertex.groups if g.group in groups)
             if weight > 0.5:
-                lowest = min(lowest, (evaluated.matrix_world @ moved[vertex.index].co).z)
+                lowest = min(lowest, (evaluated.matrix_world @ vertex.co).z)
         evaluated.to_mesh_clear()
     return lowest
 
@@ -154,9 +241,9 @@ def skin(rig: Any) -> list[Any]:
 
 
 def underside(meshes: list[Any], at: Vec) -> float:
-    """The underside of a seated body: its lowest point within a hand's breadth of the hips,
-    front to back (what rests on the seat: trousers, or skirt, or skin)."""
-    near = [p.z for p in points(meshes) if abs(p.y - at.y) < 0.12 and abs(p.x - at.x) < 0.2]
+    """The underside of a seated body: its lowest point within a seat's reach of the hips
+    (what rests on the seat: trousers, or skirt, or a jacket's tail behind them)."""
+    near = [p.z for p in points(meshes) if (Vec(p.x, p.y, 0) - at.flat()).length() < SEAT_SPAN]
     return float(min(near, default=at.z))
 
 
@@ -237,9 +324,10 @@ def _palm_down(rig: Any, side: str) -> None:
     forearm.matrix = Matrix.Translation(head) @ (turn @ forearm.matrix.to_3x3()).to_4x4()
 
 
-def _reach_by_ik(rig: Any, ends: dict[str, tuple[Vector, Vector]]) -> None:
-    """Each named bone's chain (four bones up from it) bent until its end reaches its target,
-    the middle joint pointing at its pole; the result kept as the pose. In pose mode."""
+def _reach_by_ik(rig: Any, ends: dict[str, tuple[Vector, Vector]], chain: int = 4) -> None:
+    """Each named bone's chain (`chain` bones up from it: four reach from the shoulder or the
+    hip, two swing from the elbow or the knee) bent until its end reaches its target, the
+    middle joint pointing at its pole; the result kept as the pose. In pose mode."""
     made = []
     for name, (target_at, pole_at) in ends.items():
         target = bpy.data.objects.new(f"reach {name}", None)
@@ -249,7 +337,7 @@ def _reach_by_ik(rig: Any, ends: dict[str, tuple[Vector, Vector]]) -> None:
             bpy.context.scene.collection.objects.link(empty)
             made.append(empty)
         solver = rig.pose.bones[name].constraints.new("IK")
-        solver.target, solver.pole_target, solver.chain_count = target, pole, 4
+        solver.target, solver.pole_target, solver.chain_count = target, pole, chain
         solver.pole_angle = math.radians(-90)
     bpy.context.view_layer.update()
     bpy.ops.pose.select_all(action="SELECT")

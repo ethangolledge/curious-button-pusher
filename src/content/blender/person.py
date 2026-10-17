@@ -10,8 +10,9 @@ one skeleton every person shares, and kept standing at rest: a shot poses them w
 them, on its own furniture (`rigging.py`). Each surface is named for its role (skin, hair,
 fabric, leather), so every look draws it its own way.
 
-So a shot can be composed without Blender, every pose is tried here and measured (posed as
-`body.py` says, at the engine's chair and table): the room it takes, how high a seat it fits
+So a shot can be composed without Blender, every pose is tried here and measured (standing as
+its stance stands, posed as `body.py` says, at the engine's chair and table: the recipe names
+each pose's stance, a motion in the library): the room it takes, how high a seat it fits
 and where what it holds goes. Writes them, with the person's size, to `facts.json`."""
 
 import json
@@ -45,7 +46,7 @@ HAIR = {("man", False): "short02", ("man", True): "short04", ("woman", False): "
 
 
 def main(recipe: dict[str, Any], target: Path, facts: Path) -> int:
-    rig, roles = _made(recipe)
+    rig, roles = made(recipe)
     _name_roles(roles)
     meshes = rigging.skin(rig)
     low, high = rigging.extent(meshes)
@@ -54,7 +55,7 @@ def main(recipe: dict[str, Any], target: Path, facts: Path) -> int:
     rig.location -= Vector((at.x, at.y, low.z))
     bpy.context.view_layer.update()
     postures = {
-        f"{pose}:{doing}": _measured(rig, pose, doing, recipe["height"])
+        f"{pose}:{doing}": _measured(rig, pose, doing, recipe)
         for pose in body.POSES
         for doing in ("", *(d for p, d in body.ACTIVITIES if p == pose))
     }
@@ -72,7 +73,7 @@ def main(recipe: dict[str, Any], target: Path, facts: Path) -> int:
     return 0
 
 
-def _made(recipe: dict[str, Any]) -> tuple[Any, dict[str, str]]:
+def made(recipe: dict[str, Any]) -> tuple[Any, dict[str, str]]:
     """The body, dressed, at its height, on the shared skeleton; and each surface's role."""
     bpy.ops.wm.read_factory_settings(use_empty=True)
     addon_utils.enable(EXTENSION, default_set=True)
@@ -116,14 +117,16 @@ def _made(recipe: dict[str, Any]) -> tuple[Any, dict[str, str]]:
     return rig, roles
 
 
-def _measured(rig: Any, pose: str, doing: str, height: float) -> dict[str, Any]:
+def _measured(rig: Any, pose: str, doing: str, recipe: dict[str, Any]) -> dict[str, Any]:
     """A pose tried on the person, at the engine's chair and table, and measured: the room it
     takes (its size, and where its middle is from where they stand), how high the seat it
     fits is, and where each thing they hold goes."""
     rigging.rest(rig)
     standing = rig.location.copy()
-    frame = body.Frame(rigging.hips(rig), 0.0, Quat(), height / body.STANDARD_HEIGHT)
-    held = rigging.perform(rig, frame, pose, doing, seat=SEAT_HEIGHT, table=None)
+    frame = body.Frame(rigging.hips(rig), 0.0, Quat(), recipe["height"] / body.STANDARD_HEIGHT)
+    path, name, at = recipe["stances"][pose]
+    stance = (rigging.motion(path, name), at)
+    held = rigging.perform(rig, frame, pose, doing, stance=stance, seat=SEAT_HEIGHT, table=None)
     hips = rigging.hips(rig)
     meshes = rigging.skin(rig)
     low, high = rigging.extent(meshes)

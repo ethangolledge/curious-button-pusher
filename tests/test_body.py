@@ -12,7 +12,6 @@ from content.blender.body import (
     holds,
     reaches,
     table_before,
-    ways,
 )
 from content.blender.maths import UP, Quat, Vec, axis_angle
 
@@ -53,13 +52,13 @@ def test_a_person_turned_is_posed_turned() -> None:
 
     straight = holds("seated", "drink", SEATED, None)["drink"]
     round_ = holds("seated", "drink", turned, None)["drink"]
-    limbs, turned_limbs = ways("seated", SEATED), ways("seated", turned)
 
     assert round_.z == pytest.approx(straight.z)
     assert axis_angle(UP, 90.0).rotate(straight).x == pytest.approx(round_.x)
-    assert axis_angle(UP, 90.0).rotate(limbs["upperleg01.L"]).y == pytest.approx(
-        turned_limbs["upperleg01.L"].y
-    )
+    elbows = [r.elbow - SEATED.hips for r in reaches("seated", "resting", SEATED, None)]
+    turned_elbows = [r.elbow - turned.hips for r in reaches("seated", "resting", turned, None)]
+    for elbow, turned_elbow in zip(elbows, turned_elbows, strict=True):
+        assert axis_angle(UP, 90.0).rotate(elbow).y == pytest.approx(turned_elbow.y)
 
 
 def test_a_taller_person_reaches_further_from_their_hips_but_not_into_the_table() -> None:

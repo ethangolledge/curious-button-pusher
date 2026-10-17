@@ -256,13 +256,17 @@ class RehearsalStage(Bookkeeping):
         pose: str,
         doing: str = "",
         *,
+        stance: str,
+        at: float = 0.0,
         seat: float = 0.0,
         table: Thing | None = None,
     ) -> dict[str, Vec]:
         """Where they hold things, from where their hips would roughly be (a rehearsal does
         not bend bones)."""
         piece = self._piece(thing)
-        self._record("perform", name=piece.name, pose=pose, doing=doing, seat=seat)
+        self._record(
+            "perform", name=piece.name, pose=pose, doing=doing, stance=stance, at=at, seat=seat
+        )
         standing = piece.extent()
         up = seat if pose == "seated" else standing.size.z * HIPS
         frame = Frame(

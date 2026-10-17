@@ -20,8 +20,9 @@ from typing import Any, ClassVar, Protocol
 
 from content.providers.http import RETRY_WAITS
 
-# Free to use as they are; "own": made for the channel (drawn, generated or built by hand).
-FREE = frozenset({"CC0", "Public Domain", "own"})
+# Free to use as they are; "own": made for the channel (drawn, generated or built by hand);
+# "no restrictions": a collection's own terms that ask nothing (CMU's motion capture).
+FREE = frozenset({"CC0", "Public Domain", "own", "no restrictions"})
 # Free to use with credit to the maker, which the finished video carries.
 CREDITED = frozenset({"CC-BY"})
 ALLOWED = FREE | CREDITED

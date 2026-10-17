@@ -96,7 +96,7 @@ USES_BLENDER = (
     "content.blender.stage", "content.blender.canvas", "content.blender.worker",
     "content.blender.audit", "content.blender.ingest", "content.blender.imports",
     "content.blender.person", "content.blender.generate", "content.blender.lift",
-    "content.blender.rigging",
+    "content.blender.rigging", "content.blender.retarget",
     "content.blender.blocks.looks.",
 )  # fmt: skip
 

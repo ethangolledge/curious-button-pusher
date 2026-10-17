@@ -105,6 +105,18 @@ class Posture:
 
 
 @dataclass(frozen=True)
+class Movement:
+    """A motion's length (frames at 30 a second, and seconds), the pace it walks at for a
+    person of the standard height (metres a second; 0 for one that stays put), and whether it
+    loops."""
+
+    frames: int
+    seconds: float
+    speed: float = 0.0
+    loop: bool = False
+
+
+@dataclass(frozen=True)
 class Model:
     model_id: str
     names: tuple[str, ...]
@@ -126,6 +138,8 @@ class Model:
     # A person: the room each of their poses takes, by `pose:doing` ("seated:drink"), as
     # measured when they were made (`blender/person.py`).
     postures: dict[str, "Posture"] = field(default_factory=dict)
+    # A motion (`staging/motions.py`): how long it is and the pace it walks at.
+    movement: Movement | None = None
     # A set's named parts (marks, surfaces, paths, actors, interior), each with where it is,
     # which way it faces and its size: what a shot using the set can refer to.
     parts: tuple[dict[str, Any], ...] = ()
@@ -372,6 +386,8 @@ def load_library(folder: Path | None, channel_blocks: Sequence[Path] = ()) -> Li
             data[listed] = tuple(data.get(listed, ()))
         data["paint"] = dict(data.get("paint", {}))
         data["postures"] = {k: Posture.read(v) for k, v in data.get("postures", {}).items()}
+        movement = data.get("movement")
+        data["movement"] = Movement(**movement) if movement else None
         identity = data.get("identity")
         data["identity"] = Identity(**identity) if identity else None
         model = Model(**data)

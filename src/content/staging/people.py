@@ -19,6 +19,7 @@ from content.blender.body import STANDARD_HEIGHT
 from content.providers.blender import LocalBlender
 from content.schemas.staging import Person
 from content.staging.library import Library, Model, Posture
+from content.staging.motions import STANCES_MADE, stance_files
 from content.staging.store import Store
 
 SOURCE = "MakeHuman (MPFB)"
@@ -26,7 +27,7 @@ SOURCE = "MakeHuman (MPFB)"
 USUAL_HEIGHT = {"man": 1.78, "woman": 1.65}
 # How people are made (`blender/person.py`): raised when that changes, so everyone is made
 # again rather than kept as they were.
-MAKER = 9
+MAKER = 16
 # Words for a thing that is a person, when a scene forgot to say so.
 HUMAN = frozenset(
     {"person", "people", "man", "men", "woman", "women", "figure", "figures", "official",
@@ -54,6 +55,8 @@ class Recipe:
     dress: str
     height: float
     maker: int = MAKER
+    # The stances each pose is measured in as they are made.
+    stances: str = STANCES_MADE
 
 
 def recipe(person: Person, height: float) -> Recipe:
@@ -90,7 +93,8 @@ def character(library: Library, made: Recipe, *, make: bool) -> Model | None:
     store = Store(library.folder)
     with tempfile.TemporaryDirectory() as work:
         file = Path(work) / "person.glb"
-        facts = LocalBlender().person(asdict(made), file)
+        # Each pose measured as it stands in the shot: the same motions.
+        facts = LocalBlender().person({**asdict(made), "stances": stance_files(library)}, file)
         kept = store.keep_file(file)
     model = Model(
         model_id=model_id,

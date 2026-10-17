@@ -1,6 +1,7 @@
 """A person placed where the shot's composer worked out they go (`staging/compose.py`), and
-posed there on the shot's own furniture: standing, seated on a seat (their legs bent so their
-feet stand on the floor) or mid-stride; their hands resting on the table before them, holding
+posed there on the shot's own furniture: standing as a motion stands (a frame of motion
+capture: at ease, sitting, mid-stride), seated on a seat (their legs bent so their feet stand
+on the floor); their hands resting on the table before them, holding
 a drink, pointing (`body.py`). Every person, made from words or from a design, is posed this
 same way, on the same skeleton. Where they hold things is left as a mark, `<actor>.<thing>`
 (`<aide>.drink`), for what they hold to be put in their hand."""
@@ -21,6 +22,8 @@ class Settings:
     z: Annotated[float, Range(-50, 200, "metres up: the floor they stand on")] = 0.0
     heading: Annotated[float, Range(-360, 360, "degrees turned from facing the front")] = 0.0
     pose: Literal["standing", "seated", "walking"] = "standing"
+    stance: Annotated[str, About("the motion they stand as (a library motion)")] = ""
+    at: Annotated[float, Range(0, 1, "how far through the motion they stand")] = 0.0
     doing: Annotated[str, About("what their hands do: resting, drink, pointing…")] = ""
     seat: Annotated[float, Range(0.2, 1.2, "metres high, the seat they sit on")] = SEAT_HEIGHT
     table: Annotated[str, About("the table or desk before them (an actor), if any")] = ""
@@ -29,7 +32,7 @@ class Settings:
 class Person(Actor):
     name = "person"
     settings = Settings
-    example = Settings(pose="standing", doing="drink")
+    example = Settings(pose="standing", doing="drink", stance="sample_stance")
     example_model = "sample_person"
 
     def build(self, stage: Stage, p: Settings, actor_id: str, model: str) -> None:
@@ -37,7 +40,9 @@ class Person(Actor):
         facing = axis_angle(UP, p.heading).rotate(FRONT)
         stage.place(thing, Vec(p.x, p.y, p.z), facing=facing)
         table = stage.actor(p.table) if p.table else None
-        held = stage.perform(thing, p.pose, p.doing, seat=p.seat, table=table)
+        held = stage.perform(
+            thing, p.pose, p.doing, stance=p.stance, at=p.at, seat=p.seat, table=table
+        )
         for name, at in held.items():
             stage.mark(Mark(f"{actor_id}.{name}", at, facing))
         stage.cast(actor_id, thing)
