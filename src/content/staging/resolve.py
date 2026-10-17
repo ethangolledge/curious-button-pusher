@@ -21,7 +21,7 @@ from content.blender.maths import Vec
 from content.schemas.staging import Thing
 from content.staging.compose import Resolve, Resolved
 from content.staging.library import PICTURES, Library, Model
-from content.staging.poses import STANCES, USUAL_HEIGHT, clip, pose_id, room
+from content.staging.poses import STANCES, USUAL_HEIGHT, chosen, pose_id, room
 
 # Finding a model online for some words: taken into the library, or None.
 FindModel = Callable[[str], Model | None]
@@ -188,14 +188,19 @@ def _person(library: Library, thing: Thing, *, make: bool) -> Resolved:
     person = thing.person
     height = thing.height or USUAL_HEIGHT[person.sex]
     doing = person.activity or ""
-    name, at = STANCES[person.pose]
-    model = clip(library, name, make=make)
-    taken = room(library, model, person.pose, doing, height)
+    # Each copy of a group is its own (`men#3`): taken in turn from the clips for the pose.
+    variant = int(thing.thing_id.rpartition("#")[2] or 0) if "#" in thing.thing_id else 0
+    model, at = chosen(library, person.pose, variant, make=make)
+    taken = room(library, model, person.pose, doing, height, at)
     # Walking at the clip's own pace; longer legs walk further a stride.
     movement = model.movement if model is not None and person.pose == "walking" else None
     pace = movement.speed * height / STANDARD_HEIGHT if movement else 0.0
     # Not read yet: named with nothing to pose from, so it cannot be rendered by mistake.
-    file = library.model_file(model.model_id) if model else ModelFile(pose_id(name), "", (0, 0, 0))
+    file = (
+        library.model_file(model.model_id)
+        if model
+        else ModelFile(pose_id(STANCES[person.pose][0]), "", (0, 0, 0))
+    )
     assert file is not None
     return Resolved(
         file.model_id, taken.size, file, pose=person.pose, doing=doing, holds=taken.holds,

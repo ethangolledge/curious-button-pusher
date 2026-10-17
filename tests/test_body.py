@@ -166,3 +166,34 @@ def test_a_limb_hidden_behind_something_is_left_out(tmp_path: Path) -> None:
     drawn = Image.open(draw(picture, seen, tmp_path / "posed.png"))
 
     assert drawn.getpixel((60, 250)) == (90, 90, 90)  # the thigh runs behind the desk
+
+
+def test_a_person_standing_at_ease_is_standing_and_natural() -> None:
+    from content.staging.poses import judged
+
+    judgement = judged(STANDS)
+
+    assert judgement.kind == "standing" and judgement.plausible and judgement.faults == {}
+
+
+def test_a_head_tilted_back_and_an_arm_raised_are_faults() -> None:
+    from content.staging.poses import judged
+
+    joints = dict(STANDS.joints)
+    joints["nose"] = joints["nose"] + Vec(0.0, 0.0, 0.08)  # the chin up
+    joints["wrist.R"] = Vec(-0.25, -0.1, 1.7)
+    joints["elbow.R"] = Vec(-0.25, -0.05, 1.45)
+
+    faults = judged(Figure(joints)).faults
+
+    assert faults["looks up"] > 10 and faults["arms raised"] > 10
+
+
+def test_a_sitting_figure_is_seated_and_a_broken_body_never_ranks() -> None:
+    from content.staging.poses import judged
+
+    sat = seated(placed(_sitting(), Vec(), Quat(), 1.0), 0.45, 0.0, Quat(), 1.0)
+    stretched = Figure({**STANDS.joints, "ankle.L": Vec(0.1, 0.0, -0.9)})
+
+    assert judged(sat).kind == "seated"
+    assert not judged(stretched).plausible and judged(stretched).score == float("inf")

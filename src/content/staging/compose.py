@@ -321,7 +321,13 @@ class Composer:
             or self._held_by(thing.thing_id, index)
             or natural[(index + turn) % len(natural)],
         }
-        return thing.model_copy(update={"person": person.model_copy(update=filled)})
+        # Its own id (`men#3`), so each copy may be posed differently (`poses.chosen`).
+        return thing.model_copy(
+            update={
+                "thing_id": f"{thing.thing_id}#{index}",
+                "person": person.model_copy(update=filled),
+            }
+        )
 
     def _table_for(self, target: str, group: Sequence[Placed]) -> str:
         """The table or desk a person is placed at, by the actor's name, for their hands to

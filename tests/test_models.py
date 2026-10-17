@@ -4,6 +4,7 @@ nearest; a version of a model is the same shape repainted and resized, made from
 original's file (or code) and carrying its rights."""
 
 import json
+import math
 from pathlib import Path
 
 import pytest
@@ -262,3 +263,25 @@ def test_a_person_is_a_pose_of_recorded_motion_and_until_read_only_takes_room(
     assert after.doing == "drink" and after.holds["drink"].z == pytest.approx(TABLE_HEIGHT)
     assert 1.2 < after.size.z < 1.6
     assert shorter is not None and shorter.size.z < after.size.z
+
+
+def test_poses_taken_for_a_pose_are_used_in_turn_and_a_walk_is_one_loop(tmp_path: Path) -> None:
+    from content.blender.api import Figure
+    from content.blender.maths import Vec
+    from content.staging.poses import chosen, take
+
+    library = load_library(tmp_path)
+    standing = Figure({name: Vec(*point) for name, point in STANDING.items()})
+    rights = {"source": "Sketchfab", "licence": "CC-BY", "author": "someone", "page": "p"}
+    first = take(library, [standing], "seated", name="Sitting Idle", rights=rights)
+    second = take(library, [standing], "seated", name="Man Sitting", rights=rights)
+    # A walk two steps long, recorded three times over: kept as one loop.
+    stride = [Figure({n: p + Vec(0.0, 0.0, 0.05 * math.cos(i * math.tau / 30))
+                      for n, p in standing.joints.items()}) for i in range(90)]  # fmt: skip
+    walk = take(library, stride, "walking", name="Walk", rights=rights)
+
+    picked = [chosen(library, "seated", n, make=False)[0] for n in range(4)]
+    assert [m.model_id for m in picked if m] == [second.model_id, first.model_id] * 2
+    assert walk.movement is not None and walk.movement.loop and walk.movement.frames == 30
+    # Nothing taken for standing: the engine's own pose, not read yet.
+    assert chosen(library, "standing", 0, make=False) == (None, 0.3)

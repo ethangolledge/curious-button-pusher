@@ -67,6 +67,19 @@ FACE = {"nose": (0.3, 0.5, 0.0), "eye": (0.42, 0.42, 0.15), "ear": (0.36, -0.05,
 FLESH = 0.12
 
 
+def pace(figures: list[Figure], step: float) -> float:
+    """How fast a walk on the spot goes, `step` seconds a frame: the foot on the ground slides
+    back under the body as fast as the body would go over it (the median over the loop, metres
+    a second)."""
+    slides = []
+    for before, after in zip(figures, figures[1:], strict=False):
+        planted = min(("L", "R"), key=lambda side: before.joints[f"ankle.{side}"].z)
+        moved = after.joints[f"ankle.{planted}"] - before.joints[f"ankle.{planted}"]
+        slides.append(moved.flat().length() / step)
+    slides.sort()
+    return slides[len(slides) // 2] if slides else 0.0
+
+
 def landmark(figure: Figure, name: str) -> Vec:
     """A joint, or one of the points a mannequin is built between: the middle of the hips, the
     middle of the head (between the ears)."""

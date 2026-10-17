@@ -21,7 +21,8 @@ from typing import Any
 import bpy  # type: ignore[import-not-found]
 
 from content.blender import skeletons
-from content.blender.body import ANKLE_HEIGHT, JOINTS, face
+from content.blender.api import Figure
+from content.blender.body import ANKLE_HEIGHT, JOINTS, face, pace
 from content.blender.imports import import_model
 from content.blender.maths import Vec, axis_angle
 
@@ -109,19 +110,7 @@ def _written(
     travel = last["hip.L"].lerp(last["hip.R"], 0.5).flat()
     steps = max(1, len(out) - 1)
     spot = [{n: p - travel * (i / steps) for n, p in f.items()} for i, f in enumerate(out)]
-    return spot, _pace(spot, seconds / steps)
-
-
-def _pace(frames: list[dict[str, Vec]], step: float) -> float:
-    """How fast a walk on the spot goes: the foot on the ground slides back under the body as
-    fast as the body would go over it (the median over the loop, metres a second)."""
-    slides = []
-    for before, after in zip(frames, frames[1:], strict=False):
-        planted = min(("L", "R"), key=lambda side: before[f"ankle.{side}"].z)
-        moved = after[f"ankle.{planted}"] - before[f"ankle.{planted}"]
-        slides.append(moved.flat().length() / step)
-    slides.sort()
-    return slides[len(slides) // 2] if slides else 0.0
+    return spot, pace([Figure(f) for f in spot], seconds / steps)
 
 
 if __name__ == "__main__":
