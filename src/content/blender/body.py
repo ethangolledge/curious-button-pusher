@@ -58,6 +58,10 @@ STANDING = {
 HIP_ABOVE_SEAT, ANKLE_HEIGHT = 0.09, 0.08
 # How far a seated person's ankle is in front of their knee (metres, at the standard height).
 SHIN_LEAN = 0.06
+# Where the face's points are, from the base of the skull: up the head, forward and aside (as
+# shares of the head's height, base to crown), checked against a real head (2026-10-17: the
+# eyes on the lenses of a pair of glasses, the ears beside them).
+FACE = {"nose": (0.3, 0.5, 0.0), "eye": (0.42, 0.42, 0.15), "ear": (0.36, -0.05, 0.36)}
 # Room round a pose's joints taken by the body itself (metres): a person is wider than
 # their bones.
 FLESH = 0.12
@@ -149,20 +153,20 @@ def extent(pose: Figure) -> Box:
 
 
 def face(head: Vec, top: Vec, forward: Vec) -> dict[str, Vec]:
-    """The face's points (nose, eyes, ears) from the head's joint, the top of the head and
-    the way the face looks: what tells the image model which way a head turns."""
+    """The face's points (nose, eyes, ears) from the head's joint (the base of the skull), the
+    top of the head and the way the face looks: what tells the image model which way a head
+    turns and tilts. Each point is so far up the head, forward and aside (`FACE`), as shares of
+    the head's height."""
     up = (top - head).normalised()
     size = (top - head).length()
-    middle = head + up * (size * 0.45)
     look = (forward - up * forward.dot(up)).normalised()
     left = up.cross(look).normalised()
-    return {
-        "nose": middle + look * (size * 0.55) - up * (size * 0.1),
-        "eye.L": middle + look * (size * 0.45) + left * (size * 0.18) + up * (size * 0.08),
-        "eye.R": middle + look * (size * 0.45) - left * (size * 0.18) + up * (size * 0.08),
-        "ear.L": middle + left * (size * 0.38),
-        "ear.R": middle - left * (size * 0.38),
-    }
+    out = {}
+    for name, (rise, ahead, aside) in FACE.items():
+        point = head + up * (rise * size) + look * (ahead * size)
+        for side, sign in ((".L", 1.0), (".R", -1.0)) if aside else (("", 0.0),):
+            out[name + side] = point + left * (sign * aside * size)
+    return out
 
 
 # What a person does with their hands, by pose: where each wrist that moves goes, and where
