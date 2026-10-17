@@ -26,7 +26,20 @@ JOINTS = (
     "hip.R", "knee.R", "ankle.R", "hip.L", "knee.L", "ankle.L", "eye.R", "eye.L", "ear.R",
     "ear.L",
 )  # fmt: skip
-# Figure clips are kept this many frames a second.
+# The faint body drawn round a pose's joints in a layout (`Stage.skeleton`): each part a
+# rounded limb from one point to another (`landmark`) and how thick it is (its radius, metres,
+# at the standard height). It shows where the body is and what it touches (the seat under the
+# thighs, the desk under the hands), not what it looks like: the image model draws the person.
+LIMBS = (
+    ("neck", "hips", 0.13), ("shoulder.L", "shoulder.R", 0.06), ("hip.L", "hip.R", 0.1),
+    ("shoulder.L", "elbow.L", 0.05), ("elbow.L", "wrist.L", 0.04),
+    ("shoulder.R", "elbow.R", 0.05), ("elbow.R", "wrist.R", 0.04),
+    ("hip.L", "knee.L", 0.075), ("knee.L", "ankle.L", 0.055),
+    ("hip.R", "knee.R", 0.075), ("knee.R", "ankle.R", 0.055),
+    ("neck", "head", 0.05),
+)  # fmt: skip
+HEAD = 0.1
+# Pose clips are kept this many frames a second.
 RECORDED_FPS = 30
 # A person standing at ease, as a pose is written: what a rehearsal (a check without Blender)
 # poses everyone as.
@@ -48,6 +61,16 @@ SHIN_LEAN = 0.06
 # Room round a pose's joints taken by the body itself (metres): a person is wider than
 # their bones.
 FLESH = 0.12
+
+
+def landmark(figure: Figure, name: str) -> Vec:
+    """A joint, or one of the points a mannequin is built between: the middle of the hips, the
+    middle of the head (between the ears)."""
+    if name == "hips":
+        return figure.hips
+    if name == "head":
+        return figure.joints["ear.L"].lerp(figure.joints["ear.R"], 0.5)
+    return figure.joints[name]
 
 
 def recording(path: Path) -> list[Figure]:
@@ -145,26 +168,26 @@ def face(head: Vec, top: Vec, forward: Vec) -> dict[str, Vec]:
 # What a person does with their hands, by pose: where each wrist that moves goes, and where
 # what they hold goes. A point is (right, back, up, measured from):
 # from the hips (scaled with height); from a table (back from its near edge, up from its top:
-# a wrist lying on it a few centimetres up, the hand on the top); or from the floor.
+# a wrist resting on it about 3 cm up, the hand flat on the top); or from the floor.
 Point = tuple[float, float, float, str]
 ACTIVITIES: dict[tuple[str, str], dict[str, Any]] = {
     ("seated", "resting"): {
-        "hands": {"L": (0.17, -0.06, 0.05, "table"), "R": (-0.17, -0.06, 0.05, "table")},
+        "hands": {"L": (0.17, -0.06, 0.03, "table"), "R": (-0.17, -0.06, 0.03, "table")},
     },
     ("seated", "drink"): {
-        "hands": {"L": (0.17, -0.06, 0.05, "table"), "R": (-0.12, -0.09, 0.12, "table")},
+        "hands": {"L": (0.17, -0.06, 0.03, "table"), "R": (-0.12, -0.09, 0.1, "table")},
         "holds": {"drink": (-0.15, -0.17, 0.0, "table")},
     },
     ("seated", "reading"): {
-        "hands": {"L": (0.13, -0.08, 0.06, "table"), "R": (-0.13, -0.08, 0.06, "table")},
+        "hands": {"L": (0.13, -0.08, 0.04, "table"), "R": (-0.13, -0.08, 0.04, "table")},
         "holds": {"document": (0.0, -0.14, 0.0, "table")},
     },
     ("seated", "writing"): {
-        "hands": {"L": (0.15, -0.08, 0.05, "table"), "R": (-0.06, -0.11, 0.07, "table")},
+        "hands": {"L": (0.15, -0.08, 0.03, "table"), "R": (-0.06, -0.11, 0.05, "table")},
         "holds": {"paper": (0.02, -0.16, 0.0, "table")},
     },
     ("seated", "pointing"): {
-        "hands": {"L": (0.17, -0.06, 0.05, "table"), "R": (-0.14, -0.42, 0.26, "table")},
+        "hands": {"L": (0.17, -0.06, 0.03, "table"), "R": (-0.14, -0.42, 0.24, "table")},
     },
     ("seated", "lap"): {
         "hands": {"L": (0.12, -0.24, 0.12, "hips"), "R": (-0.12, -0.24, 0.12, "hips")},

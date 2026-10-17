@@ -19,6 +19,9 @@ SAMPLES = 24
 # Things may touch, but not pass into each other by more than this (metres); a character's
 # motion may sink a foot a little further.
 OVERLAP, POSED_OVERLAP = 0.01, 0.03
+# Marks what is in a layout only to guide the image model (a person's see-through body): it
+# rests on seats and desks, and is no solid thing to check.
+GUIDE_ONLY = "guide_only"
 
 
 def audit(frames: int, subject: tuple[Vector, float] | None = None) -> list[str]:
@@ -26,7 +29,10 @@ def audit(frames: int, subject: tuple[Vector, float] | None = None) -> list[str]
     scene = bpy.context.scene
     camera = scene.camera
     issues: list[str] = []
-    meshes = [obj for obj in scene.objects if obj.type == "MESH" and not obj.hide_render]
+    meshes = [
+        obj for obj in scene.objects
+        if obj.type == "MESH" and not obj.hide_render and not obj.get(GUIDE_ONLY)
+    ]  # fmt: skip
     previous = None
     for frame in sorted({1, frames, *range(1, frames + 1, max(1, frames // SAMPLES))}):
         scene.frame_set(frame)
@@ -65,7 +71,7 @@ def _overlaps() -> list[tuple[str, str]]:
     solids = [
         _shrunk(obj, depsgraph)
         for obj in bpy.context.scene.objects
-        if obj.type == "MESH" and not obj.hide_render
+        if obj.type == "MESH" and not obj.hide_render and not obj.get(GUIDE_ONLY)
     ]
     found: set[tuple[str, str]] = set()
     for index, (thing, low, high, tree) in enumerate(solids):
@@ -135,8 +141,12 @@ def _blocking(scene: Any, eye: Vector, centre: Vector, radius: float) -> str | N
     hit, _, _, _, obj, _ = scene.ray_cast(
         bpy.context.evaluated_depsgraph_get(), eye, towards.normalized(), distance=distance
     )
-    if not hit or any(
-        slot.material and slot.material.name.startswith("glass") for slot in obj.material_slots
+    if (
+        not hit
+        or obj.get(GUIDE_ONLY)
+        or any(
+            slot.material and slot.material.name.startswith("glass") for slot in obj.material_slots
+        )
     ):
         return None
     return str(obj.name)

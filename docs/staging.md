@@ -188,9 +188,15 @@ credited in the video, as any credited model is. Sketchfab needs a free account'
   composer keeps things clear of them; held things go where their hand is (marks named
   `<actor>.drink`) and hang from them.
 
-The worker projects each person's joints through the camera on every rendered frame into the
-report (`Report.skeletons`), and the keyframe stage draws them over the layout before it is
-sent (`poses.draw`), with the theme's `repaint_note` saying how to read them. A walking person
+A stick figure alone has no depth (a wrist on the desk and one above it can land on the same
+pixels), so two cues go with it. A faint, see-through body is built round the joints
+(`body.LIMBS`, `Stage.skeleton`): it shows the thighs on the seat and the forearms on the
+desk, and it is left out of the checks (`audit.GUIDE_ONLY`). And a joint something solid
+stands in front of (the desk, a chair) is marked hidden, so its limbs are not drawn: legs under
+a desk disappear, as a picture would hide them. The worker projects each person's joints
+through the camera on every rendered frame into the report (`Report.skeletons`: where, how
+far, seen or hidden), and the keyframe stage draws them over the layout before it is sent
+(`poses.draw`), with the theme's `repaint_note` saying how to read them. A walking person
 plays their clip's loop as they travel, at its own pace unless the scene says how fast: the
 same joints, frame by frame, are what an action shot's pose control will take later. A thing
 whose words name a person ("a guard", "two officials") is a person even when the scene forgot

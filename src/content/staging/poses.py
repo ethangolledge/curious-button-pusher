@@ -210,8 +210,10 @@ def room(library: Library, model: Model | None, pose: str, doing: str, height: f
 
 
 def draw(picture: Path, skeletons: dict[str, dict[str, list[float]]], out: Path) -> Path:
-    """The skeletons (each joint's place in the picture, in pixels) drawn over the picture in
-    OpenPose's colours: what the image model draws each person's pose from."""
+    """The skeletons drawn over the picture in OpenPose's colours: what the image model draws
+    each person's pose from. Each joint is its place in the picture (pixels across and down),
+    then (as the worker reports it) how far in front of the camera and whether it is seen; a
+    limb behind the desk or a chair is left out, as a picture would hide it."""
     from PIL import Image, ImageDraw
 
     image = Image.open(picture).convert("RGB")
@@ -219,10 +221,11 @@ def draw(picture: Path, skeletons: dict[str, dict[str, list[float]]], out: Path)
     scale = image.height / FOR_HEIGHT
     line, dot = max(2, round(LINE * scale)), max(2, round(DOT * scale))
     for joints in skeletons.values():
+        seen = {name: at for name, at in joints.items() if len(at) < 4 or at[3] > 0}
         for a, b, colour in LIMBS:
-            if a in joints and b in joints:
-                pen.line([tuple(joints[a][:2]), tuple(joints[b][:2])], fill=colour, width=line)
-        for x, y, *_ in joints.values():
+            if a in seen and b in seen:
+                pen.line([tuple(seen[a][:2]), tuple(seen[b][:2])], fill=colour, width=line)
+        for x, y, *_ in seen.values():
             pen.ellipse([x - dot, y - dot, x + dot, y + dot], fill=(255, 255, 255))
     out.parent.mkdir(parents=True, exist_ok=True)
     image.save(out)

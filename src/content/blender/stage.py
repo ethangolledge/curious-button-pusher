@@ -25,8 +25,9 @@ from content.blender.api import (
     ShapeKind,
     standing_in,
 )
+from content.blender.audit import GUIDE_ONLY
 from content.blender.blocks.base import Look, Prop, read
-from content.blender.body import recording
+from content.blender.body import HEAD, LIMBS, landmark, recording
 from content.blender.bookkeeping import Bookkeeping
 from content.blender.imports import import_model, surface
 from content.blender.job import ModelFile
@@ -42,6 +43,10 @@ from content.blender.maths import (
 )
 
 BlenderObject = Any
+# A person's see-through body in a layout: how much of it shows (0 to 1), and how long its
+# neck-to-hips is at the standard height (its limbs are as thick as `body.LIMBS` for a body
+# that long). A joint closer than `JOINT_DEPTH` behind a surface counts as on it, not hidden.
+MANNEQUIN_ALPHA, TORSO, JOINT_DEPTH = 0.45, 0.56, 0.06
 
 
 class BlenderStage(Bookkeeping):
@@ -380,33 +385,92 @@ class BlenderStage(Bookkeeping):
     ) -> BlenderObject:
         thing = self.group(name)
         self._skeletons[thing.name] = (list(figures), fps, room)
+        self._mannequin(thing, figures[0])
         return thing
+
+    def _mannequin(self, thing: BlenderObject, figure: Figure) -> None:
+        """A faint, see-through body round a pose's joints, hanging from the person: it shows
+        what they touch (the seat, the desk) and what stands in front of them, never what they
+        look like. Left out of the checks (`audit.GUIDE_ONLY`)."""
+        scale = (figure.joints["neck"] - figure.hips).length() / TORSO
+        parts = bmesh.new()
+        for a, b, radius in LIMBS:
+            start, end = landmark(figure, a), landmark(figure, b)
+            _limb(parts, Vector(start.tuple()), Vector(end.tuple()), radius * scale)
+        bmesh.ops.create_uvsphere(
+            parts, u_segments=16, v_segments=10, radius=HEAD * scale,
+            matrix=Matrix.Translation(landmark(figure, "head").tuple()),
+        )  # fmt: skip
+        mesh = bpy.data.meshes.new(f"{thing.name}.mannequin")
+        parts.to_mesh(mesh)
+        parts.free()
+        body = bpy.data.objects.new(f"{thing.name}.mannequin", mesh)
+        body[GUIDE_ONLY] = True
+        self._link(body, Vec(), thing)
+        if "mannequin" not in bpy.data.materials:
+            material = bpy.data.materials.new("mannequin")
+            shader = material.node_tree.nodes["Principled BSDF"]
+            shader.inputs["Base Color"].default_value = (*linear("#9a9a9a"), 1.0)
+            shader.inputs["Roughness"].default_value = 1.0
+            shader.inputs["Alpha"].default_value = MANNEQUIN_ALPHA
+            material.surface_render_method = "BLENDED"
+        mesh.materials.append(bpy.data.materials["mannequin"])
+        body.visible_shadow = False
 
     def projected(self, frame: int) -> dict[str, dict[str, list[float]]]:
         """Every person's joints where the camera sees them on a frame: pixels across and down
-        the picture, and how far in front of the camera (negative: behind it)."""
+        the picture, how far in front of the camera (negative: behind it), 1 if nothing stands
+        between the camera and the joint (0 if the desk or a chair hides it), and how many
+        pixels a metre is there."""
         from bpy_extras.object_utils import world_to_camera_view  # type: ignore[import-not-found]
 
         scene = self._scene
         scene.frame_set(frame)
         bpy.context.view_layer.update()
         width, height = scene.render.resolution_x, scene.render.resolution_y
+        eye = scene.camera.matrix_world.translation
+        across = scene.camera.matrix_world.to_3x3() @ Vector((1.0, 0.0, 0.0))
         out = {}
         for name, (figures, fps, _) in self._skeletons.items():
             thing = bpy.data.objects[name]
             index = int((frame - 1) * fps / self._fps) % len(figures) if fps else 0
             joints = {}
             for joint, point in figures[index].joints.items():
-                seen = world_to_camera_view(
-                    scene, scene.camera, thing.matrix_world @ Vector(point.tuple())
-                )
+                there = thing.matrix_world @ Vector(point.tuple())
+                seen = world_to_camera_view(scene, scene.camera, there)
+                aside = world_to_camera_view(scene, scene.camera, there + across * 0.1)
                 joints[joint] = [
                     round(seen.x * width, 1),
                     round((1 - seen.y) * height, 1),
                     round(seen.z, 3),
+                    0.0 if self._hidden(eye, there) else 1.0,
+                    round(abs(aside.x - seen.x) * width / 0.1, 1),
                 ]
             out[name] = joints
         return out
+
+    def _hidden(self, eye: Vector, point: Vector) -> bool:
+        """Whether something solid stands between the camera and a point (not a person's own
+        see-through body, nor glass)."""
+        graph = bpy.context.evaluated_depsgraph_get()
+        start = eye.copy()
+        for _ in range(8):
+            towards = point - start
+            reach = towards.length - JOINT_DEPTH
+            if reach <= 0:
+                return False
+            way = towards.normalized()
+            hit, at, _, _, obj, _ = self._scene.ray_cast(graph, start, way, distance=reach)
+            if not hit:
+                return False
+            see_through = obj.get(GUIDE_ONLY) or any(
+                slot.material and slot.material.name.startswith("glass")
+                for slot in obj.material_slots
+            )
+            if not see_through:
+                return True
+            start = at + way * 1e-3
+        return False
 
     def play(
         self, thing: BlenderObject, motion: str, *, start_frame: int = 1, speed: float = 1.0
@@ -515,3 +579,20 @@ class BlenderStage(Bookkeeping):
             body.mass = max(size.x * size.y * size.z * 500, 0.02)
             body.angular_damping = 0.3
         return stand_in
+
+
+def _limb(parts: Any, start: Vector, end: Vector, radius: float) -> None:
+    """A rounded limb from one point to another: a cylinder, a ball at each end."""
+    along = end - start
+    if along.length < 1e-6:
+        return
+    turn = Vector((0.0, 0.0, 1.0)).rotation_difference(along.normalized()).to_matrix().to_4x4()
+    middle = Matrix.Translation((start + end) / 2)
+    bmesh.ops.create_cone(
+        parts, cap_ends=True, segments=12, radius1=radius, radius2=radius, depth=along.length,
+        matrix=middle @ turn,
+    )  # fmt: skip
+    for at in (start, end):
+        bmesh.ops.create_uvsphere(
+            parts, u_segments=12, v_segments=8, radius=radius, matrix=Matrix.Translation(at)
+        )

@@ -98,7 +98,7 @@ def test_a_seated_figure_reaching_a_table_puts_its_wrists_there() -> None:
 def test_without_a_table_hands_go_to_the_usual_table() -> None:
     hands = reaches("seated", "resting", SEATED, None)
 
-    assert all(hand.at.z == pytest.approx(TABLE_HEIGHT + 0.05) for hand in hands)
+    assert all(hand.at.z == pytest.approx(TABLE_HEIGHT + 0.03) for hand in hands)
     assert all(hand.at.y < -SEAT_REACH for hand in hands)
 
 
@@ -154,3 +154,15 @@ def test_a_skeleton_is_drawn_where_its_joints_are_seen(tmp_path: Path) -> None:
 
     assert drawn.getpixel((80, 105)) == (255, 0, 0)  # neck to right shoulder: OpenPose red
     assert drawn.getpixel((10, 10)) == (90, 90, 90)
+
+
+def test_a_limb_hidden_behind_something_is_left_out(tmp_path: Path) -> None:
+    from PIL import Image
+
+    picture = tmp_path / "layout.png"
+    Image.new("RGB", (200, 400), (90, 90, 90)).save(picture)
+    seen = {"man": {"hip.R": [60.0, 200.0, 3.0, 1.0], "knee.R": [60.0, 300.0, 3.0, 0.0]}}
+
+    drawn = Image.open(draw(picture, seen, tmp_path / "posed.png"))
+
+    assert drawn.getpixel((60, 250)) == (90, 90, 90)  # the thigh runs behind the desk
